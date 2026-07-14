@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useTasks } from '../hooks/useTasks';
 import { moveTask } from '../lib/taskWrites';
@@ -8,6 +9,7 @@ import { STATUS_LABEL, TASK_STATUSES, type Task, type TaskStatus } from '../type
 
 /** Kanban board for the selected sprint (or backlog). Native HTML5 drag-and-drop. */
 export default function SprintBoard() {
+  const { user, isAdmin } = useAuth();
   const { selectedSprintId, selectedSprint } = useSprintContext();
   const { tasks, loading } = useTasks(selectedSprintId);
 
@@ -27,7 +29,7 @@ export default function SprintBoard() {
     // Place at the end of the target column.
     const col = byStatus[status];
     const lastOrder = col.length > 0 ? col[col.length - 1].order : 0;
-    await moveTask(dragging, status, lastOrder + 1000);
+    await moveTask(dragging, status, lastOrder + 1000, selectedSprint?.name);
     setDragging(null);
   }
 
@@ -67,6 +69,7 @@ export default function SprintBoard() {
                   key={t.id}
                   task={t}
                   dragging={dragging?.id === t.id}
+                  canDrag={isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid}
                   onClick={setEditing}
                   onDragStart={setDragging}
                   onDragEnd={() => setDragging(null)}

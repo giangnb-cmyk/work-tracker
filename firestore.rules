@@ -27,15 +27,24 @@ service cloud.firestore {
     }
 
     // --- users ---
-    // Anyone signed in can read the team roster. You may only write your own doc,
-    // and you may not self-promote to admin (role stays 'member' unless already admin).
+    // Anyone signed in reads the team roster. Admins fully manage members
+    // (add/edit/delete, incl. Discord/Notion links and roles). A normal member may
+    // create their own doc on first sign-in and edit it, but cannot self-promote to admin.
     match /users/{uid} {
       allow read: if isSignedIn();
-      allow create: if isSelf(uid)
-                    && request.resource.data.role == 'member';
-      allow update: if isSelf(uid)
-                    && (request.resource.data.role == resource.data.role || isAdmin());
+      allow create: if isAdmin()
+                    || (isSelf(uid) && request.resource.data.role == 'member');
+      allow update: if isAdmin()
+                    || (isSelf(uid) && request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
+    }
+
+    // --- config (e.g. the sign-in allowlist at config/access) ---
+    // Any signed-in user may read it (the client checks their own access after auth);
+    // only admins may change it.
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // --- sprints ---

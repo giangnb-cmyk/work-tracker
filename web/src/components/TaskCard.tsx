@@ -8,16 +8,18 @@ interface TaskCardProps {
   onDragStart: (task: Task) => void;
   onDragEnd: () => void;
   dragging: boolean;
+  canDrag: boolean;
 }
 
-export default function TaskCard({ task, onClick, onDragStart, onDragEnd, dragging }: TaskCardProps) {
+export default function TaskCard({ task, onClick, onDragStart, onDragEnd, dragging, canDrag }: TaskCardProps) {
   const overdue = task.status !== 'done' && task.dueDate && (daysUntil(task.dueDate) ?? 1) < 0;
 
   return (
     <div
       className={`task-card${dragging ? ' dragging' : ''}`}
-      draggable
-      onDragStart={() => onDragStart(task)}
+      style={canDrag ? undefined : { cursor: 'pointer' }}
+      draggable={canDrag}
+      onDragStart={() => canDrag && onDragStart(task)}
       onDragEnd={onDragEnd}
       onClick={() => onClick(task)}
     >

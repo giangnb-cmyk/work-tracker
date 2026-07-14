@@ -30,7 +30,7 @@ export default function MyTasks() {
 
   async function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
-    await moveTask(task, status, task.order);
+    await moveTask(task, status, task.order, sprintName(task.sprintId));
   }
 
   if (loading) {

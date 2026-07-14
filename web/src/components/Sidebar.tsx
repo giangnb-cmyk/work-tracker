@@ -1,7 +1,7 @@
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from './Avatar';
 
-export type ViewId = 'board' | 'mytasks' | 'dashboard' | 'sprints' | 'team';
+export type ViewId = 'board' | 'mytasks' | 'dashboard' | 'sprints' | 'team' | 'settings';
 
 interface NavDef {
   id: ViewId;
@@ -16,6 +16,7 @@ const NAV: NavDef[] = [
   { id: 'dashboard', label: 'Thống kê', icon: '📊' },
   { id: 'sprints', label: 'Quản lý Sprint', icon: '🗂️', adminOnly: true },
   { id: 'team', label: 'Thành viên', icon: '👥' },
+  { id: 'settings', label: 'Cấu hình', icon: '⚙️', adminOnly: true },
 ];
 
 interface SidebarProps {

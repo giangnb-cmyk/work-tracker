@@ -12,6 +12,7 @@ Cach dung:
 
 import argparse
 import json
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -31,6 +32,8 @@ import task_repo as repo
 _BOT_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(_BOT_DIR / ".env")
 _SETTINGS = json.loads((_BOT_DIR / "settings.json").read_text(encoding="utf-8"))
+
+log = logging.getLogger("reminder")
 
 
 def die(message: str):
@@ -91,6 +94,74 @@ def build_standup_message() -> str:
         "🧭 Standup hom nay! Moi nguoi tra loi nhanh 3 y:\n"
         "- Hom qua lam gi?\n- Hom nay lam gi?\n- Co vuong mac gi khong?"
     )
+
+
+def _discord_id(client, user_id, cache: dict):
+    """Lay discordId cua 1 user (co cache). None neu khong co user/discordId."""
+    if not user_id:
+        return None
+    if user_id not in cache:
+        doc = client.collection(repo.USERS).document(user_id).get()
+        cache[user_id] = doc.to_dict() if doc.exists else {}
+    return (cache[user_id] or {}).get("discordId")
+
+
+def _sprint_name(client, sprint_id) -> str:
+    """Ten sprint tu sprintId; 'backlog' neu null; '?' neu khong tim thay."""
+    if not sprint_id:
+        return "backlog"
+    doc = client.collection(repo.SPRINTS).document(sprint_id).get()
+    return doc.to_dict().get("name", "?") if doc.exists else "?"
+
+
+def build_done_message(client, task: dict) -> str:
+    """Tao thong bao task hoan thanh, chi ping nguoi co discordId.
+
+    Tieng Viet co dau. Tranh ping trung neu reporter cung la assignee.
+    """
+    cache = {}
+    assignee_did = _discord_id(client, task.get("assigneeId"), cache)
+    reporter_did = _discord_id(client, task.get("reporterId"), cache)
+
+    title = task.get("title", "(khong ten)")
+    sprint = _sprint_name(client, task.get("sprintId"))
+    parts = [f'✅ Task đã hoàn thành: "{title}" (sprint {sprint}).']
+    if assignee_did:
+        parts.append(f"<@{assignee_did}> làm tốt lắm!")
+    if reporter_did and reporter_did != assignee_did:
+        parts.append(f"cc <@{reporter_did}>")
+    return " ".join(parts)
+
+
+def notify_done(task_or_id) -> bool:
+    """Post thong bao task hoan thanh vao kenh Discord. Best-effort (khong crash).
+
+    task_or_id: dict task hoac task id. Tra ve True neu da gui thanh cong.
+    Thieu token/kenh/task -> log canh bao va tra ve False (no-op).
+    """
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        log.warning("Thieu DISCORD_TOKEN, bo qua thong bao task hoan thanh.")
+        return False
+    channel_id = _done_channel_id()
+    if not channel_id:
+        log.warning("Chua dat task_done_channel_id/reminder_channel_id, bo qua thong bao.")
+        return False
+
+    client = repo.db()
+    task = task_or_id if isinstance(task_or_id, dict) else repo.get_task(client, task_or_id)
+    if not task:
+        log.warning("Khong tim thay task de thong bao hoan thanh.")
+        return False
+
+    content = build_done_message(client, task)
+    return post_to_discord(token, channel_id, content) == 0
+
+
+def _done_channel_id() -> int:
+    """Kenh cho thong bao hoan thanh: task_done_channel_id, fallback reminder_channel_id."""
+    value = _SETTINGS.get("task_done_channel_id") or _SETTINGS.get("reminder_channel_id")
+    return int(value) if value else 0
 
 
 # --- Phan 2: gui Discord (tach rieng khoi query) ----------------------------

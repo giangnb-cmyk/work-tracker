@@ -25,6 +25,7 @@ import notion_gateway
 import task_repo as repo
 from constants import (
     STATUS_TODO,
+    STATUS_DONE,
     PRIORITY_MEDIUM,
     normalize_priority,
     normalize_status,
@@ -159,6 +160,29 @@ def cmd_update(args):
     title = updates.get("title", task.get("title", ""))
     print(f"Da cap nhat task [{repo.short_id(task['_id'])}] \"{title}\": {changed}.")
     print(_sync_update(client, task, updates))
+
+    done_line = _notify_done_if_needed(task, updates)
+    if done_line:
+        print(done_line)
+
+
+def _notify_done_if_needed(task, updates):
+    """Neu update chuyen task sang 'done' (truoc do chua done) -> bao Discord.
+
+    Tra ve dong relay, hoac None neu khong phai chuyen sang done. Best-effort:
+    loi/thieu cau hinh chi log, khong lam hong lenh update Firestore.
+    """
+    if updates.get("status") != STATUS_DONE or task.get("status") == STATUS_DONE:
+        return None
+    # Import lazy: neu chua cai discord.py thi van khong vo lenh update.
+    try:
+        import reminder
+    except ImportError:
+        return "Discord: bỏ qua (chưa cài discord.py)"
+
+    merged = {**task, **updates}  # phan anh title/assignee moi neu vua doi
+    ok = reminder.notify_done(merged)
+    return "Discord: đã báo hoàn thành" if ok else "Discord: bỏ qua (chưa cấu hình kênh)"
 
 
 def _sync_update(client, task, updates) -> str:

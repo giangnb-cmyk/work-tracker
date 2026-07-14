@@ -59,6 +59,25 @@ Build production: `npm run build` → `web/dist/`.
 5. Trong Firebase → Authentication → Settings → **Authorized domains**, thêm domain Vercel
    (`your-app.vercel.app`) để Google sign-in hoạt động.
 
+### Phân quyền, allowlist đăng nhập & vai trò
+
+- **Quyền (`role`)**: `admin` quản lý thành viên, sprint, allowlist và toàn bộ task (thêm/sửa/xoá);
+  `member` chỉ đổi trạng thái task của mình. Admin đầu tiên: sửa `role` thành `admin` trong Console.
+- **Ai được đăng nhập**: admin vào trang **Cấu hình** trên web để thêm **email** hoặc **domain**
+  được phép. Khi danh sách còn trống → mọi tài khoản Google vào được (để admin đầu tiên khởi tạo);
+  thêm ít nhất một domain để khoá lại. Người ngoài danh sách đăng nhập sẽ bị từ chối ngay.
+- **Chuyên môn (`jobRole`)**: lần đầu đăng nhập, nhân viên chọn vai trò — Developer, 2D Artist,
+  Game Designer, Sound Designer, UI Artist, Animator (không ảnh hưởng quyền).
+
+### Thông báo Discord khi task hoàn thành
+
+Khi một task chuyển sang **Done**, hệ thống báo vào Discord và **mention** người nhận + người tạo
+(qua `discordId` khai trong trang Thành viên).
+- **Từ web**: cần đặt env `DISCORD_WEBHOOK_URL` ở Vercel (Discord → Channel Settings → Integrations →
+  Webhooks → New Webhook → Copy URL) + `FIREBASE_SERVICE_ACCOUNT` (để xác thực) — xem `web/.env.example`.
+- **Từ bot**: bot tự post bằng token của nó vào kênh `task_done_channel_id` trong `bot/settings.json`.
+- Chưa cấu hình thì bỏ qua êm, không lỗi.
+
 ---
 
 ## 3. Discord bot (`bot/`)

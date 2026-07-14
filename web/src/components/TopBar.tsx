@@ -1,3 +1,4 @@
+import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import type { SprintStatus } from '../types';
 
@@ -13,6 +14,7 @@ interface TopBarProps {
 
 /** Sticky top bar: sprint context selector + primary action. */
 export default function TopBar({ onNewTask }: TopBarProps) {
+  const { isAdmin } = useAuth();
   const { sprints, selectedSprintId, selectedSprint, selectSprint } = useSprintContext();
 
   return (
@@ -38,9 +40,11 @@ export default function TopBar({ onNewTask }: TopBarProps) {
         )}
       </div>
 
-      <button className="btn-primary" onClick={onNewTask}>
-        + Task mới
-      </button>
+      {isAdmin && (
+        <button className="btn-primary" onClick={onNewTask}>
+          + Task mới
+        </button>
+      )}
     </header>
   );
 }

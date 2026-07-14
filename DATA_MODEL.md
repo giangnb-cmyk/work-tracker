@@ -21,14 +21,37 @@ Created/merged on first Google sign-in.
 | `email`       | string    | Google account email                                         |
 | `displayName` | string    | Full name from Google                                        |
 | `photoURL`    | string    | Avatar url (may be empty)                                    |
-| `role`        | string    | `admin` \| `member` (default `member`)                       |
+| `role`        | string    | permission level: `admin` \| `member` (default `member`)     |
+| `jobRole`     | string    | job discipline (see enum below); chosen at first sign-in     |
 | `discordId`   | string    | Discord user id, links a Discord account to this user (opt.) |
 | `notionUserId`| string    | Notion user id, for assigning the Notion "people" prop (opt.)|
 | `createdAt`   | Timestamp | first sign-in                                                |
 | `lastSeenAt`  | Timestamp | updated on each sign-in                                      |
 
-> An **admin** can create/close sprints and edit any task. Members edit their own tasks and
-> claim/assign tasks. Promote a user by setting `role: "admin"` (manually in console at first).
+> **Permission role (`role`)** — an **admin** manages members, sprints, the sign-in allowlist,
+> and all tasks (create/edit/delete). A **member** can only change the status of tasks they own
+> (assignee or reporter). Promote the first user by setting `role: "admin"` in the console.
+>
+> **Job role (`jobRole`)** — a separate discipline field the user picks on first sign-in:
+> `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`.
+> It does not affect permissions.
+
+---
+
+## `config/access`
+
+Single document holding the admin-managed **sign-in allowlist**. Admins edit it on the web
+(Cấu hình page). Read by any signed-in user; written only by admins (see `firestore.rules`).
+
+| Field     | Type     | Notes                                               |
+|-----------|----------|-----------------------------------------------------|
+| `emails`  | string[] | exact emails allowed to sign in                     |
+| `domains` | string[] | email domains allowed (e.g. `easygoing.vn`)         |
+
+> If **both arrays are empty**, sign-in is open to any Google account (bootstrap, so the first
+> admin can get in). `VITE_ALLOWED_EMAIL_DOMAIN` acts as a fallback only while the list is empty.
+> Enforcement runs client-side in `AuthContext` right after Google auth (rejected users are
+> signed straight back out).
 
 ---
 

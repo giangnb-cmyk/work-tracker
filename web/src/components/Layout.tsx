@@ -8,6 +8,7 @@ import MyTasks from './MyTasks';
 import Dashboard from './Dashboard';
 import SprintManager from './SprintManager';
 import Team from './Team';
+import Settings from './Settings';
 import TaskModal from './TaskModal';
 
 /** Main authenticated shell: nav + top bar + the active view. */
@@ -18,7 +19,8 @@ export default function Layout() {
   const [creating, setCreating] = useState(false);
 
   // Guard against a non-admin landing on an admin-only view.
-  const activeView = view === 'sprints' && !isAdmin ? 'board' : view;
+  const adminOnlyViews: ViewId[] = ['sprints', 'settings'];
+  const activeView = adminOnlyViews.includes(view) && !isAdmin ? 'board' : view;
 
   return (
     <div className="app-shell">
@@ -31,6 +33,7 @@ export default function Layout() {
           {activeView === 'dashboard' && <Dashboard />}
           {activeView === 'sprints' && <SprintManager />}
           {activeView === 'team' && <Team />}
+          {activeView === 'settings' && <Settings />}
         </main>
       </div>
 

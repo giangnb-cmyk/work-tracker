@@ -15,9 +15,10 @@ import {
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { ALLOWED_EMAIL_DOMAIN, auth, db, googleProvider } from '../firebase';
-import type { TeamMember, UserRole } from '../types';
+import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
+import type { JobRole, TeamMember, UserRole } from '../types';
 
 interface AuthState {
   user: User | null;
@@ -28,6 +29,7 @@ interface AuthState {
   error: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  setJobRole: (jobRole: JobRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -70,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      setError(null);
       if (!fbUser) {
         setUser(null);
         setProfile(null);
@@ -78,12 +79,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
+        // Enforce the admin-managed sign-in allowlist before creating a profile.
+        const config = await fetchAccessConfig();
+        if (!isEmailAllowed(fbUser.email ?? '', config, ALLOWED_EMAIL_DOMAIN)) {
+          await fbSignOut(auth);
+          setError('Email của bạn chưa được cấp quyền truy cập. Liên hệ admin để được thêm vào danh sách.');
+          return;
+        }
         const p = await upsertUserProfile(fbUser);
         setUser(fbUser);
         setProfile(p);
       } catch (err) {
         console.error('Failed to load user profile', err);
-        setError('Không tải được hồ sơ người dùng.');
+        const code = (err as { code?: string })?.code ?? '';
+        // Surface the most common setup causes so the user knows what to fix.
+        if (code === 'permission-denied') {
+          setError('Chưa deploy Firestore rules (hoặc rules chặn). Hãy publish firestore.rules.');
+        } else if (code === 'unavailable' || code === 'not-found') {
+          setError('Chưa tạo Firestore Database, hoặc sai vùng/kết nối. Tạo database trong Console.');
+        } else {
+          setError(`Không tải được hồ sơ người dùng${code ? ` (${code})` : ''}.`);
+        }
       } finally {
         setLoading(false);
       }
@@ -94,12 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signIn() {
     setError(null);
     try {
-      const cred = await signInWithPopup(auth, googleProvider);
-      const email = cred.user.email ?? '';
-      if (ALLOWED_EMAIL_DOMAIN && !email.endsWith(`@${ALLOWED_EMAIL_DOMAIN}`)) {
-        await fbSignOut(auth);
-        setError(`Chỉ tài khoản @${ALLOWED_EMAIL_DOMAIN} mới được đăng nhập.`);
-      }
+      // Allowlist enforcement happens centrally in onAuthStateChanged.
+      await signInWithPopup(auth, googleProvider);
     } catch (err) {
       console.error('Sign-in failed', err);
       setError('Đăng nhập thất bại. Thử lại nhé.');
@@ -108,6 +120,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     await fbSignOut(auth);
+  }
+
+  /** Persist the user's chosen job discipline (used by the first-login role picker). */
+  async function setJobRole(jobRole: JobRole) {
+    if (!user) return;
+    await updateDoc(doc(db, 'users', user.uid), { jobRole });
+    setProfile((p) => (p ? { ...p, jobRole } : p));
   }
 
   const value = useMemo<AuthState>(
@@ -120,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       signIn,
       signOut,
+      setJobRole,
     }),
     [user, profile, loading, error],
   );

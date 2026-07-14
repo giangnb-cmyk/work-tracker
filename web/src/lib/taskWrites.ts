@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { createNotionPage, updateNotionPage } from './notionSync';
+import { notifyTaskDone } from './discordNotify';
 import type { NewTaskInput, Task, TaskStatus } from '../types';
 
 interface CreateOpts {
@@ -60,18 +61,32 @@ export async function updateTask(
   task: Task,
   patch: Partial<Task>,
   assigneeNotionUserId?: string | null,
+  sprintName?: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'tasks', task.id), { ...patch, updatedAt: serverTimestamp() });
+  const merged = { ...task, ...patch };
   if (task.notionPageId) {
-    void safeNotionUpdate(task.notionPageId, { ...task, ...patch }, assigneeNotionUserId);
+    void safeNotionUpdate(task.notionPageId, merged, assigneeNotionUserId);
   }
+  if (becameDone(task.status, merged.status)) void notifyTaskDone(merged, sprintName);
 }
 
-export async function moveTask(task: Task, status: TaskStatus, order: number): Promise<void> {
+export async function moveTask(
+  task: Task,
+  status: TaskStatus,
+  order: number,
+  sprintName?: string,
+): Promise<void> {
   await updateDoc(doc(db, 'tasks', task.id), { status, order, updatedAt: serverTimestamp() });
   if (task.notionPageId) {
     void safeNotionUpdate(task.notionPageId, { ...task, status });
   }
+  if (becameDone(task.status, status)) void notifyTaskDone({ ...task, status }, sprintName);
+}
+
+/** True only on the transition into `done` (avoids re-notifying already-done tasks). */
+function becameDone(prev: TaskStatus, next: TaskStatus | undefined): boolean {
+  return next === 'done' && prev !== 'done';
 }
 
 export function deleteTask(id: string): Promise<void> {

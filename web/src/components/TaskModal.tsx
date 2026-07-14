@@ -23,9 +23,16 @@ interface TaskModalProps {
 
 /** Create or edit a task. Assignee/sprint pulled from SprintContext. */
 export default function TaskModal({ task, defaultSprintId, defaultStatus, onClose }: TaskModalProps) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { members, sprints } = useSprintContext();
   const isEdit = Boolean(task);
+
+  // Permission model: admins edit everything; a member may only change the STATUS
+  // of a task they own (assignee or reporter). Everything else is read-only for them.
+  const canEditFields = isAdmin;
+  const canChangeStatus =
+    isAdmin || task?.assigneeId === user?.uid || task?.reporterId === user?.uid;
+  const canSave = canEditFields || canChangeStatus;
 
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
@@ -63,6 +70,7 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
             dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
           },
           assignee?.notionUserId ?? null,
+          sprints.find((s) => s.id === sprintId)?.name,
         );
       } else {
         await createTask(
@@ -102,12 +110,12 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
 
         <label className="field">
           <span>Tên task *</span>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEditFields} autoFocus />
         </label>
 
         <label className="field">
           <span>Mô tả</span>
-          <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEditFields} />
         </label>
 
         <div className="grid-2">
@@ -117,6 +125,7 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
               className="select"
               value={sprintId ?? 'backlog'}
               onChange={(e) => setSprintId(e.target.value === 'backlog' ? null : e.target.value)}
+              disabled={!canEditFields}
             >
               <option value="backlog">Backlog</option>
               {sprints.map((s) => (
@@ -126,7 +135,12 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
           </label>
           <label className="field">
             <span>Trạng thái</span>
-            <select className="select" value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
+            <select
+              className="select"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as TaskStatus)}
+              disabled={!canChangeStatus}
+            >
               {TASK_STATUSES.map((s) => (
                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
               ))}
@@ -141,6 +155,7 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
               className="select"
               value={assigneeId ?? ''}
               onChange={(e) => setAssigneeId(e.target.value || null)}
+              disabled={!canEditFields}
             >
               <option value="">Chưa giao</option>
               {members.map((m) => (
@@ -150,7 +165,7 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
           </label>
           <label className="field">
             <span>Độ ưu tiên</span>
-            <select className="select" value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}>
+            <select className="select" value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} disabled={!canEditFields}>
               {TASK_PRIORITIES.map((p) => (
                 <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
               ))}
@@ -167,11 +182,12 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
               min={0}
               value={points}
               onChange={(e) => setPoints(Number(e.target.value) || 0)}
+              disabled={!canEditFields}
             />
           </label>
           <label className="field">
             <span>Hạn chót</span>
-            <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+            <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditFields} />
           </label>
         </div>
 
@@ -183,15 +199,17 @@ export default function TaskModal({ task, defaultSprintId, defaultStatus, onClos
         {error && <p className="error-text">{error}</p>}
 
         <div className="modal-actions">
-          {isEdit && (
+          {isEdit && isAdmin && (
             <button className="btn-sm btn-danger" onClick={handleDelete} disabled={saving} style={{ marginRight: 'auto' }}>
               Xoá
             </button>
           )}
-          <button className="btn-sm" onClick={onClose} disabled={saving}>Huỷ</button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Đang lưu…' : isEdit ? 'Lưu' : 'Tạo task'}
-          </button>
+          <button className="btn-sm" onClick={onClose} disabled={saving}>Đóng</button>
+          {canSave && (
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Đang lưu…' : isEdit ? 'Lưu' : 'Tạo task'}
+            </button>
+          )}
         </div>
       </div>
     </div>

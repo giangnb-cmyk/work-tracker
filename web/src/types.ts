@@ -6,8 +6,37 @@ import type { Timestamp } from 'firebase/firestore';
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type SprintStatus = 'planning' | 'active' | 'completed';
-export type UserRole = 'admin' | 'member';
+export type UserRole = 'admin' | 'member'; // permission level (NOT job discipline)
 export type TaskSource = 'web' | 'discord';
+
+/** Job discipline — separate from the admin/member permission role. */
+export type JobRole =
+  | 'developer'
+  | '2d_artist'
+  | 'game_designer'
+  | 'sound_designer'
+  | 'ui_artist'
+  | 'animator';
+
+export const JOB_ROLES: { id: JobRole; label: string; icon: string }[] = [
+  { id: 'developer', label: 'Developer', icon: '💻' },
+  { id: '2d_artist', label: '2D Artist', icon: '🎨' },
+  { id: 'game_designer', label: 'Game Designer', icon: '🎮' },
+  { id: 'sound_designer', label: 'Sound Designer', icon: '🎵' },
+  { id: 'ui_artist', label: 'UI Artist', icon: '🖌️' },
+  { id: 'animator', label: 'Animator', icon: '🎞️' },
+];
+
+export const JOB_ROLE_LABEL: Record<JobRole, string> = JOB_ROLES.reduce(
+  (acc, r) => ({ ...acc, [r.id]: r.label }),
+  {} as Record<JobRole, string>,
+);
+
+/** Admin-managed sign-in allowlist. Empty (both arrays) = allow anyone (bootstrap). */
+export interface AccessConfig {
+  emails: string[];
+  domains: string[];
+}
 
 export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'review', 'done'];
 export const TASK_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
@@ -32,6 +61,7 @@ export interface TeamMember {
   displayName: string;
   photoURL: string;
   role: UserRole;
+  jobRole?: JobRole;
   discordId?: string;
   notionUserId?: string;
   createdAt?: Timestamp;

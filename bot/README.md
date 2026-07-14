@@ -83,6 +83,19 @@ python skills\reminder.py --dry-run
 python skills\reminder.py --standup --dry-run
 ```
 
+### Thong bao "task hoan thanh"
+
+Khi 1 task duoc chuyen sang `done` (va truoc do chua done), bot tu dang 1 tin nhan
+tieng Viet vao kenh Discord, vi du:
+`✅ Task đã hoàn thành: "Fix login" (sprint Sprint 12). <@assignee> làm tốt lắm! cc <@reporter>`
+Chi ping nhung nguoi that su co `discordId` (thieu thi bo qua), va khong ping trung
+neu reporter cung la assignee.
+
+- Kenh: `task_done_channel_id` trong `settings.json`; neu de `0` thi dung
+  `reminder_channel_id`.
+- Best-effort: thieu token/kenh hoac gui loi chi ghi log, KHONG lam hong lenh update.
+  task_ops in dong `Discord: đã báo hoàn thành` / `Discord: bỏ qua (chưa cấu hình kênh)`.
+
 ## Ban co the noi gi voi bot (tieng Viet)
 
 Tag bot roi go tu nhien, vi du:
