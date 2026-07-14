@@ -19,8 +19,6 @@ try:
 except Exception:
     pass
 
-from firebase_admin import firestore
-
 import notion_gateway
 import task_repo as repo
 from constants import (
@@ -44,12 +42,12 @@ def die(message: str):
 # --- Phan giai tham so dung chung -------------------------------------------
 
 def _resolve_reporter(client):
-    """reporterId = user khop BOT_SENDER_ID neu co, khong thi giu raw id / 'bot'."""
+    """reporterId = profile khop BOT_SENDER_ID, hoac None (reporter_id la uuid FK)."""
     sender = os.getenv("BOT_SENDER_ID", "").strip()
     if not sender:
-        return "discord-bot"
+        return None
     user = repo.resolve_user(client, sender)
-    return user["_id"] if user else sender
+    return user["_id"] if user else None
 
 
 def _resolve_sprint_id(client, token: str):
@@ -92,9 +90,7 @@ def cmd_create(args):
     assignee_id, assignee_name = _assignee_fields(client, args.assignee)
     due_dt = _parse_due(args.due)
 
-    doc_ref = client.collection(repo.TASKS).document()
     task_doc = {
-        "id": doc_ref.id,
         "title": title,
         "description": args.desc or "",
         "sprintId": sprint_id,
@@ -107,25 +103,21 @@ def cmd_create(args):
         "tags": [],
         "dueDate": due_dt,
         "order": repo.next_order(client, sprint_id),
-        "createdAt": firestore.SERVER_TIMESTAMP,
-        "updatedAt": firestore.SERVER_TIMESTAMP,
         "source": "discord",
-        "notionPageId": None,  # chua sync; se ghi lai neu gateway tra ve
-        "notionUrl": None,
     }
-    doc_ref.set(task_doc)  # Firestore la nguon su that -> ghi truoc, Notion sau
+    task_id = repo.insert_task(client, task_doc)  # Postgres la nguon su that -> ghi truoc, Notion sau
 
     where = "backlog" if sprint_id is None else args.sprint
     who = assignee_name or "chua giao"
     print(
-        f"Da tao task [{repo.short_id(doc_ref.id)}] \"{title}\" "
+        f"Da tao task [{repo.short_id(task_id)}] \"{title}\" "
         f"(status todo, priority {priority}, giao cho: {who}, sprint: {where})."
     )
-    print(_sync_create(client, doc_ref, task_doc, assignee_id))
+    print(_sync_create(client, task_id, task_doc, assignee_id))
 
 
-def _sync_create(client, doc_ref, task_doc, assignee_id) -> str:
-    """Tao page Notion sau khi ghi Firestore. Ghi nguoc notionPageId/Url neu thanh cong.
+def _sync_create(client, task_id, task_doc, assignee_id) -> str:
+    """Tao page Notion sau khi ghi DB. Ghi nguoc notionPageId/Url neu thanh cong.
 
     Loi khong lam hong task da tao -> chi tra ve dong 'Notion: ...' de Claude thuat lai.
     """
@@ -137,7 +129,7 @@ def _sync_create(client, doc_ref, task_doc, assignee_id) -> str:
         return "Notion: skipped (goi gateway that bai)"
     page_id = result.get("notionPageId")
     url = result.get("notionUrl") or ""
-    doc_ref.update({"notionPageId": page_id, "notionUrl": url})
+    repo.set_notion_link(client, task_id, page_id, url)
     return f"Notion: synced ({url})" if url else "Notion: synced"
 
 
@@ -153,10 +145,9 @@ def cmd_update(args):
     if not updates:
         die("khong co truong nao de cap nhat (dung --status/--priority/--title/...)")
 
-    updates["updatedAt"] = firestore.SERVER_TIMESTAMP
-    client.collection(repo.TASKS).document(task["_id"]).update(updates)
+    repo.update_task(client, task["_id"], updates)
 
-    changed = ", ".join(f"{k}={_show(v)}" for k, v in updates.items() if k != "updatedAt")
+    changed = ", ".join(f"{k}={_show(v)}" for k, v in updates.items())
     title = updates.get("title", task.get("title", ""))
     print(f"Da cap nhat task [{repo.short_id(task['_id'])}] \"{title}\": {changed}.")
     print(_sync_update(client, task, updates))

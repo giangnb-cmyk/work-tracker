@@ -1,19 +1,10 @@
 // useSprints — live list of sprints + admin mutations. See DATA_MODEL.md.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { useCallback, useMemo } from 'react';
+import { supabase } from '../supabase';
+import { rowToSprint } from '../lib/mappers';
+import { toISO } from '../lib/time';
+import { useLiveQuery } from './useLiveQuery';
 import type { Sprint, SprintStatus } from '../types';
 
 interface NewSprintInput {
@@ -23,25 +14,28 @@ interface NewSprintInput {
   endDate: Date | null;
 }
 
-export function useSprints(currentUid: string) {
-  const [sprints, setSprints] = useState<Sprint[]>([]);
-  const [loading, setLoading] = useState(true);
+/** Map a camelCase sprint patch to a snake_case DB row patch. */
+function sprintPatchToRow(patch: Partial<Sprint>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.goal !== undefined) row.goal = patch.goal;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.startDate !== undefined) row.start_date = toISO(patch.startDate);
+  if (patch.endDate !== undefined) row.end_date = toISO(patch.endDate);
+  return row;
+}
 
-  useEffect(() => {
-    const q = query(collection(db, 'sprints'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setSprints(snap.docs.map((d) => ({ ...(d.data() as Sprint), id: d.id })));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('useSprints listener error', err);
-        setLoading(false);
-      },
-    );
-    return unsub;
+export function useSprints(currentUid: string) {
+  const fetcher = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('sprints')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(rowToSprint);
   }, []);
+
+  const { data: sprints, loading } = useLiveQuery<Sprint>({ table: 'sprints', fetcher, deps: [] });
 
   const activeSprint = useMemo(
     () => sprints.find((s) => s.status === 'active') ?? null,
@@ -50,31 +44,38 @@ export function useSprints(currentUid: string) {
 
   const createSprint = useCallback(
     async (input: NewSprintInput) => {
-      const ref = await addDoc(collection(db, 'sprints'), {
-        name: input.name.trim(),
-        goal: input.goal.trim(),
-        status: 'planning' as SprintStatus,
-        startDate: input.startDate ? Timestamp.fromDate(input.startDate) : null,
-        endDate: input.endDate ? Timestamp.fromDate(input.endDate) : null,
-        createdAt: serverTimestamp(),
-        createdBy: currentUid,
-      });
-      await updateDoc(ref, { id: ref.id });
-      return ref.id;
+      const { data, error } = await supabase
+        .from('sprints')
+        .insert({
+          name: input.name.trim(),
+          goal: input.goal.trim(),
+          status: 'planning' as SprintStatus,
+          start_date: toISO(input.startDate),
+          end_date: toISO(input.endDate),
+          created_by: currentUid || null,
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data.id as string;
     },
     [currentUid],
   );
 
   const updateSprint = useCallback(async (id: string, patch: Partial<Sprint>) => {
-    await updateDoc(doc(db, 'sprints', id), patch);
+    const { error } = await supabase.from('sprints').update(sprintPatchToRow(patch)).eq('id', id);
+    if (error) throw error;
   }, []);
 
-  const setSprintStatus = useCallback(
-    (id: string, status: SprintStatus) => updateDoc(doc(db, 'sprints', id), { status }),
-    [],
-  );
+  const setSprintStatus = useCallback(async (id: string, status: SprintStatus) => {
+    const { error } = await supabase.from('sprints').update({ status }).eq('id', id);
+    if (error) throw error;
+  }, []);
 
-  const deleteSprint = useCallback((id: string) => deleteDoc(doc(db, 'sprints', id)), []);
+  const deleteSprint = useCallback(async (id: string) => {
+    const { error } = await supabase.from('sprints').delete().eq('id', id);
+    if (error) throw error;
+  }, []);
 
   return { sprints, activeSprint, loading, createSprint, updateSprint, setSprintStatus, deleteSprint };
 }

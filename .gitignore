@@ -40,3 +40,9 @@ firebase-debug.log
 
 # === CodeGraph (local code-intelligence index; regenerate with `codegraph init`) ===
 .codegraph/
+
+# === Local agent tooling (per-machine; not project source) ===
+.claude/
+.agents/
+.mcp.json
+skills-lock.json

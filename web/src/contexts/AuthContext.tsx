@@ -1,27 +1,30 @@
-// AuthContext — owns Google sign-in state and the current user's team profile.
-// On sign-in it upserts the `users/{uid}` doc (see DATA_MODEL.md).
+// AuthContext — owns Supabase Google sign-in state and the current user's profile.
+// The DB trigger creates a `profiles` row on first sign-up; here we refresh presence
+// and enforce the admin-managed sign-in allowlist.
 
 import {
   createContext,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut as fbSignOut,
-  type User,
-} from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
-import { ALLOWED_EMAIL_DOMAIN, auth, db, googleProvider } from '../firebase';
+import type { User } from '@supabase/supabase-js';
+import { ALLOWED_EMAIL_DOMAIN, supabase } from '../supabase';
 import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
+import { rowToMember } from '../lib/mappers';
 import type { JobRole, TeamMember, UserRole } from '../types';
 
+/** Minimal user shape the app consumes (keeps `uid` naming across components). */
+interface AppUser {
+  uid: string;
+  email: string;
+}
+
 interface AuthState {
-  user: User | null;
+  user: AppUser | null;
   profile: TeamMember | null;
   role: UserRole;
   isAdmin: boolean;
@@ -34,98 +37,98 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/** Create the user doc on first sign-in, or refresh lastSeenAt on return visits. */
-async function upsertUserProfile(user: User): Promise<TeamMember> {
-  const ref = doc(db, 'users', user.uid);
-  const snap = await getDoc(ref);
+function displayNameOf(u: User): string {
+  const m = u.user_metadata ?? {};
+  return m.full_name || m.name || u.email || 'Unknown';
+}
+function photoOf(u: User): string {
+  const m = u.user_metadata ?? {};
+  return m.avatar_url || m.picture || '';
+}
 
-  if (!snap.exists()) {
-    const fresh: Omit<TeamMember, 'createdAt' | 'lastSeenAt'> = {
-      uid: user.uid,
-      email: user.email ?? '',
-      displayName: user.displayName ?? user.email ?? 'Unknown',
-      photoURL: user.photoURL ?? '',
-      role: 'member',
-    };
-    await setDoc(ref, { ...fresh, createdAt: serverTimestamp(), lastSeenAt: serverTimestamp() });
-    return { ...fresh } as TeamMember;
-  }
-
-  // Existing member: keep their role, just refresh presence + display fields.
-  await setDoc(
-    ref,
+/** Ensure the profile row exists + refresh presence/display fields; returns it. */
+async function syncProfile(u: User): Promise<TeamMember | null> {
+  await supabase.from('profiles').upsert(
     {
-      displayName: user.displayName ?? user.email ?? 'Unknown',
-      photoURL: user.photoURL ?? '',
-      lastSeenAt: serverTimestamp(),
+      id: u.id,
+      email: u.email ?? '',
+      display_name: displayNameOf(u),
+      photo_url: photoOf(u),
+      last_seen_at: new Date().toISOString(),
     },
-    { merge: true },
+    { onConflict: 'id' },
   );
-  return snap.data() as TeamMember;
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', u.id).single();
+  if (error || !data) {
+    console.error('Load profile failed', error);
+    return null;
+  }
+  return rowToMember(data);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const handledUser = useRef<string | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      if (!fbUser) {
+    async function handle(u: User | null) {
+      if (!u) {
+        handledUser.current = null;
         setUser(null);
         setProfile(null);
         setLoading(false);
         return;
       }
+      if (handledUser.current === u.id) return; // ignore token-refresh churn
+      handledUser.current = u.id;
       try {
-        // Enforce the admin-managed sign-in allowlist before creating a profile.
         const config = await fetchAccessConfig();
-        if (!isEmailAllowed(fbUser.email ?? '', config, ALLOWED_EMAIL_DOMAIN)) {
-          await fbSignOut(auth);
+        if (!isEmailAllowed(u.email ?? '', config, ALLOWED_EMAIL_DOMAIN)) {
+          await supabase.auth.signOut();
+          handledUser.current = null;
           setError('Email của bạn chưa được cấp quyền truy cập. Liên hệ admin để được thêm vào danh sách.');
           return;
         }
-        const p = await upsertUserProfile(fbUser);
-        setUser(fbUser);
+        const p = await syncProfile(u);
+        setUser({ uid: u.id, email: u.email ?? '' });
         setProfile(p);
       } catch (err) {
         console.error('Failed to load user profile', err);
-        const code = (err as { code?: string })?.code ?? '';
-        // Surface the most common setup causes so the user knows what to fix.
-        if (code === 'permission-denied') {
-          setError('Chưa deploy Firestore rules (hoặc rules chặn). Hãy publish firestore.rules.');
-        } else if (code === 'unavailable' || code === 'not-found') {
-          setError('Chưa tạo Firestore Database, hoặc sai vùng/kết nối. Tạo database trong Console.');
-        } else {
-          setError(`Không tải được hồ sơ người dùng${code ? ` (${code})` : ''}.`);
-        }
+        setError('Không tải được hồ sơ người dùng.');
       } finally {
         setLoading(false);
       }
+    }
+
+    supabase.auth.getSession().then(({ data }) => handle(data.session?.user ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      void handle(session?.user ?? null);
     });
-    return unsub;
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   async function signIn() {
     setError(null);
-    try {
-      // Allowlist enforcement happens centrally in onAuthStateChanged.
-      await signInWithPopup(auth, googleProvider);
-    } catch (err) {
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (err) {
       console.error('Sign-in failed', err);
       setError('Đăng nhập thất bại. Thử lại nhé.');
     }
   }
 
   async function signOut() {
-    await fbSignOut(auth);
+    await supabase.auth.signOut();
   }
 
-  /** Persist the user's chosen job discipline (used by the first-login role picker). */
   async function setJobRole(jobRole: JobRole) {
     if (!user) return;
-    await updateDoc(doc(db, 'users', user.uid), { jobRole });
+    await supabase.from('profiles').update({ job_role: jobRole }).eq('id', user.uid);
     setProfile((p) => (p ? { ...p, jobRole } : p));
   }
 

@@ -50,8 +50,7 @@ def _mention_or_name(client, task, user_cache: dict) -> str:
     if not assignee_id:
         return name
     if assignee_id not in user_cache:
-        doc = client.collection(repo.USERS).document(assignee_id).get()
-        user_cache[assignee_id] = doc.to_dict() if doc.exists else {}
+        user_cache[assignee_id] = repo.get_profile(client, assignee_id) or {}
     discord_id = (user_cache[assignee_id] or {}).get("discordId")
     return f"<@{discord_id}>" if discord_id else name
 
@@ -101,17 +100,13 @@ def _discord_id(client, user_id, cache: dict):
     if not user_id:
         return None
     if user_id not in cache:
-        doc = client.collection(repo.USERS).document(user_id).get()
-        cache[user_id] = doc.to_dict() if doc.exists else {}
+        cache[user_id] = repo.get_profile(client, user_id) or {}
     return (cache[user_id] or {}).get("discordId")
 
 
 def _sprint_name(client, sprint_id) -> str:
     """Ten sprint tu sprintId; 'backlog' neu null; '?' neu khong tim thay."""
-    if not sprint_id:
-        return "backlog"
-    doc = client.collection(repo.SPRINTS).document(sprint_id).get()
-    return doc.to_dict().get("name", "?") if doc.exists else "?"
+    return repo.sprint_name(client, sprint_id)
 
 
 def build_done_message(client, task: dict) -> str:

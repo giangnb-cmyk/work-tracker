@@ -1,5 +1,6 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
+import NotificationBell from './NotificationBell';
 import type { SprintStatus } from '../types';
 
 const SPRINT_STATUS_LABEL: Record<SprintStatus, string> = {
@@ -40,11 +41,14 @@ export default function TopBar({ onNewTask }: TopBarProps) {
         )}
       </div>
 
-      {isAdmin && (
-        <button className="btn-primary" onClick={onNewTask}>
-          + Task mới
-        </button>
-      )}
+      <div className="row" style={{ gap: '0.75rem', alignItems: 'center' }}>
+        <NotificationBell />
+        {isAdmin && (
+          <button className="btn-primary" onClick={onNewTask}>
+            + Task mới
+          </button>
+        )}
+      </div>
     </header>
   );
 }

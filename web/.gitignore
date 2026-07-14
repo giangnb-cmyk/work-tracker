@@ -1,0 +1,6 @@
+
+# Emitted TS build artifacts (composite) — must not shadow vite.config.ts
+vite.config.js
+vite.config.d.ts
+*.tsbuildinfo
+.tsbuild/

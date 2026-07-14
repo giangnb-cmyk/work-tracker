@@ -1,33 +1,29 @@
-// useMyTasks — all tasks assigned to a user across every sprint. See DATA_MODEL.md.
+// useMyTasks — all tasks assigned to a user across every sprint.
 
-import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { useCallback } from 'react';
+import { supabase } from '../supabase';
+import { rowToTask } from '../lib/mappers';
+import { useLiveQuery } from './useLiveQuery';
 import type { Task } from '../types';
 
 export function useMyTasks(uid: string) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!uid) return;
-    setLoading(true);
-    const q = query(collection(db, 'tasks'), where('assigneeId', '==', uid));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const rows = snap.docs.map((d) => ({ ...(d.data() as Task), id: d.id }));
-        rows.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        setTasks(rows);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('useMyTasks listener error', err);
-        setLoading(false);
-      },
-    );
-    return unsub;
+  const fetcher = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('assignee_id', uid)
+      .order('order', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(rowToTask);
   }, [uid]);
+
+  const { data: tasks, loading } = useLiveQuery<Task>({
+    table: 'tasks',
+    fetcher,
+    filter: `assignee_id=eq.${uid}`,
+    deps: [uid],
+    enabled: Boolean(uid),
+  });
 
   return { tasks, loading };
 }

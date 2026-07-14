@@ -1,7 +1,7 @@
 // All shared domain types. Mirrors DATA_MODEL.md — keep field names in sync
 // with Firestore and bot/skills/constants.py.
 
-import type { Timestamp } from 'firebase/firestore';
+import type { Timestamp } from './lib/time';
 
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -31,6 +31,37 @@ export const JOB_ROLE_LABEL: Record<JobRole, string> = JOB_ROLES.reduce(
   (acc, r) => ({ ...acc, [r.id]: r.label }),
   {} as Record<JobRole, string>,
 );
+
+export const JOB_ROLE_ICON: Record<JobRole, string> = JOB_ROLES.reduce(
+  (acc, r) => ({ ...acc, [r.id]: r.icon }),
+  {} as Record<JobRole, string>,
+);
+
+export type ActivityType = 'created' | 'status_change' | 'comment' | 'updated';
+
+/** One entry in a task's activity feed (auto events + comments). */
+export interface Activity {
+  id: string;
+  taskId: string;
+  actorId: string | null;
+  actorName: string;
+  type: ActivityType;
+  body: string;
+  createdAt?: Timestamp;
+}
+
+/** An in-app notification delivered to one user (the web half of completion notices). */
+export interface AppNotification {
+  id: string;
+  recipientId: string;
+  taskId: string;
+  taskTitle: string;
+  type: 'task_done';
+  body: string;
+  actorName: string;
+  read: boolean;
+  createdAt?: Timestamp;
+}
 
 /** Admin-managed sign-in allowlist. Empty (both arrays) = allow anyone (bootstrap). */
 export interface AccessConfig {
@@ -88,6 +119,19 @@ export interface TeamMember {
   lastSeenAt?: Timestamp;
 }
 
+/** A project (created in-app) optionally linked to a Notion project page. */
+export interface Project {
+  id: string;
+  name: string;
+  icon: string; // emoji shown on the card
+  color: string; // accent token/hex for the card
+  description: string;
+  /** Notion Projects DB page id — lets task syncs set the Notion "Project" relation. */
+  notionProjectId: string | null;
+  createdAt?: Timestamp;
+  createdBy: string;
+}
+
 export interface Sprint {
   id: string;
   name: string;
@@ -104,6 +148,7 @@ export interface Task {
   title: string;
   description: string;
   sprintId: string | null;
+  projectId: string | null;
   status: TaskStatus;
   priority: TaskPriority;
   assigneeId: string | null;
@@ -111,6 +156,9 @@ export interface Task {
   reporterId: string;
   points: number;
   tags: string[];
+  /** Work window start (set to creation day). End is `dueDate`. */
+  dueStart: Timestamp | null;
+  /** Work window end / deadline. On completion it is reset to the actual done day. */
   dueDate: Timestamp | null;
   order: number;
   createdAt?: Timestamp;
@@ -128,7 +176,7 @@ export interface Task {
 /** Payload used when creating a task from the UI (server fills timestamps/id). */
 export type NewTaskInput = Pick<
   Task,
-  'title' | 'description' | 'sprintId' | 'status' | 'priority' | 'points'
+  'title' | 'description' | 'sprintId' | 'projectId' | 'status' | 'priority' | 'points'
 > & {
   assigneeId: string | null;
   dueDate: Date | null;

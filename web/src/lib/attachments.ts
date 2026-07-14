@@ -1,9 +1,10 @@
 // Attachment helpers: detect the provider from a URL (for the card icon), and
-// upload reference images to Firebase Storage.
+// upload reference images to Supabase Storage.
 
-import { getDownloadURL, ref, uploadBytes, deleteObject } from 'firebase/storage';
-import { storage } from '../firebase';
+import { supabase } from '../supabase';
 import type { Attachment } from '../types';
+
+const BUCKET = 'attachments';
 
 export const PROVIDERS: Record<string, { label: string; icon: string }> = {
   drive: { label: 'Google Drive', icon: '📁' },
@@ -11,8 +12,11 @@ export const PROVIDERS: Record<string, { label: string; icon: string }> = {
   notion: { label: 'Notion', icon: '📝' },
   figma: { label: 'Figma', icon: '🎨' },
   github: { label: 'GitHub', icon: '🐙' },
+  dropbox: { label: 'Dropbox', icon: '📦' },
+  onedrive: { label: 'OneDrive', icon: '☁️' },
+  youtube: { label: 'YouTube', icon: '▶️' },
   image: { label: 'Ảnh', icon: '🖼️' },
-  link: { label: 'Link', icon: '🔗' },
+  link: { label: 'Website', icon: '🔗' },
 };
 
 export function providerMeta(provider: string) {
@@ -28,7 +32,19 @@ export function detectProvider(url: string): string {
   if (u.includes('notion.so') || u.includes('notion.site')) return 'notion';
   if (u.includes('figma.com')) return 'figma';
   if (u.includes('github.com')) return 'github';
+  if (u.includes('dropbox.com')) return 'dropbox';
+  if (u.includes('1drv.ms') || u.includes('onedrive.live')) return 'onedrive';
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
   return 'link';
+}
+
+/** "drive.google.com" — shown as the card subtitle under the attachment name. */
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
 }
 
 /** A short human label for a URL (host + trimmed path) when the user gives none. */
@@ -61,18 +77,17 @@ export function makeLinkAttachment(url: string, name?: string): Attachment {
 export async function uploadImageAttachment(file: File): Promise<Attachment> {
   const id = uid();
   const path = `task-attachments/${id}-${file.name.replace(/[^\w.-]/g, '_')}`;
-  const r = ref(storage, path);
-  await uploadBytes(r, file, { contentType: file.type });
-  const url = await getDownloadURL(r);
-  return { id, kind: 'image', url, name: file.name, provider: 'image', storagePath: path };
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw error;
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return { id, kind: 'image', url: data.publicUrl, name: file.name, provider: 'image', storagePath: path };
 }
 
 /** Best-effort delete of an uploaded image's underlying Storage object. */
 export async function deleteAttachmentFile(att: Attachment): Promise<void> {
   if (!att.storagePath) return;
-  try {
-    await deleteObject(ref(storage, att.storagePath));
-  } catch (err) {
-    console.warn('Could not delete storage object', att.storagePath, err);
-  }
+  const { error } = await supabase.storage.from(BUCKET).remove([att.storagePath]);
+  if (error) console.warn('Could not delete storage object', att.storagePath, error);
 }

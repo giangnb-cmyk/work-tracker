@@ -1,7 +1,9 @@
 import { useAuth } from '../contexts/AuthContext';
+import { useSprintContext } from '../contexts/SprintContext';
 import Avatar from './Avatar';
 
-export type ViewId = 'board' | 'mytasks' | 'dashboard' | 'sprints' | 'team' | 'settings';
+// 'projects' is no longer an in-app tab — it's the landing page you enter through.
+export type ViewId = 'board' | 'mytasks' | 'timeline' | 'dashboard' | 'sprints' | 'team' | 'settings';
 
 interface NavDef {
   id: ViewId;
@@ -13,6 +15,7 @@ interface NavDef {
 const NAV: NavDef[] = [
   { id: 'board', label: 'Bảng Sprint', icon: '📋' },
   { id: 'mytasks', label: 'Task của tôi', icon: '🎯' },
+  { id: 'timeline', label: 'Timeline', icon: '📆' },
   { id: 'dashboard', label: 'Thống kê', icon: '📊' },
   { id: 'sprints', label: 'Quản lý Sprint', icon: '🗂️', adminOnly: true },
   { id: 'team', label: 'Thành viên', icon: '👥' },
@@ -26,13 +29,16 @@ interface SidebarProps {
 
 export default function Sidebar({ active, onSelect }: SidebarProps) {
   const { profile, isAdmin, signOut } = useAuth();
+  const { selectedProject, selectProject } = useSprintContext();
 
   return (
     <aside className="sidebar">
-      <div className="logo">
-        <span className="mark">✅</span>
-        <span>Work Tracker</span>
-      </div>
+      {/* Top-left: click to go back to the project-selection landing page. */}
+      <button className="project-back" onClick={() => selectProject(null)} title="Về trang chọn dự án">
+        <span className="back-arrow">←</span>
+        <span className="project-back-icon">{selectedProject?.icon ?? '📁'}</span>
+        <span className="project-back-name">{selectedProject?.name ?? 'Dự án'}</span>
+      </button>
 
       {NAV.filter((n) => !n.adminOnly || isAdmin).map((n) => (
         <button

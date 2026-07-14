@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useMyTasks } from '../hooks/useMyTasks';
-import { moveTask } from '../lib/taskWrites';
+import { becameDone, moveTask } from '../lib/taskWrites';
+import { useNotify } from '../contexts/NotifyContext';
 import TaskModal from './TaskModal';
-import { formatDate } from '../lib/format';
+import { formatDateRange } from '../lib/format';
 import {
   PRIORITY_LABEL,
   STATUS_LABEL,
@@ -17,6 +18,7 @@ import {
 export default function MyTasks() {
   const { user } = useAuth();
   const { sprints } = useSprintContext();
+  const { confirmDoneNotify } = useNotify();
   const { tasks, loading } = useMyTasks(user?.uid ?? '');
   const [editing, setEditing] = useState<Task | null>(null);
 
@@ -30,7 +32,9 @@ export default function MyTasks() {
 
   async function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
-    await moveTask(task, status, task.order, sprintName(task.sprintId));
+    const justFinished = becameDone(task.status, status);
+    await moveTask(task, status, task.order);
+    if (justFinished) confirmDoneNotify({ ...task, status }, sprintName(task.sprintId));
   }
 
   if (loading) {
@@ -75,7 +79,7 @@ export default function MyTasks() {
                   <td onClick={() => setEditing(t)}>
                     <span className={`badge prio-${t.priority}`}>{PRIORITY_LABEL[t.priority]}</span>
                   </td>
-                  <td className="muted mono" onClick={() => setEditing(t)}>{formatDate(t.dueDate)}</td>
+                  <td className="muted mono" onClick={() => setEditing(t)}>{formatDateRange(t.dueStart, t.dueDate)}</td>
                   <td>
                     <select
                       className="select"

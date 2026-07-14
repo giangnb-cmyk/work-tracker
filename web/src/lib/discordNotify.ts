@@ -1,27 +1,28 @@
 // Client for the /api/notify-discord gateway. Fire-and-forget from the UI.
 // Looks up the involved members' Discord ids, then asks the server to post.
 
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
-import type { Task, TeamMember } from '../types';
+import { supabase } from '../supabase';
+import type { Task } from '../types';
 
 async function discordIdOf(uid: string | null | undefined): Promise<string | null> {
   if (!uid) return null;
-  try {
-    const snap = await getDoc(doc(db, 'users', uid));
-    return snap.exists() ? ((snap.data() as TeamMember).discordId ?? null) : null;
-  } catch {
-    return null;
-  }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('discord_id')
+    .eq('id', uid)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.discord_id ?? null;
 }
 
 /**
- * Notify Discord that a task is done, mentioning its assignee and reporter.
+ * Notify Discord that a task is done, mentioning its assignee, reporter, and watchers.
  * Best-effort: any failure is logged and swallowed (never blocks the status change).
  */
 export async function notifyTaskDone(task: Task, sprintName?: string): Promise<void> {
   try {
-    const token = await auth.currentUser?.getIdToken();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
     if (!token) return;
 
     const watcherIds = task.watcherIds ?? [];

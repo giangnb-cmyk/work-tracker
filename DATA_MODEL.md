@@ -1,4 +1,12 @@
-# Data Model — Firestore (source of truth)
+# Data Model
+
+> **Migration in progress (branch `migrate/supabase`).** The source of truth is moving to
+> **Supabase Postgres** — the authoritative schema is now `supabase/migrations/*.sql`
+> (snake_case columns; the web/bot map to the camelCase names below). This document
+> describes the shared shape; see `MIGRATION_SUPABASE.md` for status. The Firestore notes
+> below remain the reference for field semantics during the cutover.
+
+## (legacy framing) Firestore
 
 This file is the **single source of truth** for the Firestore schema shared by `web/` and
 `bot/`. Change field/collection names here first, then update both sides and `firestore.rules`.
@@ -74,6 +82,27 @@ A time-boxed sprint. Doc id is auto-generated.
 
 ---
 
+## `projects/{projectId}`
+
+A project created in-app, optionally linked to a Notion project page so task syncs can
+set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
+
+| Field             | Type           | Notes                                                     |
+|-------------------|----------------|-----------------------------------------------------------|
+| `id`              | string         | mirror of doc id                                          |
+| `name`            | string         | project name (e.g. `P001 - Block Tile`)                   |
+| `icon`            | string         | emoji shown on the project card                           |
+| `color`           | string         | accent token/hex for the card                             |
+| `description`     | string         | optional short description                                |
+| `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
+| `createdAt`       | Timestamp      | creation time                                             |
+| `createdBy`       | string         | uid of creator                                            |
+
+> The Notion project list is fetched on demand via `POST /api/notion { action: 'list-projects' }`
+> (reads `NOTION_PROJECTS_DB_ID`). Tasks reference a project by `projectId`.
+
+---
+
 ## `tasks/{taskId}`
 
 A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the **backlog**.
@@ -84,6 +113,7 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | `title`        | string            | required, 1–140 chars                                   |
 | `description`  | string            | markdown-ish free text (may be empty)                   |
 | `sprintId`     | string \| null    | which sprint; `null` = backlog                          |
+| `projectId`    | string \| null    | which project (`projects/{id}`); `null` = none          |
 | `status`       | string            | `todo` \| `in_progress` \| `review` \| `done`           |
 | `priority`     | string            | `low` \| `medium` \| `high` \| `urgent`                 |
 | `assigneeId`   | string \| null    | uid of assignee                                         |
@@ -91,7 +121,8 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | `reporterId`   | string            | uid (or bot marker) of who created the task             |
 | `points`       | number            | story points (0 if unestimated)                         |
 | `tags`         | string[]          | free tags                                               |
-| `dueDate`      | Timestamp \| null | optional deadline (drives reminders)                    |
+| `dueStart`     | Timestamp \| null | work-window start (creation day)                        |
+| `dueDate`      | Timestamp \| null | work-window end / deadline; reset to done-day on finish |
 | `order`        | number            | sort order within its status column (lower = higher)    |
 | `createdAt`    | Timestamp         | creation time                                           |
 | `updatedAt`    | Timestamp         | last modification                                       |
@@ -123,6 +154,26 @@ subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `revie
 - Overdue (bot reminder): `tasks where status != done and dueDate <= now`
 
 ---
+
+## `notifications/{notifId}`
+
+In-app notifications (the "web" half of completion notices; Discord is the other half).
+One document per recipient. Doc id is auto-generated. Created when a user confirms the
+"task done" popup; each related person (assignee, reporter, watchers) gets one doc.
+
+| Field         | Type      | Notes                                                   |
+|---------------|-----------|---------------------------------------------------------|
+| `recipientId` | string    | uid this notice is for (query key)                      |
+| `taskId`      | string    | the task that was completed                             |
+| `taskTitle`   | string    | denormalized task title for rendering                   |
+| `type`        | string    | `task_done` (only kind for now)                         |
+| `body`        | string    | ready-to-render message                                 |
+| `actorName`   | string    | who completed the task                                  |
+| `read`        | boolean   | flips true when the recipient opens the bell            |
+| `createdAt`   | Timestamp | creation time (sorted client-side, newest first)        |
+
+> Read/update/delete gated to `recipientId == auth.uid`; any signed-in user may create
+> (the completer writes notices for others). No composite index — sorted in the client.
 
 ---
 

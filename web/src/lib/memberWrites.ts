@@ -1,17 +1,8 @@
-// Admin-only member (users doc) writes. Firestore rules require admin for these.
-// Members created here (for Discord-only teammates who never sign in) use an
-// auto-generated doc id as their uid; real sign-ins are keyed by Firebase Auth uid.
+// Admin-only member (profiles row) writes. RLS requires admin for create/delete.
+// Members created here (for Discord-only teammates who never sign in) get an
+// auto-generated uuid id; real sign-ins are keyed by their Supabase Auth uid.
 
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabase';
 import type { JobRole, TeamMember, UserRole } from '../types';
 
 export interface MemberInput {
@@ -24,25 +15,36 @@ export interface MemberInput {
 }
 
 export async function createMember(input: MemberInput): Promise<string> {
-  const ref = await addDoc(collection(db, 'users'), {
-    displayName: input.displayName.trim(),
-    email: input.email.trim(),
-    role: input.role,
-    jobRole: input.jobRole,
-    discordId: input.discordId.trim(),
-    notionUserId: input.notionUserId.trim(),
-    photoURL: '',
-    createdAt: serverTimestamp(),
-  });
-  // Mirror the generated id into `uid` so it matches the sign-in-created shape.
-  await setDoc(ref, { uid: ref.id }, { merge: true });
-  return ref.id;
+  const { data, error } = await supabase
+    .from('profiles')
+    .insert({
+      display_name: input.displayName.trim(),
+      email: input.email.trim(),
+      role: input.role,
+      job_role: input.jobRole,
+      discord_id: input.discordId.trim(),
+      notion_user_id: input.notionUserId.trim(),
+      photo_url: '',
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id as string;
 }
 
-export function updateMember(uid: string, patch: Partial<TeamMember>): Promise<void> {
-  return updateDoc(doc(db, 'users', uid), patch);
+export async function updateMember(uid: string, patch: Partial<TeamMember>): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.displayName !== undefined) row.display_name = patch.displayName;
+  if (patch.email !== undefined) row.email = patch.email;
+  if (patch.role !== undefined) row.role = patch.role;
+  if (patch.jobRole !== undefined) row.job_role = patch.jobRole;
+  if (patch.discordId !== undefined) row.discord_id = patch.discordId;
+  if (patch.notionUserId !== undefined) row.notion_user_id = patch.notionUserId;
+  const { error } = await supabase.from('profiles').update(row).eq('id', uid);
+  if (error) throw error;
 }
 
-export function deleteMember(uid: string): Promise<void> {
-  return deleteDoc(doc(db, 'users', uid));
+export async function deleteMember(uid: string): Promise<void> {
+  const { error } = await supabase.from('profiles').delete().eq('id', uid);
+  if (error) throw error;
 }

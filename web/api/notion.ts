@@ -7,6 +7,7 @@ import { authorize } from './_auth';
 import {
   buildProperties,
   DATABASE_ID,
+  listProjects,
   NOTION_ENABLED,
   notion,
   type NotionTaskInput,
@@ -38,6 +39,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   try {
+    if (action === 'list-projects') {
+      return res.status(200).json({ projects: await listProjects() });
+    }
+
     if (action === 'create') {
       if (!task?.title) return res.status(400).json({ error: 'task.title required' });
       const page = await notion.pages.create({

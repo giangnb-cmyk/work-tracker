@@ -1,6 +1,6 @@
 // Pure sprint analytics — derives stats from a task list. No Firestore/React here.
 
-import type { Sprint, Task, TaskStatus } from '../types';
+import type { JobRole, Sprint, Task, TaskStatus, TeamMember } from '../types';
 import { TASK_STATUSES } from '../types';
 
 export interface SprintStats {
@@ -40,6 +40,43 @@ export function groupByAssignee(tasks: Task[]): Map<string, Task[]> {
     map.set(key, arr);
   }
   return map;
+}
+
+/** Job-role bucket key: a concrete JobRole, or 'unknown' when the assignee has none. */
+export type DeptKey = JobRole | 'unknown';
+
+export interface DeptGroup {
+  key: DeptKey;
+  total: number;
+  done: number;
+  percentDone: number; // 0..100 by task count
+}
+
+/**
+ * Groups tasks by the assignee's job discipline (department) and computes completion.
+ * Resolves each task's assigneeId through the members roster; unmatched → 'unknown'.
+ * Returns only non-empty departments, most tasks first.
+ */
+export function groupByJobRole(tasks: Task[], members: TeamMember[]): DeptGroup[] {
+  const roleByUid = new Map(members.map((m) => [m.uid, m.jobRole]));
+  const buckets = new Map<DeptKey, { total: number; done: number }>();
+
+  for (const t of tasks) {
+    const key: DeptKey = (t.assigneeId && roleByUid.get(t.assigneeId)) || 'unknown';
+    const b = buckets.get(key) ?? { total: 0, done: 0 };
+    b.total += 1;
+    if (t.status === 'done') b.done += 1;
+    buckets.set(key, b);
+  }
+
+  return [...buckets.entries()]
+    .map(([key, b]) => ({
+      key,
+      total: b.total,
+      done: b.done,
+      percentDone: b.total === 0 ? 0 : Math.round((b.done / b.total) * 100),
+    }))
+    .sort((a, b) => b.total - a.total);
 }
 
 /**
@@ -95,6 +132,7 @@ const STATUS_STAGE: Record<TaskStatus, number> = {
  * people are lazy about moving status.
  */
 export function taskProgress(task: Task): number {
+  if (task.status === 'done') return 100; // a completed task is always 100%
   const subs = task.subtasks ?? [];
   if (subs.length > 0) {
     const done = subs.filter((s) => s.done).length;

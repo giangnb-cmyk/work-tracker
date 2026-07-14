@@ -1,29 +1,26 @@
-// useMembers — live team roster from `users`. Read-only for the UI.
+// useMembers — live team roster from `profiles`. Read-only for the UI.
 
-import { useEffect, useState } from 'react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { db } from '../firebase';
+import { useCallback } from 'react';
+import { supabase } from '../supabase';
+import { rowToMember } from '../lib/mappers';
+import { useLiveQuery } from './useLiveQuery';
 import type { TeamMember } from '../types';
 
 export function useMembers() {
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(collection(db, 'users'), orderBy('displayName'));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setMembers(snap.docs.map((d) => d.data() as TeamMember));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('useMembers listener error', err);
-        setLoading(false);
-      },
-    );
-    return unsub; // cleanup: avoid Firestore cost leak
+  const fetcher = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('display_name', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(rowToMember);
   }, []);
+
+  const { data: members, loading } = useLiveQuery<TeamMember>({
+    table: 'profiles',
+    fetcher,
+    deps: [],
+  });
 
   return { members, loading };
 }

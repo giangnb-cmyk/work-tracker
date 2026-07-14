@@ -12,11 +12,19 @@ import {
 import { useAuth } from './AuthContext';
 import { useSprints } from '../hooks/useSprints';
 import { useMembers } from '../hooks/useMembers';
-import type { Sprint, TeamMember } from '../types';
+import { useProjects } from '../hooks/useProjects';
+import type { Project, Sprint, TeamMember } from '../types';
+
+const PROJECT_KEY = 'selectedProjectId';
 
 interface SprintContextState extends ReturnType<typeof useSprints> {
   members: TeamMember[];
   membersLoading: boolean;
+  projects: Project[];
+  projectsLoading: boolean;
+  selectedProjectId: string | null;
+  selectedProject: Project | null;
+  selectProject: (id: string | null) => void;
   selectedSprintId: string | null;
   selectedSprint: Sprint | null;
   selectSprint: (id: string | null) => void;
@@ -28,8 +36,24 @@ export function SprintProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const sprintApi = useSprints(user?.uid ?? '');
   const { members, loading: membersLoading } = useMembers();
+  const { projects, loading: projectsLoading } = useProjects();
+  // Selected project is the app-entry gate; persist it so a refresh stays in the project.
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    () => localStorage.getItem(PROJECT_KEY),
+  );
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+
+  const selectedProject = useMemo(
+    () => projects.find((p) => p.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
+  );
+
+  function selectProject(id: string | null) {
+    if (id) localStorage.setItem(PROJECT_KEY, id);
+    else localStorage.removeItem(PROJECT_KEY);
+    setSelectedProjectId(id);
+  }
 
   // Default the selection to the active sprint once sprints load (until the user picks one).
   useEffect(() => {
@@ -48,6 +72,11 @@ export function SprintProvider({ children }: { children: ReactNode }) {
       ...sprintApi,
       members,
       membersLoading,
+      projects,
+      projectsLoading,
+      selectedProjectId,
+      selectedProject,
+      selectProject,
       selectedSprintId,
       selectedSprint,
       selectSprint: (id) => {
@@ -55,7 +84,7 @@ export function SprintProvider({ children }: { children: ReactNode }) {
         setSelectedSprintId(id);
       },
     }),
-    [sprintApi, members, membersLoading, selectedSprintId, selectedSprint],
+    [sprintApi, members, membersLoading, projects, projectsLoading, selectedProjectId, selectedProject, selectedSprintId, selectedSprint],
   );
 
   return <SprintContext.Provider value={value}>{children}</SprintContext.Provider>;

@@ -13,6 +13,7 @@ import { Doughnut, Line } from 'react-chartjs-2';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useTasks } from '../hooks/useTasks';
 import { burndownSeries, computeStats, groupByAssignee } from '../lib/sprint';
+import DepartmentDonuts from './DepartmentDonuts';
 import { daysUntil } from '../lib/format';
 import { STATUS_LABEL, TASK_STATUSES } from '../types';
 
@@ -22,7 +23,7 @@ const STATUS_COLORS = ['#94a3b8', '#38bdf8', '#c084fc', '#22c55e'];
 
 /** Sprint analytics: stat tiles, status doughnut, burndown, per-assignee load. */
 export default function Dashboard() {
-  const { selectedSprint, selectedSprintId } = useSprintContext();
+  const { selectedSprint, selectedSprintId, members } = useSprintContext();
   const { tasks, loading } = useTasks(selectedSprintId);
 
   const stats = useMemo(() => computeStats(tasks), [tasks]);
@@ -65,22 +66,28 @@ export default function Dashboard() {
           {stats.total === 0 ? (
             <div className="empty">Chưa có task.</div>
           ) : (
-            <Doughnut
-              data={{
-                labels: TASK_STATUSES.map((s) => STATUS_LABEL[s]),
-                datasets: [
-                  {
-                    data: TASK_STATUSES.map((s) => stats.byStatus[s]),
-                    backgroundColor: STATUS_COLORS,
-                    borderColor: '#1e293b',
-                    borderWidth: 2,
-                  },
-                ],
-              }}
-              options={{
-                plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } },
-              }}
-            />
+            // Fixed-height wrapper + maintainAspectRatio:false so the canvas can't grow unbounded.
+            <div style={{ height: 260, position: 'relative' }}>
+              <Doughnut
+                data={{
+                  labels: TASK_STATUSES.map((s) => STATUS_LABEL[s]),
+                  datasets: [
+                    {
+                      data: TASK_STATUSES.map((s) => stats.byStatus[s]),
+                      backgroundColor: STATUS_COLORS,
+                      borderColor: '#1e293b',
+                      borderWidth: 2,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  cutout: '62%',
+                  plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } },
+                }}
+              />
+            </div>
           )}
         </div>
 
@@ -89,6 +96,7 @@ export default function Dashboard() {
           {!burndown || burndown.labels.length === 0 ? (
             <div className="empty">Cần sprint có ngày bắt đầu/kết thúc.</div>
           ) : (
+            <div style={{ height: 260, position: 'relative' }}>
             <Line
               data={{
                 labels: burndown.labels,
@@ -113,6 +121,8 @@ export default function Dashboard() {
                 ],
               }}
               options={{
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: { legend: { labels: { color: '#94a3b8' } } },
                 scales: {
                   x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
@@ -120,8 +130,14 @@ export default function Dashboard() {
                 },
               }}
             />
+            </div>
           )}
         </div>
+      </div>
+
+      <div className="section">
+        <h3 style={{ marginBottom: '1rem' }}>% Hoàn thành theo bộ phận</h3>
+        <DepartmentDonuts tasks={tasks} members={members} />
       </div>
 
       <div className="glass section" style={{ padding: '1.5rem' }}>

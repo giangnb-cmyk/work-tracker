@@ -54,6 +54,14 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // --- projects ---
+    // Everyone signed in reads the project list. Only admins manage projects
+    // (incl. the Notion project link used to route task syncs).
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
     // --- tasks ---
     // Everyone signed in reads all tasks. Any signed-in member can create a task.
     // Update/delete allowed for admins, the reporter, or the current assignee.
@@ -68,6 +76,18 @@ service cloud.firestore {
                         || resource.data.assigneeId == request.auth.uid
                         || request.resource.data.assigneeId == request.auth.uid);
       allow delete: if isAdmin() || resource.data.reporterId == request.auth.uid;
+    }
+
+    // --- notifications ---
+    // In-app "task done" notices. You may only read/modify/delete notifications
+    // addressed to you. Any signed-in user may create one for a teammate (the
+    // person who completes a task writes notices for the related people).
+    match /notifications/{notifId} {
+      allow read, update, delete: if isSignedIn()
+                    && resource.data.recipientId == request.auth.uid;
+      allow create: if isSignedIn()
+                    && request.resource.data.recipientId is string
+                    && request.resource.data.recipientId.size() > 0;
     }
   }
 }

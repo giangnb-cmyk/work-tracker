@@ -34,6 +34,7 @@ def _task_payload(task: dict, assignee_notion_user_id) -> dict:
         "priority": task.get("priority", ""),
         "assigneeName": task.get("assigneeName", ""),
         "assigneeNotionUserId": assignee_notion_user_id,
+        "dueStart": _due_str(task.get("dueStart")),
         "dueDate": _due_str(task.get("dueDate")),
         "description": task.get("description", ""),
     }

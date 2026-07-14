@@ -9,7 +9,9 @@ export interface NotionTaskInput {
   priority?: string; // low | medium | high | urgent
   assigneeName?: string;
   assigneeNotionUserId?: string | null;
-  dueDate?: string | null; // YYYY-MM-DD
+  notionProjectId?: string | null; // Notion Projects-DB page id for the relation
+  dueStart?: string | null; // YYYY-MM-DD — work window start
+  dueDate?: string | null; // YYYY-MM-DD — work window end / deadline
   description?: string;
 }
 
@@ -25,6 +27,7 @@ const PROP = {
   assignee: env.NOTION_PROP_ASSIGNEE || 'Assignee',
   priority: env.NOTION_PROP_PRIORITY || 'Priority',
   due: env.NOTION_PROP_DUE || 'Due',
+  project: env.NOTION_PROP_PROJECT || 'Project',
 };
 
 // Notion column kinds vary per database; make them configurable.
@@ -32,6 +35,7 @@ const STATUS_TYPE = (env.NOTION_STATUS_TYPE || 'status') as 'status' | 'select';
 const ASSIGNEE_TYPE = (env.NOTION_ASSIGNEE_TYPE || 'rich_text') as 'people' | 'rich_text';
 const PRIORITY_ENABLED = env.NOTION_PROP_PRIORITY !== '';
 const DUE_ENABLED = env.NOTION_PROP_DUE !== '';
+const PROJECT_ENABLED = env.NOTION_PROP_PROJECT !== '';
 
 function parseMap(raw: string | undefined, fallback: Record<string, string>) {
   if (!raw) return fallback;
@@ -84,11 +88,53 @@ export function buildProperties(input: NotionTaskInput, forCreate: boolean) {
   if (PRIORITY_ENABLED && input.priority) {
     props[PROP.priority] = { select: { name: PRIORITY_MAP[input.priority] ?? input.priority } };
   }
-  if (DUE_ENABLED && input.dueDate !== undefined) {
-    props[PROP.due] = input.dueDate ? { date: { start: input.dueDate } } : { date: null };
+  if (DUE_ENABLED && (input.dueDate !== undefined || input.dueStart !== undefined)) {
+    // start = window start (falls back to end for legacy single-date tasks);
+    // end is ticked only when it differs from start (a real range).
+    const start = input.dueStart ?? input.dueDate ?? null;
+    const end = input.dueStart ? input.dueDate ?? null : null;
+    props[PROP.due] = start
+      ? { date: end && end !== start ? { start, end } : { start } }
+      : { date: null };
+  }
+  if (PROJECT_ENABLED && input.notionProjectId !== undefined) {
+    props[PROP.project] = input.notionProjectId
+      ? { relation: [{ id: input.notionProjectId }] }
+      : { relation: [] };
   }
   return props;
 }
 
 export const DATABASE_ID = env.NOTION_DATABASE_ID || '';
 export const SYNC_SECRET = env.NOTION_SYNC_SECRET || '';
+export const PROJECTS_DB_ID = env.NOTION_PROJECTS_DB_ID || '';
+
+export interface NotionProject {
+  id: string;
+  name: string;
+}
+
+/** Pull the project pages' id + title from the Notion Projects DB (paginated). */
+export async function listProjects(): Promise<NotionProject[]> {
+  if (!notion || !PROJECTS_DB_ID) return [];
+  const out: NotionProject[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion.databases.query({
+      database_id: PROJECTS_DB_ID,
+      page_size: 100,
+      start_cursor: cursor,
+    });
+    for (const page of res.results) {
+      const props = (page as { properties?: Record<string, unknown> }).properties ?? {};
+      const titleProp = Object.values(props).find(
+        (p): p is { type: 'title'; title: { plain_text: string }[] } =>
+          (p as { type?: string })?.type === 'title',
+      );
+      const name = (titleProp?.title ?? []).map((t) => t.plain_text).join('').trim();
+      out.push({ id: (page as { id: string }).id, name: name || '(không tên)' });
+    }
+    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+  } while (cursor);
+  return out;
+}
