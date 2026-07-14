@@ -4,6 +4,9 @@
 .env.*.local
 **/serviceAccountKey.json
 **/service-account*.json
+**/*-firebase-adminsdk-*.json
+keys/
+bot/keys/
 bot/.discord_session
 
 # === Node / web ===
