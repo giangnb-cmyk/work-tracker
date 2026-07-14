@@ -27,14 +27,17 @@ bot-work-tracker/
 1. Tạo project tại <https://console.firebase.google.com>.
 2. **Authentication** → Sign-in method → bật **Google**.
 3. **Firestore Database** → Create database (production mode).
-4. Deploy security rules + indexes (cài Firebase CLI: `npm i -g firebase-tools`):
+4. (Tuỳ chọn) **Storage** → bật nếu muốn **upload ảnh ref** đính kèm task. Không bật thì vẫn
+   đính kèm được bằng cách dán link ảnh (Drive/Discord…).
+5. Deploy security rules + indexes (cài Firebase CLI: `npm i -g firebase-tools`):
    ```bash
    firebase login
    firebase use --add        # chọn project vừa tạo
-   firebase deploy --only firestore:rules,firestore:indexes
+   firebase deploy --only firestore:rules,firestore:indexes,storage
    ```
-5. **Cấp quyền admin cho chính bạn**: đăng nhập web một lần (tạo doc `users/{uid}`), rồi vào
-   Firestore Console sửa `role` của doc đó thành `admin`.
+   (Bỏ `,storage` nếu chưa bật Storage.)
+6. **Cấp quyền admin cho chính bạn**: đăng nhập web một lần (tạo doc `users/{uid}`), rồi vào
+   Firestore Console sửa `role` của doc đó thành `admin` (hoặc chạy `python bot/set_admin.py <email>`).
 
 ---
 

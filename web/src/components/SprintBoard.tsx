@@ -3,84 +3,85 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useTasks } from '../hooks/useTasks';
 import { moveTask } from '../lib/taskWrites';
-import TaskCard from './TaskCard';
+import { STATUS_ORDER } from '../lib/sprint';
+import TaskRow from './TaskRow';
 import TaskModal from './TaskModal';
-import { STATUS_LABEL, TASK_STATUSES, type Task, type TaskStatus } from '../types';
+import { JOB_ROLES, type JobRole, type Task, type TaskStatus } from '../types';
 
-/** Kanban board for the selected sprint (or backlog). Native HTML5 drag-and-drop. */
+/**
+ * Sprint task LIST (not Kanban — the team is lazy about moving cards). Shows every
+ * task with a progress bar and an inline quick-status control, filterable by the
+ * assignee's team discipline (jobRole).
+ */
 export default function SprintBoard() {
   const { user, isAdmin } = useAuth();
-  const { selectedSprintId, selectedSprint } = useSprintContext();
+  const { selectedSprintId, selectedSprint, members } = useSprintContext();
   const { tasks, loading } = useTasks(selectedSprintId);
-
-  const [dragging, setDragging] = useState<Task | null>(null);
-  const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [filterRole, setFilterRole] = useState<JobRole | 'all'>('all');
 
-  const byStatus = useMemo(() => {
-    const groups: Record<TaskStatus, Task[]> = { todo: [], in_progress: [], review: [], done: [] };
-    for (const t of tasks) groups[t.status].push(t);
-    return groups;
-  }, [tasks]);
+  // uid → jobRole, so we can filter tasks by who they're assigned to.
+  const jobRoleOf = useMemo(() => {
+    const map = new Map(members.map((m) => [m.uid, m.jobRole]));
+    return (uid: string | null) => (uid ? map.get(uid) : undefined);
+  }, [members]);
 
-  async function handleDrop(status: TaskStatus) {
-    setDragOver(null);
-    if (!dragging || dragging.status === status) return;
-    // Place at the end of the target column.
-    const col = byStatus[status];
-    const lastOrder = col.length > 0 ? col[col.length - 1].order : 0;
-    await moveTask(dragging, status, lastOrder + 1000, selectedSprint?.name);
-    setDragging(null);
+  const visible = useMemo(() => {
+    const rows =
+      filterRole === 'all'
+        ? tasks
+        : tasks.filter((t) => jobRoleOf(t.assigneeId) === filterRole);
+    // Order: by status stage (todo → done), then by manual order.
+    return [...rows].sort(
+      (a, b) =>
+        STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
+        (a.order ?? 0) - (b.order ?? 0),
+    );
+  }, [tasks, filterRole, jobRoleOf]);
+
+  const canChangeStatus = (t: Task) =>
+    isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid;
+
+  function quickStatus(task: Task, status: TaskStatus) {
+    if (status === task.status) return;
+    void moveTask(task, status, task.order, selectedSprint?.name);
   }
 
   return (
     <div className="fade-in">
       <div className="view-header">
         <h1>{selectedSprint ? selectedSprint.name : 'Backlog'}</h1>
-        <p>{selectedSprint?.goal || 'Kéo-thả thẻ để đổi trạng thái. Nhấn thẻ để sửa chi tiết.'}</p>
+        <p>{selectedSprint?.goal || 'Danh sách công việc và tiến độ. Đổi trạng thái ngay ở cột phải.'}</p>
+      </div>
+
+      <div className="filter-bar">
+        <span className="muted" style={{ fontSize: '0.85rem' }}>Bộ phận:</span>
+        <select
+          className="select"
+          style={{ width: 'auto' }}
+          value={filterRole}
+          onChange={(e) => setFilterRole(e.target.value as JobRole | 'all')}
+        >
+          <option value="all">Tất cả</option>
+          {JOB_ROLES.map((r) => (<option key={r.id} value={r.id}>{r.icon} {r.label}</option>))}
+        </select>
+        <span className="muted" style={{ fontSize: '0.8rem' }}>{visible.length} task</span>
       </div>
 
       {loading ? (
-        <div className="center-screen" style={{ minHeight: 200 }}>
-          <div className="spinner" />
-        </div>
+        <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
+      ) : visible.length === 0 ? (
+        <div className="glass empty">Không có task nào{filterRole !== 'all' ? ' cho bộ phận này' : ''}.</div>
       ) : (
-        <div className="board">
-          {TASK_STATUSES.map((status) => (
-            <div
-              key={status}
-              className={`column${dragOver === status ? ' drag-over' : ''}`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(status);
-              }}
-              onDragLeave={() => setDragOver((s) => (s === status ? null : s))}
-              onDrop={() => handleDrop(status)}
-            >
-              <div className="column-head">
-                <span>
-                  <span className={`column-dot dot-${status}`} />
-                  {STATUS_LABEL[status]}
-                </span>
-                <span className="count">{byStatus[status].length}</span>
-              </div>
-              {byStatus[status].map((t) => (
-                <TaskCard
-                  key={t.id}
-                  task={t}
-                  dragging={dragging?.id === t.id}
-                  canDrag={isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid}
-                  onClick={setEditing}
-                  onDragStart={setDragging}
-                  onDragEnd={() => setDragging(null)}
-                />
-              ))}
-              {byStatus[status].length === 0 && (
-                <div className="muted" style={{ fontSize: '0.78rem', padding: '0.5rem' }}>
-                  Trống
-                </div>
-              )}
-            </div>
+        <div className="task-list">
+          {visible.map((t) => (
+            <TaskRow
+              key={t.id}
+              task={t}
+              canChangeStatus={canChangeStatus(t)}
+              onOpen={setEditing}
+              onQuickStatus={quickStatus}
+            />
           ))}
         </div>
       )}

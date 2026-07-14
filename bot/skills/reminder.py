@@ -117,20 +117,35 @@ def _sprint_name(client, sprint_id) -> str:
 def build_done_message(client, task: dict) -> str:
     """Tao thong bao task hoan thanh, chi ping nguoi co discordId.
 
-    Tieng Viet co dau. Tranh ping trung neu reporter cung la assignee.
+    Tieng Viet co dau. Assignee duoc khen rieng; reporter + watchers vao 'cc',
+    da bo trung id (khong ping 1 nguoi 2 lan).
     """
     cache = {}
     assignee_did = _discord_id(client, task.get("assigneeId"), cache)
-    reporter_did = _discord_id(client, task.get("reporterId"), cache)
 
     title = task.get("title", "(khong ten)")
     sprint = _sprint_name(client, task.get("sprintId"))
     parts = [f'✅ Task đã hoàn thành: "{title}" (sprint {sprint}).']
     if assignee_did:
         parts.append(f"<@{assignee_did}> làm tốt lắm!")
-    if reporter_did and reporter_did != assignee_did:
-        parts.append(f"cc <@{reporter_did}>")
+
+    cc_ids = _cc_discord_ids(client, task, cache, exclude=assignee_did)
+    if cc_ids:
+        parts.append("cc " + " ".join(f"<@{d}>" for d in cc_ids))
     return " ".join(parts)
+
+
+def _cc_discord_ids(client, task, cache, exclude) -> list:
+    """discordId cua reporter + watcherIds: giu thu tu, bo trung va bo 'exclude'."""
+    uids = [task.get("reporterId"), *(task.get("watcherIds") or [])]
+    seen = {exclude} if exclude else set()
+    result = []
+    for uid in uids:
+        did = _discord_id(client, uid, cache)
+        if did and did not in seen:
+            seen.add(did)
+            result.append(did)
+    return result
 
 
 def notify_done(task_or_id) -> bool:

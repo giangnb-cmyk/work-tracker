@@ -20,6 +20,7 @@ interface CreateOpts {
   reporterId: string;
   assigneeName: string;
   assigneeNotionUserId?: string | null;
+  watcherNames: string[];
 }
 
 export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise<string> {
@@ -35,12 +36,16 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     points: input.points,
     tags: [],
     dueDate: input.dueDate ? Timestamp.fromDate(input.dueDate) : null,
-    order: Date.now(), // monotonic-ish default; drag-drop rewrites this
+    order: Date.now(),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     source: 'web',
     notionPageId: null,
     notionUrl: null,
+    attachments: input.attachments ?? [],
+    subtasks: input.subtasks ?? [],
+    watcherIds: input.watcherIds ?? [],
+    watcherNames: opts.watcherNames ?? [],
   });
   await updateDoc(ref, { id: ref.id });
 

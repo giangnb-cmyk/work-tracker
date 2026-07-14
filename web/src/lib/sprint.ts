@@ -81,3 +81,24 @@ export function burndownSeries(sprint: Sprint, tasks: Task[]) {
 }
 
 export const STATUS_ORDER = TASK_STATUSES;
+
+const STATUS_STAGE: Record<TaskStatus, number> = {
+  todo: 0,
+  in_progress: 40,
+  review: 75,
+  done: 100,
+};
+
+/**
+ * Task completion percent (0–100). Uses subtask checklist when present, otherwise
+ * falls back to the status stage — so every task shows meaningful progress even if
+ * people are lazy about moving status.
+ */
+export function taskProgress(task: Task): number {
+  const subs = task.subtasks ?? [];
+  if (subs.length > 0) {
+    const done = subs.filter((s) => s.done).length;
+    return Math.round((done / subs.length) * 100);
+  }
+  return STATUS_STAGE[task.status];
+}

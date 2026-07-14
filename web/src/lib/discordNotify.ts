@@ -24,11 +24,13 @@ export async function notifyTaskDone(task: Task, sprintName?: string): Promise<v
     const token = await auth.currentUser?.getIdToken();
     if (!token) return;
 
-    const [assigneeDiscord, reporterDiscord] = await Promise.all([
+    const watcherIds = task.watcherIds ?? [];
+    const ids = await Promise.all([
       discordIdOf(task.assigneeId),
       discordIdOf(task.reporterId),
+      ...watcherIds.map((uid) => discordIdOf(uid)),
     ]);
-    const mentionIds = [...new Set([assigneeDiscord, reporterDiscord].filter(Boolean))] as string[];
+    const mentionIds = [...new Set(ids.filter(Boolean))] as string[];
 
     await fetch('/api/notify-discord', {
       method: 'POST',

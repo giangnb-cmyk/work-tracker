@@ -38,6 +38,26 @@ export interface AccessConfig {
   domains: string[];
 }
 
+export type AttachmentKind = 'image' | 'link';
+
+/** An image (uploaded or by URL) or an embedded external link on a task. */
+export interface Attachment {
+  id: string;
+  kind: AttachmentKind;
+  url: string;
+  name: string;
+  /** drive | discord | notion | figma | github | image | link — drives the card icon. */
+  provider: string;
+  /** Storage path for uploaded images (kept so we can delete the file later). */
+  storagePath?: string;
+}
+
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'review', 'done'];
 export const TASK_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 
@@ -98,6 +118,11 @@ export interface Task {
   source: TaskSource;
   notionPageId?: string | null;
   notionUrl?: string | null;
+  attachments: Attachment[];
+  subtasks: Subtask[];
+  /** Related people (uids) beyond the assignee — mentioned on completion. */
+  watcherIds: string[];
+  watcherNames: string[];
 }
 
 /** Payload used when creating a task from the UI (server fills timestamps/id). */
@@ -107,4 +132,7 @@ export type NewTaskInput = Pick<
 > & {
   assigneeId: string | null;
   dueDate: Date | null;
+  attachments: Attachment[];
+  subtasks: Subtask[];
+  watcherIds: string[];
 };

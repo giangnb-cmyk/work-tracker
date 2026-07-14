@@ -98,6 +98,18 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | `source`       | string            | `web` \| `discord` — where the task was created         |
 | `notionPageId` | string \| null    | id of the linked Notion page (null until synced)        |
 | `notionUrl`    | string \| null    | deep link to the Notion page (shown on the task card)   |
+| `attachments`  | Attachment[]      | ref images + embedded links (see below)                 |
+| `subtasks`     | Subtask[]         | checklist; drives the task progress bar                 |
+| `watcherIds`   | string[]          | related people (uids) — mentioned on completion         |
+| `watcherNames` | string[]          | denormalized display names of watchers                  |
+
+**Attachment**: `{ id, kind: 'image'|'link', url, name, provider, storagePath? }`.
+`provider` is one of `drive`/`discord`/`notion`/`figma`/`github`/`image`/`link` (detected from the
+URL) and picks the icon shown on the task card. `storagePath` is set for images uploaded to
+Firebase Storage (kept so the file can be deleted).
+
+**Subtask**: `{ id, title, done }`. Task progress = done/total subtasks; if a task has no
+subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `review`, `done`=100%).
 
 ### Status columns (Kanban)
 
