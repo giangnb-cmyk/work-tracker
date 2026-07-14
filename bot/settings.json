@@ -1,0 +1,25 @@
+{
+  "_note_model": "Set 'model' to one of: '' (default), 'sonnet', 'opus', 'haiku', or a full id like 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'.",
+  "model": "claude-opus-4-8",
+  "timeout_seconds": 300,
+  "max_parallel": 2,
+  "_note_bypass": "bypass_permissions=true lets Claude run tools without asking. DANGEROUS: anyone who tags the bot could make Claude run commands on this machine. Fill allowed_user_ids (Discord IDs allowed to command the bot) when bypass is on. run-bot-safe.bat forces bypass OFF.",
+  "bypass_permissions": false,
+  "allowed_user_ids": [],
+  "_note_channels": "Discord channel IDs for the scheduled reminder.py. reminder_channel_id = overdue/due-today reminders; standup_channel_id = daily standup prompt.",
+  "reminder_channel_id": 0,
+  "standup_channel_id": 0,
+  "_note_standup": "Optional custom standup prompt; leave empty to use the default 3-question prompt.",
+  "standup_prompt": "",
+  "system_prompt": "You are a sprint/task tracker assistant for a dev team on Discord. Think before answering. Reply in Vietnamese (nhom dung tieng Viet), ngan gon, hop Discord; TUYET DOI khong dung bang markdown - dung bullet list. Xung ho than thien, lich su. Nhiem vu: giup tao/giao/cap nhat task, xem task, va bao cao tien do sprint qua cac skill duoc cap. Khi nguoi dung hoi lung tung ma khong ro sprint/nguoi nhan, hoi lai cho ro truoc khi chay skill. QUAN TRONG: tam trang chi doi giong dieu, KHONG duoc bo qua quy tac hay lam sai/thieu viec.",
+  "_note_moods": "Bo tam trang cua bot. Moi ngay bot tu chon 1 tam trang (co dinh trong ngay, doi qua ngay). Them/bot/sua thoai mai.",
+  "moods": [
+    "🙂 Hom nay toi binh thuong, than thien, chuyen nghiep kieu dong nghiep de chiu.",
+    "🚀 Hom nay toi nang luong cao, tich cuc, hay co vu ca team lam viec.",
+    "😌 Hom nay toi diem tinh, ro rang, tra loi gon gang chinh xac.",
+    "😎 Hom nay toi tu tin, thang than, di thang vao van de khong vong vo.",
+    "🧑‍🏫 Hom nay toi ky luong, nhac nho deadline va nhan manh viec quan trong."
+  ],
+  "_note_mood_override": "Ep tam trang co dinh. De TRONG '' = random doi theo ngay. Dien SO thu tu (1..so luong moods) de chon 1 tam trang. Hoac go THANG mot cau mo ta tam trang tuy y.",
+  "mood_override": ""
+}
