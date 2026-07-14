@@ -1,0 +1,176 @@
+<!doctype html>
+<!--
+  Documentation template for Bot Work Tracker.
+  Self-contained (no build, no external JS). Matches the project design system
+  (glassmorphism dark theme). Replace the Vietnamese placeholder content.
+  Keep lang="vi" and UTF-8 so diacritics render correctly.
+-->
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{TIÊU ĐỀ TÀI LIỆU}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --glass: rgba(30, 41, 59, 0.7);
+        --primary: #6366f1;
+        --sky: #38bdf8;
+        --gold: #fbbf24;
+        --green: #22c55e;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.1);
+        --radius: 16px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+        font-size: 1rem;
+      }
+      .bg-premium {
+        position: fixed; inset: 0; z-index: -1;
+        background:
+          radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+          radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.06) 0%, transparent 40%),
+          var(--bg);
+      }
+      .layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1200px; margin: 0 auto; gap: 2rem; padding: 2rem; }
+      /* Table of contents */
+      .toc { position: sticky; top: 2rem; align-self: start; font-size: 0.9rem; }
+      .toc h2 { font-family: 'Outfit'; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.75rem; }
+      .toc a { display: block; color: var(--muted); text-decoration: none; padding: 0.35rem 0.6rem; border-radius: 8px; border-left: 2px solid transparent; }
+      .toc a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+      /* Article */
+      article { min-width: 0; }
+      .doc-header { margin-bottom: 2.5rem; }
+      .doc-header .eyebrow { color: var(--sky); font-weight: 600; font-size: 0.85rem; letter-spacing: 0.04em; }
+      h1 { font-family: 'Outfit'; font-weight: 800; font-size: 2.4rem; line-height: 1.15; margin: 0.4rem 0; }
+      .doc-header .meta { color: var(--muted); font-size: 0.9rem; }
+      h2 { font-family: 'Outfit'; font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1rem; padding-top: 0.5rem; scroll-margin-top: 1.5rem; }
+      h3 { font-family: 'Outfit'; font-weight: 600; font-size: 1.15rem; margin: 1.75rem 0 0.75rem; }
+      p, ul, ol { margin-bottom: 1rem; }
+      ul, ol { padding-left: 1.4rem; }
+      li { margin-bottom: 0.35rem; }
+      a { color: var(--sky); }
+      strong { color: #fff; }
+      code {
+        font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+        background: rgba(255, 255, 255, 0.08); padding: 0.15em 0.4em; border-radius: 5px;
+      }
+      pre {
+        background: rgba(2, 6, 23, 0.6); border: 1px solid var(--border);
+        border-radius: 12px; padding: 1rem 1.25rem; overflow-x: auto; margin-bottom: 1.25rem;
+      }
+      pre code { background: none; padding: 0; font-size: 0.85rem; line-height: 1.6; }
+      .card {
+        background: var(--glass); backdrop-filter: blur(10px);
+        border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem;
+      }
+      /* Callouts */
+      .callout { border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; background: rgba(0, 0, 0, 0.2); }
+      .callout.info { border-left: 3px solid var(--sky); }
+      .callout.success { border-left: 3px solid var(--green); }
+      .callout.warning { border-left: 3px solid var(--amber); }
+      .callout.danger { border-left: 3px solid var(--red); }
+      .callout .label { font-weight: 700; font-family: 'Outfit'; display: block; margin-bottom: 0.25rem; }
+      /* Tables */
+      table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.92rem; }
+      th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0.75rem; border-bottom: 1px solid var(--border); }
+      td { padding: 0.75rem; border-bottom: 1px solid var(--border); }
+      tr:hover td { background: rgba(255, 255, 255, 0.02); }
+      .table-wrap { overflow-x: auto; }
+      /* Badges */
+      .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+      .badge.new { background: rgba(34, 197, 94, 0.14); color: var(--green); }
+      footer { color: var(--muted); font-size: 0.82rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+      @media (max-width: 860px) {
+        .layout { grid-template-columns: 1fr; padding: 1.25rem; }
+        .toc { position: static; }
+        h1 { font-size: 1.9rem; }
+      }
+      @media print {
+        .bg-premium, .toc { display: none; }
+        body { background: #fff; color: #000; }
+        .layout { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-premium"></div>
+    <div class="layout">
+      <!-- Mục lục: một liên kết cho mỗi <h2> trong bài -->
+      <nav class="toc">
+        <h2>Mục lục</h2>
+        <a href="#gioi-thieu">Giới thiệu</a>
+        <a href="#noi-dung">Nội dung chính</a>
+        <a href="#tham-khao">Tham khảo</a>
+      </nav>
+
+      <article>
+        <header class="doc-header">
+          <span class="eyebrow">TÀI LIỆU</span>
+          <h1>{{TIÊU ĐỀ TÀI LIỆU}}</h1>
+          <p class="meta">Cập nhật: {{NGÀY}} · Người viết: {{TÊN}}</p>
+        </header>
+
+        <section id="gioi-thieu">
+          <h2>Giới thiệu</h2>
+          <p>
+            Viết phần mở đầu bằng tiếng Việt có dấu, nêu rõ tài liệu này nói về vấn đề gì
+            và dành cho ai đọc.
+          </p>
+          <div class="callout info">
+            <span class="label">Ghi chú</span>
+            Dùng khối callout để làm nổi bật thông tin quan trọng.
+          </div>
+        </section>
+
+        <section id="noi-dung">
+          <h2>Nội dung chính</h2>
+          <h3>Một mục con ví dụ</h3>
+          <p>Trình bày nội dung, có thể kèm danh sách, bảng, hoặc khối mã.</p>
+          <ul>
+            <li>Ý thứ nhất.</li>
+            <li>Ý thứ hai.</li>
+          </ul>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Mục</th><th>Mô tả</th></tr></thead>
+              <tbody>
+                <tr><td>Ví dụ</td><td>Nội dung ví dụ.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <pre><code>// khối mã ví dụ
+console.log("Xin chào");</code></pre>
+        </section>
+
+        <section id="tham-khao">
+          <h2>Tham khảo</h2>
+          <ul>
+            <li><a href="#">Liên kết tham khảo</a></li>
+          </ul>
+        </section>
+
+        <footer>
+          Tài liệu được tạo bằng skill <code>write-docs</code> — Bot Work Tracker.
+        </footer>
+      </article>
+    </div>
+  </body>
+</html>
