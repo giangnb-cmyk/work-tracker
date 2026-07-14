@@ -1,4 +1,3 @@
-import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import NotificationBell from './NotificationBell';
 import type { SprintStatus } from '../types';
@@ -9,13 +8,9 @@ const SPRINT_STATUS_LABEL: Record<SprintStatus, string> = {
   completed: 'Hoàn thành',
 };
 
-interface TopBarProps {
-  onNewTask: () => void;
-}
-
-/** Sticky top bar: sprint context selector + primary action. */
-export default function TopBar({ onNewTask }: TopBarProps) {
-  const { isAdmin } = useAuth();
+/** Sticky top bar: sprint context selector + notifications. Task creation now
+ *  lives on the "+" card at the top of each task list. */
+export default function TopBar() {
   const { sprints, selectedSprintId, selectedSprint, selectSprint } = useSprintContext();
 
   return (
@@ -43,11 +38,6 @@ export default function TopBar({ onNewTask }: TopBarProps) {
 
       <div className="row" style={{ gap: '0.75rem', alignItems: 'center' }}>
         <NotificationBell />
-        {isAdmin && (
-          <button className="btn-primary" onClick={onNewTask}>
-            + Task mới
-          </button>
-        )}
       </div>
     </header>
   );

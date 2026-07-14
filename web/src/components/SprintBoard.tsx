@@ -7,6 +7,7 @@ import { useNotify } from '../contexts/NotifyContext';
 import { STATUS_ORDER } from '../lib/sprint';
 import TaskRow from './TaskRow';
 import TaskModal from './TaskModal';
+import CreateTaskCard from './CreateTaskCard';
 import { JOB_ROLES, type JobRole, type Task, type TaskStatus } from '../types';
 
 /**
@@ -20,6 +21,7 @@ export default function SprintBoard() {
   const { confirmDoneNotify } = useNotify();
   const { tasks, loading } = useTasks(selectedSprintId);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [creating, setCreating] = useState(false);
   const [filterRole, setFilterRole] = useState<JobRole | 'all'>('all');
   const [filterDone, setFilterDone] = useState<'all' | 'done' | 'open'>('all');
 
@@ -89,10 +91,9 @@ export default function SprintBoard() {
 
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
-      ) : visible.length === 0 ? (
-        <div className="glass empty">Không có task nào{filterRole !== 'all' ? ' cho bộ phận này' : ''}.</div>
       ) : (
         <div className="task-list">
+          {isAdmin && <CreateTaskCard onClick={() => setCreating(true)} />}
           {visible.map((t) => (
             <TaskRow
               key={t.id}
@@ -103,11 +104,19 @@ export default function SprintBoard() {
               onQuickStatus={quickStatus}
             />
           ))}
+          {visible.length === 0 && !isAdmin && (
+            <div className="glass empty">Không có task nào{filterRole !== 'all' ? ' cho bộ phận này' : ''}.</div>
+          )}
         </div>
       )}
 
-      {editing && (
-        <TaskModal task={editing} defaultSprintId={selectedSprintId} onClose={() => setEditing(null)} />
+      {(editing || creating) && (
+        <TaskModal
+          task={editing}
+          defaultSprintId={selectedSprintId}
+          defaultProjectId={selectedProjectId}
+          onClose={() => { setEditing(null); setCreating(false); }}
+        />
       )}
     </div>
   );

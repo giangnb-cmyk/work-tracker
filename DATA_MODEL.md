@@ -103,6 +103,25 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 
 ---
 
+## `features/{featureId}`
+
+A feature: a unit of product work **inside a project**. A task optionally attaches to one
+feature (`tasks.featureId`). Admin-managed. In Postgres: `public.features`, `project_id`
+FK → `projects(id)` `on delete cascade`; RLS = read for all signed-in, write for admin.
+
+| Field         | Type      | Notes                                            |
+|---------------|-----------|--------------------------------------------------|
+| `id`          | string    | mirror of row id                                 |
+| `projectId`   | string    | owning project (`projects/{id}`) — required      |
+| `name`        | string    | feature name (1–120 chars)                       |
+| `icon`        | string    | emoji shown on the feature card                  |
+| `color`       | string    | accent hex for the card                          |
+| `description` | string    | optional short description                       |
+| `createdAt`   | Timestamp | creation time                                    |
+| `createdBy`   | string    | uid of creator                                   |
+
+---
+
 ## `tasks/{taskId}`
 
 A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the **backlog**.
@@ -114,6 +133,7 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | `description`  | string            | markdown-ish free text (may be empty)                   |
 | `sprintId`     | string \| null    | which sprint; `null` = backlog                          |
 | `projectId`    | string \| null    | which project (`projects/{id}`); `null` = none          |
+| `featureId`    | string \| null    | which feature (`features/{id}`); `null` = not attached  |
 | `status`       | string            | `todo` \| `in_progress` \| `review` \| `done`           |
 | `priority`     | string            | `low` \| `medium` \| `high` \| `urgent`                 |
 | `assigneeId`   | string \| null    | uid of assignee                                         |
@@ -150,7 +170,8 @@ subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `revie
 
 - Board for a sprint: `tasks where sprintId == S order by order`
 - My tasks: `tasks where assigneeId == uid and status != done`
-- Backlog: `tasks where sprintId == null`
+- Backlog (board dropdown): `tasks where sprintId == null`
+- Backlog **tab** (unassigned + unscheduled): `tasks where sprintId == null and assigneeId == null` (scoped to the current project)
 - Overdue (bot reminder): `tasks where status != done and dueDate <= now`
 
 ---

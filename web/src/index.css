@@ -444,44 +444,44 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   border-radius: 999px; transition: width 0.3s;
 }
 
-/* Task cards (rich detail cards) */
+/* Task cards (compact — denser grid, smaller type/tiles) */
 .task-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-  gap: 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.85rem;
   align-items: start;
 }
 .tcard {
-  padding: 1.4rem 1.5rem; cursor: pointer; border-radius: 20px;
+  padding: 0.95rem 1.05rem; cursor: pointer; border-radius: 14px;
   transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-  display: flex; flex-direction: column; gap: 1rem;
+  display: flex; flex-direction: column; gap: 0.7rem;
 }
 .tcard:hover {
   border-color: rgba(99, 102, 241, 0.45); transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.5);
+  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.45);
 }
 .tcard.done { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.25); }
 .tcard.done .tcard-title { color: var(--muted); text-decoration: line-through; }
 
 /* Header: icon · title · priority · menu */
-.tcard-head { display: flex; align-items: center; gap: 0.85rem; }
+.tcard-head { display: flex; align-items: center; gap: 0.6rem; }
 .tcard-icon {
-  display: grid; place-items: center; width: 52px; height: 52px; flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 14px; font-size: 1.5rem;
+  display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 11px; font-size: 1.15rem;
 }
 .tcard-title {
   flex: 1; min-width: 0; margin: 0;
-  font-family: var(--font-body); font-weight: 700; font-size: 1.45rem; line-height: 1.2; color: var(--text);
+  font-family: var(--font-body); font-weight: 700; font-size: 1.02rem; line-height: 1.25; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .prio-pill {
-  display: inline-flex; align-items: center; gap: 0.4rem; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0;
   background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 999px;
-  padding: 0.3rem 0.7rem; font-size: 0.8rem; font-weight: 600;
+  padding: 0.22rem 0.55rem; font-size: 0.72rem; font-weight: 600;
 }
-.prio-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.prio-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .tcard-menu-wrap { position: relative; flex-shrink: 0; }
-.tcard-menu { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0.3rem; border-radius: 8px; display: grid; place-items: center; }
+.tcard-menu { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0.25rem; border-radius: 8px; display: grid; place-items: center; }
 .tcard-menu:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
 .tcard-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
 .tcard-menu-pop {
@@ -496,45 +496,57 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tcard-menu-pop button:disabled { color: var(--muted); cursor: not-allowed; }
 
 /* Progress + status */
-.tcard-progrow { display: flex; align-items: center; gap: 0.85rem; }
-.tcard-progrow .progress { flex: 1; height: 10px; }
-.tcard-pct { font-weight: 700; font-size: 1rem; color: var(--text); min-width: 46px; text-align: right; }
-.tcard-status { font-size: 0.85rem; color: var(--muted); margin-top: -0.35rem; }
+.tcard-progrow { display: flex; align-items: center; gap: 0.6rem; }
+.tcard-progrow .progress { flex: 1; height: 7px; }
+.tcard-pct { font-weight: 700; font-size: 0.82rem; color: var(--text); min-width: 36px; text-align: right; }
+.tcard-status { font-size: 0.76rem; color: var(--muted); margin-top: -0.3rem; }
 
 .tcard-divider { height: 1px; background: var(--border-soft); }
 
 /* 2×2 meta grid */
-.tcard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem 1.25rem; }
-.tcard-cell { display: flex; align-items: center; gap: 0.75rem; min-width: 0; position: relative; }
+.tcard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem 0.9rem; }
+.tcard-cell { display: flex; align-items: center; gap: 0.5rem; min-width: 0; position: relative; }
 .tcard-cell:nth-child(odd)::after {
-  content: ""; position: absolute; right: -0.625rem; top: 4px; bottom: 4px; width: 1px; background: var(--border-soft);
+  content: ""; position: absolute; right: -0.45rem; top: 4px; bottom: 4px; width: 1px; background: var(--border-soft);
 }
 .tcard-tile {
-  display: grid; place-items: center; width: 46px; height: 46px; flex-shrink: 0; border-radius: 12px;
+  display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px;
   border: 1px solid var(--border);
 }
+.tcard-tile svg { width: 16px; height: 16px; }
 .tile-indigo { background: rgba(99, 102, 241, 0.14); color: #a5b4fc; }
 .tile-green { background: rgba(34, 197, 94, 0.14); color: #4ade80; }
 .tile-slate { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
 .tcard-cell-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.tcard-val { font-weight: 650; font-size: 0.95rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tcard-val { font-weight: 650; font-size: 0.84rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tcard-val.mono { font-family: var(--font-mono); }
 .tcard-val.overdue { color: var(--red); }
-.tcard-lbl { font-size: 0.76rem; color: var(--muted); }
-.tcard-cell .avatar { width: 46px; height: 46px; font-size: 0.95rem; flex-shrink: 0; }
+.tcard-lbl { font-size: 0.68rem; color: var(--muted); }
+.tcard-cell .avatar { width: 34px; height: 34px; font-size: 0.8rem; flex-shrink: 0; }
 
 /* Docs row */
-.tcard-docs { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.tcard-docs-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.tcard-doc-tiles { display: flex; gap: 0.6rem; }
+.tcard-docs { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; }
+.tcard-docs-label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; color: var(--text); }
+.tcard-doc-tiles { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .doc-tile {
-  width: 52px; height: 52px; border-radius: 14px; overflow: hidden; display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: 10px; overflow: hidden; display: grid; place-items: center;
   background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); text-decoration: none; transition: border-color 0.15s;
 }
 .doc-tile:hover { border-color: var(--primary); }
 .doc-tile .doc-cover { width: 100%; height: 100%; object-fit: cover; }
 .doc-tile .doc-logo { width: 58%; height: 58%; object-fit: contain; }
-.doc-tile .doc-emoji { font-size: 1.3rem; }
+.doc-tile .doc-emoji { font-size: 1.1rem; }
+
+/* Create-a-task card — first tile in a task list */
+.tcard-new {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.45rem;
+  min-height: 120px; cursor: pointer; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--border); color: var(--muted);
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease, transform 0.15s ease;
+}
+.tcard-new:hover { border-color: var(--primary); color: var(--primary); background: rgba(99, 102, 241, 0.06); transform: translateY(-2px); }
+.tcard-new-plus { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid currentColor; font-size: 1.4rem; line-height: 1; }
+.tcard-new-label { font-size: 0.85rem; font-weight: 600; }
 
 /* Timeline (mini Gantt) */
 .tl-wrap { padding: 1rem; overflow-x: auto; }
@@ -848,8 +860,12 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tm-field > span { font-size: 0.75rem; color: var(--muted); }
 .tm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
 
-.tmodal-footer { display: flex; align-items: center; gap: 0.6rem; padding: 0.9rem 1.5rem; border-top: 1px solid var(--border-soft); }
+.tmodal-footer { display: flex; align-items: center; gap: 0.6rem; padding: 0.9rem 1.5rem; border-top: 1px solid var(--border-soft); min-height: 56px; }
 .tmodal-foot-spacer { flex: 1; }
+.tm-savehint { font-size: 0.8rem; color: var(--muted); transition: color 0.2s ease; }
+.tm-save-saving { color: var(--sky); }
+.tm-save-saved { color: var(--green); }
+.tm-save-error { color: var(--red); }
 
 /* Activity sidebar */
 .tm-activity {

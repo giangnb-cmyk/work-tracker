@@ -30,6 +30,7 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
       description: input.description.trim(),
       sprint_id: input.sprintId,
       project_id: input.projectId,
+      feature_id: input.featureId,
       status: input.status,
       priority: input.priority,
       assignee_id: input.assigneeId,

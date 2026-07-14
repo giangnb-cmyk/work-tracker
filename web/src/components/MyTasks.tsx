@@ -4,44 +4,47 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useMyTasks } from '../hooks/useMyTasks';
 import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
+import TaskRow from './TaskRow';
 import TaskModal from './TaskModal';
-import { formatDateRange } from '../lib/format';
-import {
-  PRIORITY_LABEL,
-  STATUS_LABEL,
-  TASK_STATUSES,
-  type Task,
-  type TaskStatus,
-} from '../types';
+import CreateTaskCard from './CreateTaskCard';
+import type { Task, TaskStatus } from '../types';
 
-/** A focused list of the current user's tasks with quick status changes. */
+/** The current user's tasks as a card grid (same card as the Sprint board). */
 export default function MyTasks() {
   const { user } = useAuth();
-  const { sprints } = useSprintContext();
+  const { sprints, members, selectedSprintId, selectedProjectId } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
   const { tasks, loading } = useMyTasks(user?.uid ?? '');
   const [editing, setEditing] = useState<Task | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const jobRoleOf = useMemo(() => {
+    const map = new Map(members.map((m) => [m.uid, m.jobRole]));
+    return (uid: string | null) => (uid ? map.get(uid) : undefined);
+  }, [members]);
 
   const sprintName = useMemo(() => {
     const map = new Map(sprints.map((s) => [s.id, s.name]));
     return (id: string | null) => (id ? map.get(id) ?? '—' : 'Backlog');
   }, [sprints]);
 
-  const open = tasks.filter((t) => t.status !== 'done');
-  const done = tasks.filter((t) => t.status === 'done');
+  // Open first, then done.
+  const ordered = useMemo(
+    () => [...tasks].sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done')),
+    [tasks],
+  );
+  const open = tasks.filter((t) => t.status !== 'done').length;
 
-  async function quickStatus(task: Task, status: TaskStatus) {
+  function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
     const justFinished = becameDone(task.status, status);
-    await moveTask(task, status, task.order);
+    void moveTask(task, status, task.order);
     if (justFinished) confirmDoneNotify({ ...task, status }, sprintName(task.sprintId));
   }
 
   if (loading) {
     return (
-      <div className="center-screen" style={{ minHeight: 200 }}>
-        <div className="spinner" />
-      </div>
+      <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
     );
   }
 
@@ -49,58 +52,31 @@ export default function MyTasks() {
     <div className="fade-in">
       <div className="view-header">
         <h1>Task của tôi</h1>
-        <p>{open.length} task đang mở · {done.length} đã xong.</p>
+        <p>{open} task đang mở · {tasks.length - open} đã xong.</p>
       </div>
 
-      {tasks.length === 0 ? (
-        <div className="glass empty">Bạn chưa được giao task nào. 🎉</div>
-      ) : (
-        <div className="glass table-container section" style={{ padding: '0.5rem' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Task</th>
-                <th>Sprint</th>
-                <th>Ưu tiên</th>
-                <th>Hạn</th>
-                <th>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...open, ...done].map((t) => (
-                <tr key={t.id} style={{ cursor: 'pointer' }}>
-                  <td onClick={() => setEditing(t)}>
-                    {t.title}
-                    {t.notionUrl && (
-                      <a href={t.notionUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 6 }}>🔗</a>
-                    )}
-                  </td>
-                  <td className="muted" onClick={() => setEditing(t)}>{sprintName(t.sprintId)}</td>
-                  <td onClick={() => setEditing(t)}>
-                    <span className={`badge prio-${t.priority}`}>{PRIORITY_LABEL[t.priority]}</span>
-                  </td>
-                  <td className="muted mono" onClick={() => setEditing(t)}>{formatDateRange(t.dueStart, t.dueDate)}</td>
-                  <td>
-                    <select
-                      className="select"
-                      style={{ width: 'auto', padding: '0.3rem 0.5rem' }}
-                      value={t.status}
-                      onChange={(e) => quickStatus(t, e.target.value as TaskStatus)}
-                    >
-                      {TASK_STATUSES.map((s) => (
-                        <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="task-list">
+        <CreateTaskCard onClick={() => setCreating(true)} label="Tạo task cho tôi" />
+        {ordered.map((t) => (
+          <TaskRow
+            key={t.id}
+            task={t}
+            assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+            canChangeStatus
+            onOpen={setEditing}
+            onQuickStatus={quickStatus}
+          />
+        ))}
+      </div>
 
-      {editing && (
-        <TaskModal task={editing} defaultSprintId={editing.sprintId} onClose={() => setEditing(null)} />
+      {(editing || creating) && (
+        <TaskModal
+          task={editing}
+          defaultSprintId={editing?.sprintId ?? selectedSprintId}
+          defaultProjectId={selectedProjectId}
+          defaultAssigneeId={creating ? user?.uid ?? null : null}
+          onClose={() => { setEditing(null); setCreating(false); }}
+        />
       )}
     </div>
   );

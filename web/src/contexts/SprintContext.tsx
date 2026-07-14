@@ -13,7 +13,8 @@ import { useAuth } from './AuthContext';
 import { useSprints } from '../hooks/useSprints';
 import { useMembers } from '../hooks/useMembers';
 import { useProjects } from '../hooks/useProjects';
-import type { Project, Sprint, TeamMember } from '../types';
+import { useFeatures } from '../hooks/useFeatures';
+import type { Feature, Project, Sprint, TeamMember } from '../types';
 
 const PROJECT_KEY = 'selectedProjectId';
 
@@ -22,6 +23,8 @@ interface SprintContextState extends ReturnType<typeof useSprints> {
   membersLoading: boolean;
   projects: Project[];
   projectsLoading: boolean;
+  features: Feature[];
+  featuresLoading: boolean;
   selectedProjectId: string | null;
   selectedProject: Project | null;
   selectProject: (id: string | null) => void;
@@ -37,6 +40,7 @@ export function SprintProvider({ children }: { children: ReactNode }) {
   const sprintApi = useSprints(user?.uid ?? '');
   const { members, loading: membersLoading } = useMembers();
   const { projects, loading: projectsLoading } = useProjects();
+  const { features, loading: featuresLoading } = useFeatures();
   // Selected project is the app-entry gate; persist it so a refresh stays in the project.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     () => localStorage.getItem(PROJECT_KEY),
@@ -74,6 +78,8 @@ export function SprintProvider({ children }: { children: ReactNode }) {
       membersLoading,
       projects,
       projectsLoading,
+      features,
+      featuresLoading,
       selectedProjectId,
       selectedProject,
       selectProject,
@@ -84,7 +90,7 @@ export function SprintProvider({ children }: { children: ReactNode }) {
         setSelectedSprintId(id);
       },
     }),
-    [sprintApi, members, membersLoading, projects, projectsLoading, selectedProjectId, selectedProject, selectedSprintId, selectedSprint],
+    [sprintApi, members, membersLoading, projects, projectsLoading, features, featuresLoading, selectedProjectId, selectedProject, selectedSprintId, selectedSprint],
   );
 
   return <SprintContext.Provider value={value}>{children}</SprintContext.Provider>;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Timestamp } from '../lib/time';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
@@ -19,14 +19,27 @@ interface TaskModalProps {
   task?: Task | null;
   defaultSprintId: string | null;
   defaultProjectId?: string | null;
+  defaultFeatureId?: string | null;
+  defaultAssigneeId?: string | null;
   defaultStatus?: TaskStatus;
   onClose: () => void;
 }
 
-/** Full task detail view: header + info grid + subtasks + docs + activity feed. */
-export default function TaskModal({ task, defaultSprintId, defaultProjectId, defaultStatus, onClose }: TaskModalProps) {
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+/** Full task detail view: header + info grid + subtasks + docs + activity feed.
+ *  Edits autosave (debounced); creation is a single explicit action. */
+export default function TaskModal({
+  task,
+  defaultSprintId,
+  defaultProjectId,
+  defaultFeatureId,
+  defaultAssigneeId,
+  defaultStatus,
+  onClose,
+}: TaskModalProps) {
   const { user, profile, isAdmin } = useAuth();
-  const { members, sprints, projects } = useSprintContext();
+  const { members, sprints, projects, features } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
   const isEdit = Boolean(task);
 
@@ -37,76 +50,136 @@ export default function TaskModal({ task, defaultSprintId, defaultProjectId, def
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
   const [sprintId, setSprintId] = useState<string | null>(task?.sprintId ?? defaultSprintId);
-  // Project isn't editable in the modal — you're already inside one. New tasks
-  // auto-inherit the currently selected project; edits keep the task's project.
+  // Project isn't editable in the modal — you're already inside one.
   const [projectId] = useState<string | null>(task?.projectId ?? defaultProjectId ?? null);
+  const [featureId, setFeatureId] = useState<string | null>(task?.featureId ?? defaultFeatureId ?? null);
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? defaultStatus ?? 'todo');
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
-  const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? null);
+  const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? defaultAssigneeId ?? null);
   const [points, setPoints] = useState<number>(task?.points ?? 0);
   const [due, setDue] = useState<string>(toInputDate(task?.dueDate));
   const [attachments, setAttachments] = useState<Attachment[]>(task?.attachments ?? []);
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
   const [watcherIds, setWatcherIds] = useState<string[]>(task?.watcherIds ?? []);
-  const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
 
   const sprintName = sprints.find((s) => s.id === sprintId)?.name ?? 'Backlog';
   const projectName = projects.find((p) => p.id === projectId)?.name;
+  const projectFeatures = features.filter((f) => f.projectId === projectId);
   // Progress is derived from subtasks; with none, a done task still reads 100%.
   const doneCount = subtasks.filter((s) => s.done).length;
   const progress = subtasks.length
     ? Math.round((doneCount / subtasks.length) * 100)
     : status === 'done' ? 100 : 0;
 
-  async function handleSave() {
+  // Autosave bookkeeping: a serialized snapshot of the last-persisted values, and
+  // the last-saved task (so the done-transition + due-snap fire once, not per keystroke).
+  const savedTaskRef = useRef<Task | null>(task ?? null);
+  const snapshot = () =>
+    JSON.stringify({ title, description, sprintId, featureId, status, priority, assigneeId, points, due, attachments, subtasks, watcherIds });
+  const lastSavedRef = useRef<string | null>(null);
+  if (lastSavedRef.current === null) lastSavedRef.current = snapshot();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function persist(): Promise<void> {
+    const base = savedTaskRef.current;
+    if (!base) return;
+    if (!title.trim()) {
+      setError('Cần nhập tên task.');
+      return;
+    }
+    setError(null);
+    setSaveState('saving');
+    const assignee = members.find((m) => m.uid === assigneeId) ?? null;
+    const project = projects.find((p) => p.id === projectId) ?? null;
+    const notionProjectId = project?.notionProjectId ?? null;
+    const watcherNames = watcherIds
+      .map((id) => members.find((m) => m.uid === id)?.displayName ?? '')
+      .filter(Boolean);
+    const dueDate = due ? new Date(due) : null;
+    const patch: Partial<Task> = {
+      title: title.trim(), description: description.trim(), sprintId, projectId, featureId, status, priority, points,
+      assigneeId, assigneeName: assignee?.displayName ?? '',
+      dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
+      attachments, subtasks, watcherIds, watcherNames,
+    };
+    const justFinished = becameDone(base.status, status);
+    try {
+      await updateTask(base, patch, assignee?.notionUserId ?? null, notionProjectId);
+      const merged = { ...base, ...patch } as Task;
+      savedTaskRef.current = merged;
+      lastSavedRef.current = snapshot();
+      setSaveState('saved');
+      if (justFinished) confirmDoneNotify(merged, sprintName);
+    } catch (err) {
+      console.error('Autosave failed', err);
+      setSaveState('error');
+      setError('Lưu thất bại. Kiểm tra quyền hoặc kết nối.');
+    }
+  }
+
+  // Debounced autosave whenever an editable value changes (edit mode only).
+  useEffect(() => {
+    if (!isEdit || !canSave) return;
+    if (snapshot() === lastSavedRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => void persist(), 700);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, sprintId, featureId, status, priority, assigneeId, points, due, attachments, subtasks, watcherIds]);
+
+  async function handleClose() {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    // Flush any pending edit before leaving so a quick close doesn't drop it.
+    if (isEdit && canSave && snapshot() !== lastSavedRef.current) await persist();
+    onClose();
+  }
+
+  async function handleCreate() {
     if (!title.trim()) return setError('Cần nhập tên task.');
-    setSaving(true);
+    setCreating(true);
     setError(null);
     const assignee = members.find((m) => m.uid === assigneeId) ?? null;
     const project = projects.find((p) => p.id === projectId) ?? null;
     const notionProjectId = project?.notionProjectId ?? null;
-    const watcherNames = watcherIds.map((id) => members.find((m) => m.uid === id)?.displayName ?? '').filter(Boolean);
+    const watcherNames = watcherIds
+      .map((id) => members.find((m) => m.uid === id)?.displayName ?? '')
+      .filter(Boolean);
     const dueDate = due ? new Date(due) : null;
     try {
-      if (isEdit && task) {
-        const patch = {
-          title: title.trim(), description: description.trim(), sprintId, projectId, status, priority, points,
-          assigneeId, assigneeName: assignee?.displayName ?? '',
-          dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
-          attachments, subtasks, watcherIds, watcherNames,
-        };
-        const justFinished = becameDone(task.status, status);
-        await updateTask(task, patch, assignee?.notionUserId ?? null, notionProjectId);
-        if (justFinished) confirmDoneNotify({ ...task, ...patch }, sprintName);
-      } else {
-        await createTask(
-          { title, description, sprintId, projectId, status, priority, points, assigneeId, dueDate, attachments, subtasks, watcherIds },
-          { reporterId: user?.uid ?? '', assigneeName: assignee?.displayName ?? '', assigneeNotionUserId: assignee?.notionUserId ?? null, notionProjectId, watcherNames },
-        );
-      }
+      await createTask(
+        { title, description, sprintId, projectId, featureId, status, priority, points, assigneeId, dueDate, attachments, subtasks, watcherIds },
+        { reporterId: user?.uid ?? '', assigneeName: assignee?.displayName ?? '', assigneeNotionUserId: assignee?.notionUserId ?? null, notionProjectId, watcherNames },
+      );
       onClose();
     } catch (err) {
-      console.error('Save task failed', err);
-      setError('Lưu thất bại. Kiểm tra quyền hoặc kết nối.');
-      setSaving(false);
+      console.error('Create task failed', err);
+      setError('Tạo thất bại. Kiểm tra quyền hoặc kết nối.');
+      setCreating(false);
     }
   }
 
   async function handleDelete() {
     if (!task || !window.confirm(`Xoá task "${task.title}"?`)) return;
-    setSaving(true);
     try {
       await deleteTask(task.id);
       onClose();
     } catch {
       setError('Xoá thất bại.');
-      setSaving(false);
     }
   }
 
+  const saveHint =
+    saveState === 'saving' ? 'Đang lưu…' :
+    saveState === 'error' ? '⚠ Lưu lỗi' :
+    saveState === 'saved' ? '✓ Đã lưu' : 'Tự động lưu';
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={() => void handleClose()}>
       <div className="tmodal" onClick={(e) => e.stopPropagation()}>
         <div className="tmodal-main">
           {/* Header: icon · #id · priority · status switch · close */}
@@ -130,7 +203,7 @@ export default function TaskModal({ task, defaultSprintId, defaultProjectId, def
                   placeholder="Tên task"
                 />
               </div>
-              <button className="tmodal-x" onClick={onClose} aria-label="Đóng">✕</button>
+              <button className="tmodal-x" onClick={() => void handleClose()} aria-label="Đóng">✕</button>
             </div>
             {isEdit && (
               <div className="tmodal-crumb">
@@ -179,8 +252,11 @@ export default function TaskModal({ task, defaultSprintId, defaultProjectId, def
                   </select>
                 </label>
                 <label className="tm-field">
-                  <span>Hạn chót</span>
-                  <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditFields} />
+                  <span>Feature</span>
+                  <select className="select" value={featureId ?? ''} onChange={(e) => setFeatureId(e.target.value || null)} disabled={!canEditFields}>
+                    <option value="">— Chưa gắn —</option>
+                    {projectFeatures.map((f) => (<option key={f.id} value={f.id}>{f.icon} {f.name}</option>))}
+                  </select>
                 </label>
                 <label className="tm-field">
                   <span>Người nhận</span>
@@ -188,6 +264,10 @@ export default function TaskModal({ task, defaultSprintId, defaultProjectId, def
                     <option value="">Chưa giao</option>
                     {members.map((m) => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}
                   </select>
+                </label>
+                <label className="tm-field">
+                  <span>Hạn chót</span>
+                  <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditFields} />
                 </label>
                 <label className="tm-field">
                   <span>Story points</span>
@@ -212,17 +292,20 @@ export default function TaskModal({ task, defaultSprintId, defaultProjectId, def
             {error && <p className="error-text">{error}</p>}
           </div>
 
-          {/* Footer */}
+          {/* Footer: edits autosave (no Save/Cancel); creation is explicit. */}
           <div className="tmodal-footer">
             {isEdit && isAdmin && (
-              <button className="btn-sm btn-danger" onClick={handleDelete} disabled={saving}>🗑 Xoá task</button>
+              <button className="btn-sm btn-danger" onClick={handleDelete}>🗑 Xoá task</button>
             )}
             <div className="tmodal-foot-spacer" />
-            <button className="btn-sm" onClick={onClose} disabled={saving}>Huỷ</button>
-            {canSave && (
-              <button className="btn-primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Đang lưu…' : isEdit ? 'Lưu thay đổi' : 'Tạo task'}
-              </button>
+            {isEdit ? (
+              canSave && <span className={`tm-savehint tm-save-${saveState}`}>{saveHint}</span>
+            ) : (
+              canSave && (
+                <button className="btn-primary" onClick={handleCreate} disabled={creating}>
+                  {creating ? 'Đang tạo…' : 'Tạo task'}
+                </button>
+              )
             )}
           </div>
         </div>

@@ -119,6 +119,18 @@ export interface TeamMember {
   lastSeenAt?: Timestamp;
 }
 
+/** A feature: a unit of product work inside a project. Tasks may attach to one. */
+export interface Feature {
+  id: string;
+  projectId: string;
+  name: string;
+  icon: string; // emoji shown on the card
+  color: string; // accent hex
+  description: string;
+  createdAt?: Timestamp;
+  createdBy: string;
+}
+
 /** A project (created in-app) optionally linked to a Notion project page. */
 export interface Project {
   id: string;
@@ -149,6 +161,7 @@ export interface Task {
   description: string;
   sprintId: string | null;
   projectId: string | null;
+  featureId: string | null;
   status: TaskStatus;
   priority: TaskPriority;
   assigneeId: string | null;
@@ -176,7 +189,7 @@ export interface Task {
 /** Payload used when creating a task from the UI (server fills timestamps/id). */
 export type NewTaskInput = Pick<
   Task,
-  'title' | 'description' | 'sprintId' | 'projectId' | 'status' | 'priority' | 'points'
+  'title' | 'description' | 'sprintId' | 'projectId' | 'featureId' | 'status' | 'priority' | 'points'
 > & {
   assigneeId: string | null;
   dueDate: Date | null;

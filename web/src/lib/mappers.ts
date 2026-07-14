@@ -6,6 +6,7 @@ import type {
   Activity,
   AppNotification,
   Attachment,
+  Feature,
   Project,
   Sprint,
   Subtask,
@@ -57,6 +58,19 @@ export function rowToProject(r: Row): Project {
   };
 }
 
+export function rowToFeature(r: Row): Feature {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    icon: r.icon ?? '🧩',
+    color: r.color ?? '#6366f1',
+    description: r.description ?? '',
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? '',
+  };
+}
+
 export function rowToTask(r: Row): Task {
   return {
     id: r.id,
@@ -64,6 +78,7 @@ export function rowToTask(r: Row): Task {
     description: r.description ?? '',
     sprintId: r.sprint_id ?? null,
     projectId: r.project_id ?? null,
+    featureId: r.feature_id ?? null,
     status: r.status,
     priority: r.priority,
     assigneeId: r.assignee_id ?? null,
@@ -119,6 +134,7 @@ export function taskPatchToRow(patch: Partial<Task>): Row {
     description: 'description',
     sprintId: 'sprint_id',
     projectId: 'project_id',
+    featureId: 'feature_id',
     status: 'status',
     priority: 'priority',
     assigneeId: 'assignee_id',
