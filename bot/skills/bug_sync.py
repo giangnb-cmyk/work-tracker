@@ -89,15 +89,25 @@ async def _read_forum(client, forum_channel_id: int):
     ch = await _get_forum(client, forum_channel_id)
     available = [(str(t.id), t.name, _emoji_str(t.emoji)) for t in ch.available_tags]
 
-    threads = list(ch.threads)
+    # Gom moi thread (dedupe theo id). ch.threads chi la CACHE (thuong rong luc moi
+    # khoi dong) -> lay active threads qua API cua guild moi day du.
+    threads: dict[int, discord.Thread] = {}
+    try:
+        for t in await ch.guild.active_threads():
+            if t.parent_id == ch.id:
+                threads[t.id] = t
+    except Exception as e:
+        log.warning("Khong lay duoc active threads cua guild: %s", e)
+    for t in ch.threads:  # bo sung tu cache neu co
+        threads.setdefault(t.id, t)
     try:
         async for t in ch.archived_threads(limit=None):
-            threads.append(t)
+            threads[t.id] = t
     except Exception as e:
         log.warning("Khong doc duoc archived threads cua %s: %s", forum_channel_id, e)
 
     items = []
-    for t in threads:
+    for t in threads.values():
         desc, author = "", None
         try:
             starter = t.starter_message or await t.fetch_message(t.id)
