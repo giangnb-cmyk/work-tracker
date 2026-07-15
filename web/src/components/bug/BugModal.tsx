@@ -94,7 +94,9 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   const groupSelect = (g: LabelGroup) => (
     <select className="bugf-sel" value={sel(g)} onChange={(e) => setGroup(g, e.target.value)} disabled={!canEdit}>
       <option value="">— Không —</option>
-      {grp(g).map((l) => <option key={l.id} value={l.id}>{l.icon} {l.name}</option>)}
+      {grp(g).map((l) => (
+        <option key={l.id} value={l.id}>{l.icon && !l.icon.startsWith('http') ? `${l.icon} ` : ''}{l.name}</option>
+      ))}
     </select>
   );
 

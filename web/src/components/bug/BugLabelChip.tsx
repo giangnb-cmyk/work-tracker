@@ -18,7 +18,9 @@ export default function BugLabelChip({ label, onRemove, onClick, active = true, 
       style={style}
       onClick={onClick}
     >
-      {label.icon && <span className="bug-chip-ic" aria-hidden>{label.icon}</span>}
+      {label.icon && (label.icon.startsWith('http')
+        ? <img className="bug-chip-img" src={label.icon} alt="" aria-hidden />
+        : <span className="bug-chip-ic" aria-hidden>{label.icon}</span>)}
       {label.name}
       {onRemove && (
         <button

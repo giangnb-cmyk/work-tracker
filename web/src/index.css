@@ -596,6 +596,7 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   border: 1px solid color-mix(in srgb, var(--chip) 45%, transparent);
 }
 .bug-chip.sm { font-size: 0.66rem; padding: 0.14rem 0.42rem; }
+.bug-chip-img { width: 1.05em; height: 1.05em; object-fit: contain; border-radius: 3px; vertical-align: -0.15em; }
 .bug-chip.clickable { cursor: pointer; transition: opacity 0.15s ease; }
 .bug-chip.off { opacity: 0.32; }
 .bug-chip.off:hover { opacity: 0.7; }
@@ -754,11 +755,13 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .badge-sel-opt.on { background: rgba(255, 255, 255, 0.05); }
 
 /* Info grid rows */
-.bug-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem 0.9rem; }
-.bugf { display: flex; align-items: center; gap: 0.55rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft); border-radius: 10px; padding: 0.5rem 0.7rem; min-width: 0; }
-.bugf-ic { flex-shrink: 0; width: 20px; text-align: center; font-size: 0.95rem; }
-.bugf-lb { font-size: 0.8rem; color: var(--muted); flex-shrink: 0; }
-.bugf-sel { margin-left: auto; max-width: 58%; background: none; border: none; color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: right; cursor: pointer; color-scheme: dark; }
+.bug-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 0.8rem; }
+/* Lone last field (odd count) spans the full width so the grid stays balanced. */
+.bug-info > .bugf:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.bugf { display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft); border-radius: 10px; padding: 0.5rem 0.7rem; min-width: 0; height: 44px; }
+.bugf-ic { flex-shrink: 0; width: 18px; text-align: center; font-size: 0.95rem; }
+.bugf-lb { width: 78px; flex-shrink: 0; font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bugf-sel { flex: 1; min-width: 0; margin-left: auto; background: none; border: none; color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: right; cursor: pointer; color-scheme: dark; }
 .bugf-sel:focus { outline: none; }
 .bugf-sel:disabled { color: var(--text); opacity: 0.9; }
 

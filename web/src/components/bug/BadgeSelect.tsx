@@ -39,7 +39,9 @@ export default function BadgeSelect({ value, options, onChange, disabled, placeh
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
       >
-        {cur?.icon && <span className="badge-sel-ic">{cur.icon}</span>}
+        {cur?.icon && (cur.icon.startsWith('http')
+          ? <img className="bug-chip-img" src={cur.icon} alt="" />
+          : <span className="badge-sel-ic">{cur.icon}</span>)}
         <span>{cur ? cur.label : placeholder}</span>
         {!disabled && <span className="badge-sel-caret">▾</span>}
       </button>
@@ -52,7 +54,9 @@ export default function BadgeSelect({ value, options, onChange, disabled, placeh
               className={`badge-sel-opt${o.value === value ? ' on' : ''}`}
               onClick={() => { onChange(o.value); setOpen(false); }}
             >
-              {o.icon && <span>{o.icon}</span>}
+              {o.icon && (o.icon.startsWith('http')
+                ? <img className="bug-chip-img" src={o.icon} alt="" />
+                : <span>{o.icon}</span>)}
               <span style={{ color: o.color }}>{o.label}</span>
             </button>
           ))}

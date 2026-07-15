@@ -108,11 +108,26 @@ def forum_for_project(project_id: str) -> dict | None:
 # --- Doc forum (async) ------------------------------------------------------
 
 def _emoji_str(emoji) -> str:
-    """Emoji unicode -> str; bo qua custom emoji (co .id)."""
-    if not emoji or getattr(emoji, "id", None):
+    """Icon cua forum tag: emoji unicode -> ky tu; custom emoji -> URL anh CDN."""
+    if not emoji:
         return ""
+    if getattr(emoji, "id", None):  # custom emoji -> anh (hien giong het Discord)
+        url = getattr(emoji, "url", "") or ""
+        return str(url)
     s = str(emoji)
     return s if len(s) <= 4 else ""
+
+
+# Nen tang thuong ghi trong tieu de ([UNITY]/[IOS]/[Android]...). Gan nhan tuong ung.
+_PLATFORMS = [("unity", "Unity"), ("ios", "iOS"), ("android", "Android"), ("web", "Web"), ("pc", "PC")]
+
+
+def _platform_from_title(title: str) -> str | None:
+    t = (title or "").lower()
+    for key, name in _PLATFORMS:
+        if re.search(rf"\b{key}\b", t):
+            return name
+    return None
 
 
 async def _get_forum(client, forum_channel_id: int):
@@ -199,14 +214,12 @@ def _sync_palette(sb, project_id: str, available: list[tuple[str, str, str]]) ->
         if tid in by_tag:
             lab = by_tag[tid]
             tag_to_label[tid] = lab["id"]
-            if lab.get("name") != name:  # forum doi ten tag -> cap nhat nhan
-                sb.table(BUG_LABELS).update({"name": name}).eq("id", lab["id"]).execute()
+            # Mirror ten + icon giong het forum tag.
+            if lab.get("name") != name or (lab.get("icon") or "") != (emoji or ""):
+                sb.table(BUG_LABELS).update({"name": name, "icon": emoji or ""}).eq("id", lab["id"]).execute()
         elif _fold(name) in by_fold:
-            lab = by_fold[_fold(name)]  # co nhan cung ten -> lien ket vao forum tag
-            patch = {"discord_tag_id": tid}
-            if emoji and not lab.get("icon"):
-                patch["icon"] = emoji
-            sb.table(BUG_LABELS).update(patch).eq("id", lab["id"]).execute()
+            lab = by_fold[_fold(name)]  # co nhan cung ten -> lien ket + dong bo icon Discord
+            sb.table(BUG_LABELS).update({"discord_tag_id": tid, "icon": emoji or ""}).eq("id", lab["id"]).execute()
             tag_to_label[tid] = lab["id"]
         else:
             to_create.append((tid, name, emoji))
@@ -226,8 +239,9 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list, by_thr
     tag_to_label = _sync_palette(sb, project_id, available)
     profiles = _profiles_by_discord(sb)
     # id -> ten nhan (gom ca nhan vua tao) de suy ra cot kanban tu tag.
-    id_to_name = {r["id"]: r["name"] for r in
-                  sb.table(BUG_LABELS).select("id,name").eq("project_id", project_id).execute().data}
+    label_rows = sb.table(BUG_LABELS).select("id,name").eq("project_id", project_id).execute().data
+    id_to_name = {r["id"]: r["name"] for r in label_rows}
+    name_to_id = {r["name"].strip().lower(): r["id"] for r in label_rows}
 
     created = updated = 0
     for it in items:
@@ -236,6 +250,12 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list, by_thr
             lid = tag_to_label.get(tid)
             if lid and lid not in label_ids:
                 label_ids.append(lid)
+        # Nen tang tu tieu de -> gan nhan (neu nhan da ton tai trong palette).
+        plat = _platform_from_title(it["title"])
+        if plat:
+            pl_id = name_to_id.get(plat.lower())
+            if pl_id and pl_id not in label_ids:
+                label_ids.append(pl_id)
         status = _status_from_label_names([id_to_name.get(lid, "") for lid in label_ids])
         rep = profiles.get(it["owner_id"])
         reporter_id = rep[0] if rep else None
