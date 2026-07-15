@@ -55,10 +55,16 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
     setError(null);
     setSaveState('saving');
     const assignee = members.find((m) => m.uid === assigneeId) ?? null;
+    // If this bug came from a Discord thread and its labels changed here, flag it
+    // so the bot pushes the new tag set back to the forum.
+    const key = (ids: string[]) => [...ids].sort().join(',');
+    const labelsChanged = key(labelIds) !== key(bug.labelIds ?? []);
+    const pushBack = Boolean(bug.discordThreadId) && labelsChanged;
     try {
       await updateBug(bug.id, {
         title: title.trim(), description: description.trim(), status, labelIds,
         assigneeId, assigneeName: assignee?.displayName ?? '',
+        ...(pushBack ? { pendingDiscordPush: true } : {}),
       });
       savedRef.current = snapshot();
       setSaveState('saved');

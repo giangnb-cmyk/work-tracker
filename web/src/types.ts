@@ -163,6 +163,8 @@ export interface BugLabel {
   name: string;
   color: string;
   icon: string; // optional emoji
+  /** Linked Discord forum tag id (for two-way sync); null = app-only label. */
+  discordTagId: string | null;
   createdAt?: Timestamp;
   createdBy: string;
 }
@@ -181,6 +183,10 @@ export interface Bug {
   assigneeId: string | null;
   assigneeName: string;
   order: number;
+  /** Source Discord forum thread id (null = created in-app). */
+  discordThreadId: string | null;
+  /** True when app-side label edits still need pushing to the Discord thread. */
+  pendingDiscordPush?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

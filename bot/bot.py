@@ -302,10 +302,18 @@ async def daily_bug_sync():
 
 @tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
 async def poll_bug_sync_requests():
-    """Quet bang bug_sync_requests (web bam nut 'Sync') va xu ly tung yeu cau."""
+    """Moi nhip: (1) day thay doi nhan tu app -> Discord, (2) xu ly yeu cau 'Sync' tu web."""
     if not BUG_FORUMS:
         return
     sb = get_client()
+    # (1) app -> Discord: bug co pending_discord_push (nguoi dung doi nhan tren app).
+    try:
+        n = await bug_sync.push_pending(client, sb)
+        if n:
+            log.info("Da day %d bug (nhan) len Discord", n)
+    except Exception:
+        log.exception("Day nhan len Discord loi")
+    # (2) web -> yeu cau sync (nut 'Sync Discord').
     try:
         pending = await asyncio.to_thread(
             lambda: sb.table("bug_sync_requests").select("*").eq("status", "pending").order("created_at").execute().data

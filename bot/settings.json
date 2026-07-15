@@ -23,8 +23,10 @@
   ],
   "_note_mood_override": "Ep tam trang co dinh. De TRONG '' = random doi theo ngay. Dien SO thu tu (1..so luong moods) de chon 1 tam trang. Hoac go THANG mot cau mo ta tam trang tuy y.",
   "mood_override": "",
-  "_note_bug_forums": "Dong bo bug tu forum Discord vao tab Bugs. Moi muc: project_id (uuid lay tu web) + forum_channel_id (ID kenh Forum - bat Developer Mode, chuot phai kenh forum -> Copy Channel ID). Moi bai post -> 1 bug; forum tags -> nhan. Chay tu dong hang ngay luc bug_sync_hour, va khi bam nut 'Sync' tren web (bot quet moi bug_sync_poll_seconds giay).",
-  "bug_forums": [],
+  "_note_bug_forums": "Dong bo HAI CHIEU bug voi forum Discord. Moi muc: project_id (uuid tu web) + forum_channel_id (ID kenh Forum). Discord->app: moi bai post -> 1 bug, forum tags -> nhan. app->Discord: doi nhan tren app se set lai tag cua thread. Bot can quyen 'Manage Threads' (sua tag thread) + 'Manage Channels' (tao tag moi). Chay tu dong luc bug_sync_hour, khi bam 'Sync' tren web, hoac '@bot sync bug'.",
+  "bug_forums": [
+    { "project_id": "620a1a7d-d779-4c3e-b7e1-796c97e16be5", "forum_channel_id": 1458356915930403026 }
+  ],
   "bug_sync_hour": 9,
   "bug_sync_tz": "Asia/Ho_Chi_Minh",
   "bug_sync_channel_id": 0,

@@ -80,6 +80,7 @@ export function rowToBugLabel(r: Row): BugLabel {
     name: r.name,
     color: r.color ?? '#6366f1',
     icon: r.icon ?? '',
+    discordTagId: r.discord_tag_id ?? null,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };
@@ -99,6 +100,8 @@ export function rowToBug(r: Row): Bug {
     assigneeId: r.assignee_id ?? null,
     assigneeName: r.assignee_name ?? '',
     order: r.order ?? 0,
+    discordThreadId: r.discord_thread_id ?? null,
+    pendingDiscordPush: Boolean(r.pending_discord_push),
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     updatedAt: Timestamp.fromISO(r.updated_at) ?? undefined,
   };
@@ -116,6 +119,7 @@ export function bugPatchToRow(patch: Partial<Bug>): Row {
     reporterId: 'reporter_id',
     reporterName: 'reporter_name',
     order: 'order',
+    pendingDiscordPush: 'pending_discord_push',
   };
   const row: Row = {};
   for (const [k, v] of Object.entries(patch)) if (map[k]) row[map[k]] = v;

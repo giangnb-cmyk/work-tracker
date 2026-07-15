@@ -191,6 +191,7 @@ reports shown on a Kanban board (by `status`) and a GitLab-style list. Postgres:
 | `name`      | string | label text (1–40 chars)                 |
 | `color`     | string | accent hex                              |
 | `icon`      | string | optional emoji                          |
+| `discordTagId` | string \| null | linked Discord forum tag id (two-way sync) |
 
 **bugs** — RLS: read all; insert any signed-in; update admin/reporter/assignee; delete admin/reporter.
 A `BEFORE INSERT` trigger assigns `number` = next per-project running id.
@@ -208,17 +209,26 @@ A `BEFORE INSERT` trigger assigns `number` = next per-project running id.
 | `assigneeId` / `assigneeName` | string \| null / string | who owns the fix                   |
 | `order`        | number            | sort order                                                  |
 | `discordThreadId` | string \| null | source Discord forum thread id (sync upsert key; unique)    |
+| `pendingDiscordPush` | boolean | app changed the labels; bot still needs to push them to Discord |
 | `createdAt` / `updatedAt` | Timestamp | timestamps (`updatedAt` via trigger)                    |
 
-### Discord forum sync
+### Discord forum sync (two-way)
 
-The bot mirrors a Discord **forum channel** into `bugs` (each post → a bug; forum
-tags → `bug_labels`; thread author → reporter). Upsert is keyed by `discordThreadId`;
-re-syncs refresh title/description/labels but **preserve** `status`/`assigneeId` (so
-Kanban moves aren't clobbered). Runs daily (default 09:00 `Asia/Ho_Chi_Minh`, config in
-`bot/settings.json → bug_forums`), on `@bot sync bug`, or when the web queues a row in
-**`bug_sync_requests`** (admin-only insert; the service-role bot drains it — see the
-"Sync Discord" button on the Bugs tab).
+The bot keeps a Discord **forum channel** and `bugs` in sync **both directions**:
+
+- **Discord → app:** each post → a bug (title, description = first message, reporter via
+  `profiles.discord_id`). Forum tags → `bug_labels`, linked by `discordTagId` (not just
+  name); a thread's applied tags → `bug.labelIds`. Upsert keyed by `discordThreadId`;
+  re-syncs refresh content but **preserve** `status`/`assigneeId`.
+- **app → Discord:** changing a bug's labels in-app sets `pendingDiscordPush`; the bot
+  rewrites that thread's applied tags to match (creating a forum tag for an app-only
+  label if needed). While `pendingDiscordPush` is set, the Discord→app sync won't
+  relabel that bug (the app edit wins until pushed).
+
+Triggers: daily (default 09:00 `Asia/Ho_Chi_Minh`), `@bot sync bug`, or the web
+"Sync Discord" button (queues `bug_sync_requests`, admin-only insert; the service-role
+bot drains it and also pushes pending label edits every `bug_sync_poll_seconds`).
+The bot needs **Manage Threads** (edit thread tags) and **Manage Channels** (create tags).
 
 ---
 
