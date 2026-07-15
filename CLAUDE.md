@@ -2,17 +2,47 @@
 
 ## Project Context
 
-**Bot Work Tracker** — a sprint & task management app for a software team.
+**Bot Work Tracker** — a sprint, task & bug management app for a software team.
 
-Two deliverables share one Firebase project (Auth + Cloud Firestore):
+Two deliverables share one **Supabase** project (Postgres + Auth + Storage + Realtime):
 
 1. **`web/`** — React + Vite + TypeScript single-page app. Team members sign in with
-   Google, manage sprints on a Kanban board, assign tasks, and view sprint dashboards.
-   Deployed to **Vercel** as a static build from GitHub.
-2. **`bot/`** — Python `discord.py` Discord bot backed by `firebase-admin`. Reads/writes
-   the **same** Firestore data. Responds when tagged by delegating to the Claude CLI, which
-   drives narrow "skill" scripts (create/assign tasks, sprint reports, reminders). Runs
-   persistently on a host machine / small VPS, not on Vercel.
+   Google, pick a project, then manage sprints on a board, triage tasks and bugs, and
+   view dashboards. Deployed to **Vercel** as a static build from GitHub.
+2. **`bot/`** — Python `discord.py` Discord bot backed by the **Supabase service-role
+   key** (`supabase-py`). Reads/writes the **same** Postgres data. Responds when tagged
+   by delegating to the Claude CLI, which drives narrow "skill" scripts (create/assign
+   tasks, sprint reports, reminders). Also **mirrors a Discord forum into the bug
+   tracker** on a schedule. Runs persistently on a host machine / small VPS, not on Vercel.
+
+> Migrated from Firebase/Firestore to Supabase — see `MIGRATION_SUPABASE.md`. Legacy
+> `firestore.rules` / `firebase.json` may still linger in the tree but are no longer used;
+> security now lives in Postgres **RLS** (`supabase/migrations/`).
+
+### App views (web)
+
+Project is the entry gate (`ProjectSelect`); everything below is scoped to the selected project.
+
+- **Bảng Sprint** (`SprintBoard`) — task list for the selected sprint, with a "+" create card.
+- **Task của tôi** (`MyTasks`) — the current user's tasks as cards.
+- **Features** (`Features`) — per-project feature cards; open one to see its tasks. Tasks
+  attach to a feature (`tasks.feature_id`).
+- **Backlog** (`Backlog`) — parked tasks: no sprint AND no assignee.
+- **Bugs** (`Bugs`) — a bug tracker with a **Kanban** view (columns by status) and a
+  **GitLab-style list**. Bugs carry freeform `bug_labels`; the Kanban column is derived
+  from a workflow label (Fixing/Pending/Deployed/Done). A "+" filter builds token filters.
+- **Timeline / Thống kê / Quản lý Sprint / Thành viên / Cấu hình** — Gantt, charts, admin.
+
+### Discord bug sync (`bot/skills/bug_sync.py`)
+
+Two-way sync between a Discord **forum channel** and `bugs`:
+- **Discord → app** (daily 09:00 `Asia/Ho_Chi_Minh`, `@bot sync bug`, or the web "Sync
+  Discord" button which queues `bug_sync_requests`): each post → a bug; forum tags →
+  `bug_labels` (linked by `discord_tag_id`, icon mirrors the tag's emoji); starter-message
+  images are re-uploaded to Storage (videos stay in-thread — see `bug_mirror_videos`).
+- **app → Discord**: changing a bug's labels in-app sets `pending_discord_push`; the bot
+  rewrites the thread's applied tags to match.
+- Diagnostics: `python skills/bug_sync.py --estimate|--perms`.
 
 ### Tech Stack
 
@@ -20,10 +50,10 @@ Two deliverables share one Firebase project (Auth + Cloud Firestore):
 |-------|-----------|-------|
 | Web framework | React 18 + Vite + TypeScript | `web/` — SPA, one component per file |
 | Styling | CSS3 (vanilla) | `web/src/index.css` — glassmorphism dark theme, CSS custom properties. NO CSS framework. |
-| Data / Auth | Firebase (Firestore + Auth) | Web SDK v10 (`web/src/firebase.ts`); Google sign-in |
+| Data / Auth | **Supabase** (Postgres + Auth + Storage + Realtime) | `web/src/supabase.ts`; Google sign-in. RLS enforces access. |
 | Charts | Chart.js via `react-chartjs-2` (npm) | sprint burndown / stats |
 | Fonts | Google Fonts (CDN) | Outfit, Inter, JetBrains Mono |
-| Bot | Python 3.11+, `discord.py`, `firebase-admin` | `bot/` — tag → Claude CLI → skill scripts |
+| Bot | Python 3.11+, `discord.py`, `supabase-py` | `bot/` — tag → Claude CLI → skills; + bug forum sync |
 | Deploy | Vercel (web) + GitHub | bot self-hosted with a process manager / Task Scheduler |
 
 ### Design System
@@ -82,33 +112,41 @@ Use patterns when they solve a real problem, not by default.
 | Constants | SCREAMING_SNAKE_CASE | `MAX_BATCH_SIZE` |
 | Booleans | `is/has/can/should` prefix | `isLoading`, `hasPermission` |
 
+**Data-layer naming boundary**: Postgres columns are **snake_case**; app types are
+**camelCase**. Cross only in `web/src/lib/mappers.ts` (`rowToTask`, `taskPatchToRow`, …)
+and the bot's `skills/task_repo.py`. Hooks/writes stay camelCase.
+
 ### File Structure
 
 Monorepo — web app and bot are separate, self-contained folders. Never mix bot
-secrets/service-account keys into `web/`, and never import web code from `bot/`.
+secrets/service-role keys into `web/`, and never import web code from `bot/`.
 
 ```
 bot-work-tracker/
 ├── web/                    # React + Vite + TS SPA  → Vercel
 │   ├── src/
-│   │   ├── contexts/       #   AuthContext, SprintContext
-│   │   ├── hooks/          #   useSprints, useTasks, useMembers
-│   │   ├── components/     #   UI components (one component per file)
-│   │   ├── lib/            #   pure helpers (sprint math, formatting)
+│   │   ├── contexts/       #   AuthContext, SprintContext, NotifyContext
+│   │   ├── hooks/          #   useLiveQuery (fetch+subscribe), useTasks/Sprints/
+│   │   │                   #   Members/Projects/Features/Bugs/BugLabels/Activity…
+│   │   ├── components/     #   one component per file; task/ and bug/ subfolders
+│   │   ├── lib/            #   mappers, *Writes (task/project/feature/bug…), pure
+│   │   │                   #   helpers (sprint, format, bugStatus, discordLink…)
 │   │   ├── types.ts        #   All TypeScript interfaces/types
-│   │   ├── firebase.ts     #   Firebase init and exports
+│   │   ├── supabase.ts     #   Supabase client init (VITE_SUPABASE_* — client-safe)
 │   │   └── App.tsx         #   Routing/provider shell only
-│   ├── .env.example        #   VITE_FIREBASE_* keys (client-safe)
+│   ├── .env.example        #   VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
 │   └── vercel.json
-├── bot/                    # Python discord.py + firebase-admin (self-hosted)
-│   ├── bot.py              #   tag → Claude CLI → skills
-│   ├── firebase_client.py  #   firebase-admin init (service account)
-│   ├── skills/             #   task_ops.py, sprint_report.py, reminder.py
-│   ├── settings.json       #   model, allowed users, channels
-│   └── .env.example        #   DISCORD_TOKEN, GOOGLE_APPLICATION_CREDENTIALS
-├── firestore.rules         # Security rules — deploy WITH code changes
-├── firebase.json
-└── DATA_MODEL.md           # Shared Firestore schema (source of truth for web + bot)
+├── bot/                    # Python discord.py + supabase-py (self-hosted)
+│   ├── bot.py              #   tag → Claude CLI → skills; bug-sync loops
+│   ├── supabase_client.py  #   supabase-py init (service-role key, bypasses RLS)
+│   ├── skills/             #   task_ops, sprint_report, reminder, task_repo,
+│   │                       #   constants, bug_sync (Discord forum ↔ bugs)
+│   ├── settings.json       #   model, allowed users, channels, bug_forums
+│   └── .env.example        #   DISCORD_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+├── supabase/
+│   ├── migrations/         # 0001_init … — schema + RLS + realtime (SOURCE OF TRUTH)
+│   └── migrate_from_firestore.py
+└── DATA_MODEL.md           # Shared schema (source of truth for web + bot)
 ```
 
 ### Comments
@@ -122,10 +160,15 @@ bot-work-tracker/
 ## Performance
 
 - **No object creation inside loops** — extract outside or memoize
-- **Cleanup `onSnapshot` listeners** — always `return unsub` in `useEffect`; missing cleanup = Firestore cost leak
-- **`useMemo`/`useCallback`** for derived state and stable callbacks passed to children
-- **Batch Firestore writes** — use `writeBatch` for bulk operations; max 499 ops per batch
-- **Pagination** for lists that can grow unboundedly
+- **Cleanup Realtime channels** — `useLiveQuery` returns `supabase.removeChannel(channel)`
+  in its `useEffect` cleanup; any manual `.channel()` subscription MUST be removed on
+  unmount or it leaks a socket.
+- **`useMemo`/`useCallback`** for derived state and stable callbacks passed to children.
+  A `useLiveQuery` `fetcher` must be `useCallback`-stable per its `deps`.
+- **Prefer one query shape** — `useLiveQuery` refetches on any table change (RLS-filtered);
+  fine for these row counts. Add a Postgres `filter` to scope the realtime channel.
+- **Batch bulk writes** — one `.insert([...])` / `.upsert([...])` call, not a loop.
+- **Pagination** for lists that can grow unboundedly.
 
 ---
 
@@ -135,22 +178,29 @@ bot-work-tracker/
 - Never silently swallow errors — log with full context
 - Custom error types for domain errors (import failure, permission denied)
 - Show user-facing messages for expected failures; log full stack for unexpected ones
+- Supabase calls return `{ data, error }` — **always check `error` and throw/handle**; do
+  not assume `data` is populated. Notion / Discord side-syncs are fire-and-forget (Postgres
+  is the source of truth if they fail).
 
 ---
 
-## Firebase-Specific Rules
+## Supabase-Specific Rules
 
-- **Client Firebase config is public by design** — the `VITE_FIREBASE_*` values ship in the
-  browser bundle; that is expected. Access is gated by Firestore **security rules + Auth**, not
-  by hiding the config. Never put a service-account key or bot token in `web/`.
-- **The bot uses a service-account key** (`firebase-admin`) which bypasses security rules —
-  keep it out of git (`.gitignore`) and off Vercel. Enforce bot-side permission checks in code.
-- **Security rules deploy with code** — never ship a new query shape without updating
-  `firestore.rules`; keep the rules in sync with `DATA_MODEL.md`.
-- **`DATA_MODEL.md` is the single source of truth** for collection/field names shared by web
-  and bot. Change it there first, then both sides.
-- **Reset state to `[]`** synchronously when `activeSprintId` changes before new listeners attach
-- **Cleanup `onSnapshot` listeners** — always `return unsub` in `useEffect`; missing cleanup = cost leak
+- **Client config is public by design** — `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
+  ship in the browser bundle; access is gated by **RLS + Auth**, not by hiding them. Never
+  put the service-role key or bot token in `web/`.
+- **The bot uses the `service_role` key** — it **bypasses RLS**, so enforce every
+  permission check in bot code. Keep it out of git (`.gitignore` → `bot/.env`) and off Vercel.
+- **Security lives in migrations** — never ship a new query shape without the matching RLS
+  policy. Add a `supabase/migrations/00NN_*.sql` file **and** apply it (Supabase MCP
+  `apply_migration` or CLI). Run `get_advisors` after DDL. `SECURITY DEFINER` functions
+  must `revoke execute … from public, anon, authenticated` unless meant to be called.
+- **`DATA_MODEL.md` is the single source of truth** for table/field names shared by web and
+  bot. Change it there first, then both sides (mappers + `task_repo.py`).
+- **Reset state to `[]`** synchronously when the scope (e.g. `selectedSprintId`) changes,
+  before new listeners attach (`useLiveQuery` handles this via `deps`).
+- **Storage**: uploaded media lives in the public `attachments` bucket (`task-attachments/`,
+  `bug-attachments/`). Discord CDN URLs expire, so the bot re-uploads to Storage.
 
 ---
 
