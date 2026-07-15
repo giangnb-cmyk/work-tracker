@@ -425,5 +425,78 @@ def run_once() -> int:
     return state["code"]
 
 
+async def _tally_forum(client, forum_channel_id: int) -> dict:
+    """Chi DOC metadata (kich thuoc) attachment cua bai post - KHONG tai gi."""
+    ch = await _get_forum(client, forum_channel_id)
+    threads = await _gather_threads(ch)
+    agg = {"threads": len(threads), "with_media": 0, "read_fail": 0,
+           "img_n": 0, "img_b": 0, "vid_n": 0, "vid_b": 0, "file_n": 0, "file_b": 0}
+    for t in threads:
+        starter = t.starter_message
+        if starter is None:
+            try:
+                starter = await t.fetch_message(t.id)
+            except Exception:
+                agg["read_fail"] += 1
+        atts = list(getattr(starter, "attachments", None) or []) if starter else []
+        if atts:
+            agg["with_media"] += 1
+        for att in atts:
+            kind = _att_kind(getattr(att, "content_type", None), att.filename)
+            sz = att.size or 0
+            if kind == "image":
+                agg["img_n"] += 1; agg["img_b"] += sz
+            elif kind == "video":
+                agg["vid_n"] += 1; agg["vid_b"] += sz
+            else:
+                agg["file_n"] += 1; agg["file_b"] += sz
+    return agg
+
+
+def run_estimate() -> int:
+    """Uoc tinh dung luong media se luu, khong tai len."""
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("LOI: thieu DISCORD_TOKEN", file=sys.stderr)
+        return 1
+    if not load_forum_configs():
+        print("Chua cau hinh 'bug_forums' trong settings.json.")
+        return 0
+    intents = discord.Intents.default()
+    intents.message_content = True
+    client = discord.Client(intents=intents)
+    state = {"aggs": []}
+
+    @client.event
+    async def on_ready():
+        try:
+            for cfg in load_forum_configs():
+                state["aggs"].append((cfg, await _tally_forum(client, cfg["forum_channel_id"])))
+        except Exception as e:
+            print("LOI:", e, file=sys.stderr)
+        finally:
+            await client.close()
+
+    client.run(token)
+    mb = lambda b: b / 1024 / 1024  # noqa: E731
+    total = 0
+    for cfg, a in state["aggs"]:
+        tb = a["img_b"] + a["vid_b"] + a["file_b"]
+        total += tb
+        print(f"\nForum {cfg['forum_channel_id']}: {a['threads']} bai post, {a['with_media']} bai co media"
+              + (f"  [!] {a['read_fail']} bai KHONG doc duoc noi dung (thieu quyen Read Message History)" if a['read_fail'] else ""))
+        print(f"  Anh   : {a['img_n']:>4} file  ~ {mb(a['img_b']):8.1f} MB")
+        print(f"  Video : {a['vid_n']:>4} file  ~ {mb(a['vid_b']):8.1f} MB")
+        print(f"  File  : {a['file_n']:>4} file  ~ {mb(a['file_b']):8.1f} MB")
+        print(f"  TONG  : {mb(tb):.1f} MB")
+    print(f"\n==> TONG media (bai goc): {mb(total):.1f} MB. Free Supabase Storage = 1024 MB.")
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(run_once())
+    import argparse
+
+    _p = argparse.ArgumentParser(description="Sync/uoc tinh bug tu forum Discord")
+    _p.add_argument("--estimate", action="store_true", help="Chi uoc tinh dung luong media (khong tai len)")
+    _args = _p.parse_args()
+    sys.exit(run_estimate() if _args.estimate else run_once())
