@@ -10,7 +10,7 @@ import { labelsForStatus } from '../lib/bugStatus';
 import BugKanban from './bug/BugKanban';
 import BugList from './bug/BugList';
 import BugModal from './bug/BugModal';
-import BugLabelChip from './bug/BugLabelChip';
+import BugFilterBar, { matchBug, type FilterToken } from './bug/BugFilterBar';
 import type { Bug, BugStatus } from '../types';
 
 type ViewMode = 'kanban' | 'list';
@@ -18,7 +18,7 @@ type ViewMode = 'kanban' | 'list';
 /** Bugs tab: per-project bug tracker with a Kanban board and a list view. */
 export default function Bugs() {
   const { user, isAdmin } = useAuth();
-  const { selectedProjectId, selectedProject } = useSprintContext();
+  const { selectedProjectId, selectedProject, members } = useSprintContext();
   const { bugs, loading } = useBugs(selectedProjectId);
   const { labels } = useBugLabels(selectedProjectId);
   const [mode, setMode] = useState<ViewMode>('kanban');
@@ -27,25 +27,22 @@ export default function Bugs() {
   const [seeding, setSeeding] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([]);
+  const [tokens, setTokens] = useState<FilterToken[]>([]);
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const canEditBug = (b: Bug) => isAdmin || b.reporterId === user?.uid || b.assigneeId === user?.uid;
 
   const key = (ids: string[]) => [...ids].sort().join(',');
+  const meId = user?.uid ?? '';
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return bugs.filter((b) => {
-      if (filterLabelIds.length && !filterLabelIds.every((id) => b.labelIds.includes(id))) return false;
+      if (!matchBug(b, tokens, meId)) return false;
       if (!q) return true;
       return b.title.toLowerCase().includes(q) || `#${b.number}`.includes(q) || String(b.number) === q;
     });
-  }, [bugs, query, filterLabelIds]);
-
-  function toggleFilter(id: string) {
-    setFilterLabelIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
+  }, [bugs, query, tokens, meId]);
 
   /** Move on the kanban: set status AND swap the matching workflow tag, so the
    *  card's tag stays consistent (and the change pushes back to Discord). */
@@ -114,27 +111,14 @@ export default function Bugs() {
 
       {syncMsg && <div className="callout-inline" style={{ marginBottom: '1rem' }}>{syncMsg}</div>}
 
-      {/* Filter: search by title/#id + toggle label chips */}
-      <div className="bug-filter">
-        <input
-          className="input bug-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="🔍 Tìm theo tên bug hoặc #số…"
-        />
-        {labels.length > 0 && (
-          <div className="bug-filter-labels">
-            {labels.map((l) => (
-              <BugLabelChip key={l.id} label={l} active={filterLabelIds.includes(l.id)} onClick={() => toggleFilter(l.id)} />
-            ))}
-          </div>
-        )}
-        {(query || filterLabelIds.length > 0) && (
-          <button className="btn-sm bug-filter-clear" onClick={() => { setQuery(''); setFilterLabelIds([]); }}>
-            Xoá lọc ({filtered.length})
-          </button>
-        )}
-      </div>
+      <BugFilterBar
+        labels={labels}
+        members={members}
+        tokens={tokens}
+        onTokens={setTokens}
+        query={query}
+        onQuery={setQuery}
+      />
 
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>

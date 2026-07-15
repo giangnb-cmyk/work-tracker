@@ -519,7 +519,7 @@ def run_perms() -> int:
                     continue
                 me = ch.guild.me
                 p = ch.permissions_for(me)
-                print(f"\nForum '{ch.name}' ({ch.id}) @ guild '{ch.guild.name}'")
+                print(f"\nForum '{ch.name}' ({ch.id}) @ guild '{ch.guild.name}' (guild_id={ch.guild.id})")
                 print(f"  Bot: {me}  |  roles: {[r.name for r in me.roles]}")
                 for name in ("view_channel", "read_message_history", "manage_threads",
                              "manage_channels", "send_messages", "send_messages_in_threads"):

@@ -109,7 +109,9 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           <BadgeSelect value={status} options={statusOpts} onChange={(v) => changeStatus(v as BugStatus)} disabled={!canEdit} placeholder="Trạng thái" />
           <span className="bugm-head-spacer" />
           {bug?.discordThreadId && bug?.discordGuildId && (
-            <button type="button" className="bugm-iconbtn" title="Mở trong Discord" onClick={() => openDiscordThread(bug.discordGuildId!, bug.discordThreadId!)}>🔗</button>
+            <button type="button" className="bugm-iconbtn bugm-discord" title="Mở thread trong Discord" onClick={() => openDiscordThread(bug.discordGuildId!, bug.discordThreadId!)}>
+              <ProviderIcon provider="discord" size={18} />
+            </button>
           )}
           <button className="tmodal-x" onClick={onClose} aria-label="Đóng">✕</button>
         </div>
@@ -147,7 +149,6 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           <section className="bugm-section">
             <h4 className="tm-h">📋 Thông tin</h4>
             <div className="bug-info">
-              <label className="bugf"><span className="bugf-ic">🔴</span><span className="bugf-lb">Mức độ</span>{groupSelect('severity')}</label>
               <label className="bugf"><span className="bugf-ic">🏷️</span><span className="bugf-lb">Version</span>{groupSelect('version')}</label>
               <label className="bugf">
                 <span className="bugf-ic">🚀</span><span className="bugf-lb">Trạng thái</span>

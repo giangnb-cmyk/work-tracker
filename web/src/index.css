@@ -606,11 +606,48 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .bug-addlabel:hover { border-color: var(--primary); color: var(--primary); }
 .bug-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); font-weight: 700; }
 
-/* Bug filter bar: search + toggle label chips */
-.bug-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.1rem; }
-.bug-search { width: min(320px, 100%); }
-.bug-filter-labels { display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; min-width: 0; }
-.bug-filter-clear { flex-shrink: 0; }
+/* GitLab-style token filter */
+.bugflt { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 1.1rem; }
+.bugflt-bar {
+  position: relative; flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 10px; padding: 0.35rem 0.5rem;
+}
+.bugflt-search-ic { color: var(--muted); font-size: 0.85rem; }
+.bugflt-search { flex: 1; min-width: 140px; background: none; border: none; color: var(--text); font-size: 0.85rem; padding: 0.2rem; }
+.bugflt-search:focus { outline: none; }
+.bugflt-token { display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(99, 102, 241, 0.14); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 7px; padding: 0.15rem 0.2rem 0.15rem 0.45rem; font-size: 0.78rem; }
+.bugflt-token-facet { color: var(--muted); }
+.bugflt-token-op { color: var(--sky); }
+.bugflt-token-val { color: var(--text); font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bugflt-token-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 0.2rem; }
+.bugflt-token-x:hover { color: var(--red); }
+.bugflt-add { background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 6px; white-space: nowrap; }
+.bugflt-add:hover { color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+
+.bugflt-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 264px; max-height: 340px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.4rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); animation: popIn 0.16s ease;
+}
+.bugflt-pop-head { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; font-weight: 700; color: var(--muted); padding: 0.3rem 0.45rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.bugflt-back { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; padding: 0; }
+.bugflt-back:hover { color: var(--text); }
+.bugflt-pop-opt { display: flex; align-items: center; gap: 0.5rem; width: 100%; background: none; border: none; color: var(--text); font-size: 0.85rem; padding: 0.5rem; border-radius: 8px; cursor: pointer; text-align: left; }
+.bugflt-pop-opt:hover { background: rgba(99, 102, 241, 0.15); }
+.bugflt-ops { display: flex; gap: 0.3rem; padding: 0.25rem 0.4rem 0.4rem; }
+.bugflt-op { flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: var(--muted); font-size: 0.78rem; padding: 0.3rem; border-radius: 7px; cursor: pointer; }
+.bugflt-op.on { background: var(--primary); color: #fff; border-color: transparent; }
+.bugflt-vals { display: flex; flex-direction: column; gap: 1px; max-height: 210px; overflow-y: auto; }
+.bugflt-val { display: flex; align-items: center; gap: 0.4rem; width: 100%; background: none; border: none; color: var(--text); font-size: 0.83rem; padding: 0.42rem 0.45rem; border-radius: 7px; cursor: pointer; text-align: left; }
+.bugflt-val:hover { background: rgba(255, 255, 255, 0.05); }
+.bugflt-val.on { background: rgba(99, 102, 241, 0.12); }
+.bugflt-check { width: 14px; flex-shrink: 0; color: var(--primary); font-size: 0.8rem; }
+.bugflt-apply { width: 100%; margin-top: 0.4rem; background: var(--primary); border: none; color: #fff; font-size: 0.82rem; font-weight: 600; padding: 0.5rem; border-radius: 8px; cursor: pointer; }
+.bugflt-apply:disabled { opacity: 0.5; cursor: default; }
+
+/* Native <select> popup readability on the dark theme */
+select.bugf-sel option, .select option { background: var(--surface); color: var(--text); }
+.bugm-discord svg { display: block; }
 
 /* Status accent (kanban dots + list pill) */
 .s-open { --st: #94a3b8; }
