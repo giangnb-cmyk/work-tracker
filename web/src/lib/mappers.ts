@@ -6,6 +6,8 @@ import type {
   Activity,
   AppNotification,
   Attachment,
+  Bug,
+  BugLabel,
   Feature,
   Project,
   Sprint,
@@ -69,6 +71,55 @@ export function rowToFeature(r: Row): Feature {
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };
+}
+
+export function rowToBugLabel(r: Row): BugLabel {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    color: r.color ?? '#6366f1',
+    icon: r.icon ?? '',
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? '',
+  };
+}
+
+export function rowToBug(r: Row): Bug {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    number: r.number ?? 0,
+    title: r.title,
+    description: r.description ?? '',
+    status: r.status,
+    labelIds: r.label_ids ?? [],
+    reporterId: r.reporter_id ?? null,
+    reporterName: r.reporter_name ?? '',
+    assigneeId: r.assignee_id ?? null,
+    assigneeName: r.assignee_name ?? '',
+    order: r.order ?? 0,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    updatedAt: Timestamp.fromISO(r.updated_at) ?? undefined,
+  };
+}
+
+/** Convert a partial Bug patch (camelCase) to a DB row patch (snake_case). */
+export function bugPatchToRow(patch: Partial<Bug>): Row {
+  const map: Record<string, string> = {
+    title: 'title',
+    description: 'description',
+    status: 'status',
+    labelIds: 'label_ids',
+    assigneeId: 'assignee_id',
+    assigneeName: 'assignee_name',
+    reporterId: 'reporter_id',
+    reporterName: 'reporter_name',
+    order: 'order',
+  };
+  const row: Row = {};
+  for (const [k, v] of Object.entries(patch)) if (map[k]) row[map[k]] = v;
+  return row;
 }
 
 export function rowToTask(r: Row): Task {

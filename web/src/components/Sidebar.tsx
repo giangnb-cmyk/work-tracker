@@ -3,7 +3,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import Avatar from './Avatar';
 
 // 'projects' is no longer an in-app tab — it's the landing page you enter through.
-export type ViewId = 'board' | 'mytasks' | 'features' | 'backlog' | 'timeline' | 'dashboard' | 'sprints' | 'team' | 'settings';
+export type ViewId = 'board' | 'mytasks' | 'features' | 'backlog' | 'bugs' | 'timeline' | 'dashboard' | 'sprints' | 'team' | 'settings';
 
 interface NavDef {
   id: ViewId;
@@ -17,6 +17,7 @@ const NAV: NavDef[] = [
   { id: 'mytasks', label: 'Task của tôi', icon: '🎯' },
   { id: 'features', label: 'Features', icon: '🧩' },
   { id: 'backlog', label: 'Backlog', icon: '📥' },
+  { id: 'bugs', label: 'Bugs', icon: '🐞' },
   { id: 'timeline', label: 'Timeline', icon: '📆' },
   { id: 'dashboard', label: 'Thống kê', icon: '📊' },
   { id: 'sprints', label: 'Quản lý Sprint', icon: '🗂️', adminOnly: true },

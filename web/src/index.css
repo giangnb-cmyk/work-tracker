@@ -577,6 +577,86 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tl-nodate { position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 0.72rem; }
 .filter-bar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
 
+/* ============================================================================
+   Bugs (tracker): segmented toggle · label chips · kanban · list
+   ========================================================================== */
+.view-header.row.between { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+
+.seg-toggle { display: inline-flex; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 10px; padding: 2px; }
+.seg { background: none; border: none; color: var(--muted); font-size: 0.82rem; font-weight: 600; padding: 0.35rem 0.8rem; border-radius: 8px; cursor: pointer; transition: background 0.18s ease, color 0.18s ease; }
+.seg:hover { color: var(--text); }
+.seg.on { background: var(--primary); color: #fff; }
+
+/* Label chip — tint/border derive from the label's --chip color */
+.bug-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap;
+  font-size: 0.74rem; font-weight: 600; line-height: 1; padding: 0.25rem 0.55rem; border-radius: 999px;
+  color: color-mix(in srgb, var(--chip) 70%, #fff);
+  background: color-mix(in srgb, var(--chip) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip) 45%, transparent);
+}
+.bug-chip.sm { font-size: 0.66rem; padding: 0.14rem 0.42rem; }
+.bug-chip.clickable { cursor: pointer; transition: opacity 0.15s ease; }
+.bug-chip.off { opacity: 0.32; }
+.bug-chip.off:hover { opacity: 0.7; }
+.bug-chip-ic { font-size: 0.85em; }
+.bug-chip-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.95em; line-height: 1; padding: 0; margin-left: 0.05rem; opacity: 0.7; }
+.bug-chip-x:hover { opacity: 1; }
+.bug-addlabel { width: 26px; height: 26px; border-radius: 999px; border: 1px dashed var(--border); background: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; }
+.bug-addlabel:hover { border-color: var(--primary); color: var(--primary); }
+.bug-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+
+/* Status accent (kanban dots + list pill) */
+.s-open { --st: #94a3b8; }
+.s-fixing { --st: #fb923c; }
+.s-pending { --st: #f59e0b; }
+.s-deployed { --st: #6366f1; }
+.s-done { --st: #22c55e; }
+
+/* Kanban */
+.bug-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 0.85rem; overflow-x: auto; padding-bottom: 0.5rem; align-items: start; }
+.bug-col { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-soft); border-radius: 14px; padding: 0.6rem; display: flex; flex-direction: column; gap: 0.6rem; min-height: 140px; transition: border-color 0.18s ease, background 0.18s ease; }
+.bug-col.over { border-color: var(--primary); background: rgba(99, 102, 241, 0.06); }
+.bug-col-head { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; font-weight: 700; color: var(--text); padding: 0.15rem 0.25rem; }
+.bug-col-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--st, #94a3b8); }
+.bug-col-count { margin-left: auto; font-size: 0.72rem; color: var(--muted); background: rgba(255, 255, 255, 0.06); border-radius: 999px; padding: 0.05rem 0.45rem; }
+.bug-col-body { display: flex; flex-direction: column; gap: 0.5rem; }
+.bug-col-empty { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 0.4rem 0; opacity: 0.45; }
+.bug-card { background: var(--glass); border: 1px solid var(--border); border-radius: 11px; padding: 0.6rem 0.7rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.4rem; transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+.bug-card:hover { border-color: rgba(99, 102, 241, 0.5); transform: translateY(-1px); box-shadow: 0 8px 20px rgba(2, 6, 23, 0.4); }
+.bug-card.dragging { opacity: 0.45; }
+.bug-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.bug-card-title { font-size: 0.85rem; font-weight: 600; line-height: 1.35; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bug-card-labels { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+
+/* List (GitLab-style rows) */
+.bug-list { padding: 0.15rem 0; overflow: hidden; }
+.bug-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid var(--border-soft); transition: background 0.15s ease; }
+.bug-row:last-child { border-bottom: none; }
+.bug-row:hover { background: rgba(255, 255, 255, 0.03); }
+.bug-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.bug-row-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.bug-row-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.bug-row-status { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.1rem 0.4rem; border-radius: 6px; color: var(--st, #94a3b8); background: color-mix(in srgb, var(--st, #94a3b8) 18%, transparent); }
+.bug-row-ref { font-size: 0.76rem; }
+.bug-row-num { font-family: var(--font-mono); margin-left: 0.1rem; }
+.bug-row-side { display: flex; align-items: center; gap: 0.85rem; flex-shrink: 0; }
+.bug-row-updated { font-size: 0.74rem; white-space: nowrap; }
+.bug-row-unassigned { color: var(--muted); font-size: 1.1rem; }
+
+/* Bug modal extras */
+.bug-modal { width: min(620px, 100%); }
+.bug-modal-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
+.bug-status-sel { width: auto; }
+.bug-title-input { width: 100%; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; color: var(--text); font-size: 1.02rem; font-weight: 600; margin-bottom: 0.35rem; }
+.bug-title-input:focus { outline: none; border-color: var(--primary); }
+.bug-meta { font-size: 0.78rem; margin-bottom: 0.75rem; }
+.bug-label-picker { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.bug-newlabel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.5rem; padding: 0.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft); border-radius: 10px; }
+.bug-swatches { display: flex; gap: 0.25rem; }
+.bug-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.bug-swatch.on { border-color: var(--text); }
+
 /* Project-select landing page */
 .project-select { min-height: 100vh; display: flex; flex-direction: column; }
 .project-select-top {

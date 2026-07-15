@@ -144,6 +144,47 @@ export interface Project {
   createdBy: string;
 }
 
+export type BugStatus = 'open' | 'fixing' | 'pending' | 'deployed' | 'done';
+
+export const BUG_STATUSES: BugStatus[] = ['open', 'fixing', 'pending', 'deployed', 'done'];
+
+export const BUG_STATUS_LABEL: Record<BugStatus, string> = {
+  open: 'Mở',
+  fixing: 'Đang sửa',
+  pending: 'Chờ',
+  deployed: 'Đã deploy',
+  done: 'Xong',
+};
+
+/** A project-scoped label in the bug tag palette (Bug / High / Fixing / 1.0.x / …). */
+export interface BugLabel {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  icon: string; // optional emoji
+  createdAt?: Timestamp;
+  createdBy: string;
+}
+
+/** A bug report inside a project. `number` is a per-project running id (#530). */
+export interface Bug {
+  id: string;
+  projectId: string;
+  number: number;
+  title: string;
+  description: string;
+  status: BugStatus;
+  labelIds: string[];
+  reporterId: string | null;
+  reporterName: string;
+  assigneeId: string | null;
+  assigneeName: string;
+  order: number;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface Sprint {
   id: string;
   name: string;

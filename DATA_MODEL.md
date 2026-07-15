@@ -176,6 +176,41 @@ subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `revie
 
 ---
 
+## `bug_labels/{labelId}` & `bugs/{bugId}`
+
+A per-project **bug tracker**. `bug_labels` is the project's tag palette; `bugs` are
+reports shown on a Kanban board (by `status`) and a GitLab-style list. Postgres:
+`public.bug_labels`, `public.bugs` (both `project_id` FK → `projects(id)` `on delete cascade`).
+
+**bug_labels** — RLS: read all signed-in, write admin.
+
+| Field       | Type   | Notes                                   |
+|-------------|--------|-----------------------------------------|
+| `id`        | string | row id                                  |
+| `projectId` | string | owning project                          |
+| `name`      | string | label text (1–40 chars)                 |
+| `color`     | string | accent hex                              |
+| `icon`      | string | optional emoji                          |
+
+**bugs** — RLS: read all; insert any signed-in; update admin/reporter/assignee; delete admin/reporter.
+A `BEFORE INSERT` trigger assigns `number` = next per-project running id.
+
+| Field          | Type              | Notes                                                       |
+|----------------|-------------------|-------------------------------------------------------------|
+| `id`           | string            | row id                                                      |
+| `projectId`    | string            | owning project                                              |
+| `number`       | number            | per-project running id (shown as `#530`)                    |
+| `title`        | string            | 1–200 chars                                                 |
+| `description`  | string            | repro / expected / actual                                   |
+| `status`       | string            | `open` \| `fixing` \| `pending` \| `deployed` \| `done` (Kanban columns) |
+| `labelIds`     | string[]          | ids into `bug_labels` (tag palette)                         |
+| `reporterId` / `reporterName` | string \| null / string | who filed it                       |
+| `assigneeId` / `assigneeName` | string \| null / string | who owns the fix                   |
+| `order`        | number            | sort order                                                  |
+| `createdAt` / `updatedAt` | Timestamp | timestamps (`updatedAt` via trigger)                    |
+
+---
+
 ## `notifications/{notifId}`
 
 In-app notifications (the "web" half of completion notices; Discord is the other half).
