@@ -6,6 +6,8 @@
   "_note_bypass": "bypass_permissions=true lets Claude run tools without asking. DANGEROUS: anyone who tags the bot could make Claude run commands on this machine. Fill allowed_user_ids (Discord IDs allowed to command the bot) when bypass is on. run-bot-safe.bat forces bypass OFF.",
   "bypass_permissions": false,
   "allowed_user_ids": [],
+  "_note_sheets_mcp": "Bat MCP Google Sheets cho bot (CHI DOC). true = bot doc duoc noi dung sheet trong folder Drive da chia se cho service account. Yeu cau: cai 'uv' (uvx), tao service account + bat Sheets/Drive API, dien bot/mcp-bot.json (SERVICE_ACCOUNT_PATH + DRIVE_FOLDER_ID). Huong dan day du: bot/GOOGLE_SHEETS_MCP.md.",
+  "sheets_mcp_enabled": false,
   "_note_channels": "Discord channel IDs. reminder_channel_id = overdue/due-today reminders; standup_channel_id = daily standup prompt; task_done_channel_id = 'task hoan thanh' notifications (fallback to reminder_channel_id if 0).",
   "reminder_channel_id": 0,
   "standup_channel_id": 0,
@@ -31,6 +33,8 @@
   "bug_sync_tz": "Asia/Ho_Chi_Minh",
   "bug_sync_channel_id": 0,
   "bug_sync_poll_seconds": 20,
+  "_note_rag_sync": "true = moi ngay luc bug_sync_hour (9h) tu dong nap lai kho RAG: chay sync_docs.py (docs/ + links.txt) va drive_catalog.py (danh muc Google Drive, neu co keys/service-account-gsheets.json). Yeu cau Ollama chay + da ap migration 0014. Ket qua ghi log; gui Discord neu bug_sync_channel_id != 0.",
+  "rag_sync_enabled": true,
   "_note_bug_mirror_videos": "false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.",
   "bug_mirror_videos": false
 }

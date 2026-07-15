@@ -5,3 +5,12 @@ supabase>=2.9,<3.0
 requests>=2.31,<3.0
 # Du lieu mui gio cho ZoneInfo (Windows khong co san) — dung cho lich sync bug 9h sang.
 tzdata>=2024.1
+# --- RAG doc: chi CAN khi NAP tai lieu (doc_ingest.py / sync_docs.py). ---
+# Tim kiem (doc_search.py) chi dung requests, khong can cac lib duoi day.
+pypdf>=4.0,<6.0
+python-docx>=1.1,<2.0
+openpyxl>=3.1,<4.0
+beautifulsoup4>=4.12,<5.0
+# --- Danh muc Google Drive (drive_catalog.py): liet ke file Drive -> RAG. ---
+# Chi CAN neu dung drive_catalog.py. Dung service account (chi doc), goi Drive API bang requests.
+google-auth>=2.25,<3.0

@@ -1,0 +1,13 @@
+# DANH SÁCH LINK TÀI LIỆU CHO RAG
+# ------------------------------------------------------------------
+# - Mỗi dòng 1 đường dẫn (URL). Dòng bắt đầu bằng '#' là ghi chú, bị bỏ qua.
+# - Hỗ trợ: trang web (HTML), file PDF online, file text/markdown/csv online.
+#   (Google Docs/Sheets riêng tư cần chia sẻ công khai thì mới tải được.)
+# - Sau khi thêm/xóa link ở đây, chạy: sync-rag.bat  (hoặc thêm file vào thư mục docs/).
+# - Nguồn sẽ hiện với 'source' = chính URL này khi bot trích dẫn.
+#
+# Ví dụ (xóa dấu '#' để dùng thật):
+# https://example.com/quy-trinh-release
+# https://example.com/tai-lieu/onboarding.pdf
+#
+# ==== Dán link của bạn bên dưới ====

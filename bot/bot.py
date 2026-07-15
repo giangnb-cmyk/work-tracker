@@ -72,6 +72,24 @@ SPRINT_HINT = (
     f'`python "{_SKILLS_DIR}/sprint_report.py" [--sprint <name|active>]` (omit --sprint '
     "for the active sprint). Relay the printed report as-is."
 )
+DOC_HINT = (
+    " DOC SEARCH SKILL (RAG): When the user asks about the CONTENT of documents "
+    "(spec, tai lieu, huong dan, quy trinh, chinh sach, meeting notes) rather than "
+    "tasks/sprints, run "
+    f'`python "{_SKILLS_DIR}/doc_search.py" "<cau hoi>" [--project <id>] [--top-k N]`. '
+    "It returns the most relevant chunks with their source. Answer ONLY from those "
+    "chunks and cite the source [1],[2]...; if nothing relevant is returned, say the "
+    "document store has no matching info (do NOT invent an answer)."
+)
+SHEET_HINT = (
+    " GOOGLE SHEETS SKILL (live, CHI DOC): When the user asks about data inside a "
+    "Google Sheet in the shared Drive folder ('sheet', 'bang tinh', 'file tren drive', "
+    "'so lieu trong file ...'), use the google-sheets MCP tools: "
+    "mcp__google-sheets__list_spreadsheets de tim file, "
+    "mcp__google-sheets__list_sheets de xem cac tab, roi "
+    "mcp__google-sheets__get_sheet_data / search_spreadsheets / find_in_spreadsheet de doc. "
+    "READ ONLY - TUYET DOI khong tao/sua/xoa sheet. Tom tat gon cho Discord (khong dung bang markdown)."
+)
 FORMAT_HINT = (
     " FORMATTING RULES for Discord: NEVER use markdown tables (Discord does not render "
     "them). Use simple bullet lists. If script output contains Discord mention tokens "
@@ -80,6 +98,24 @@ FORMAT_HINT = (
     "'LOI:', it failed - relay that error politely and do not retry blindly."
 )
 MOOD_HINT = ""  # co the mo rong sau (bot com co set_mood skill); giu de dong bo cau truc.
+
+# --- Google Sheets MCP (tuy chon, mac dinh TAT) ------------------------------
+# Bat bang "sheets_mcp_enabled": true trong settings.json SAU khi da tao service
+# account + dien bot/mcp-bot.json. Tat -> bot chay y het nhu truoc (khong dung MCP).
+SHEETS_MCP_ENABLED = bool(_settings.get("sheets_mcp_enabled", False))
+_MCP_BOT_CONFIG = str(Path(__file__).parent / "mcp-bot.json")
+# Chi mo cac tool DOC (khong cho ghi/sua sheet) o che do an toan.
+SHEET_READ_TOOLS = [
+    "mcp__google-sheets__list_spreadsheets",
+    "mcp__google-sheets__list_sheets",
+    "mcp__google-sheets__list_folders",
+    "mcp__google-sheets__get_sheet_data",
+    "mcp__google-sheets__get_sheet_formulas",
+    "mcp__google-sheets__get_multiple_sheet_data",
+    "mcp__google-sheets__get_multiple_spreadsheet_summary",
+    "mcp__google-sheets__search_spreadsheets",
+    "mcp__google-sheets__find_in_spreadsheet",
+]
 
 # Claude chay trong thu muc con 'workspace' (khong chua .env/key) cho an toan.
 WORKSPACE = Path(__file__).parent / "workspace"
@@ -111,7 +147,7 @@ _lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
     _lock_socket.bind(("127.0.0.1", _LOCK_PORT))
 except OSError:
-    print("Bot dang chay o cua so khac roi, khong mo them instance nua. Thoat.")
+    print("Bot đang chạy ở cửa sổ khác rồi, không mở thêm instance nữa. Thoát.")
     sys.exit(2)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -140,13 +176,18 @@ BUG_SYNC_TZ = _settings.get("bug_sync_tz", "Asia/Ho_Chi_Minh")
 BUG_SYNC_CHANNEL_ID = int(_settings.get("bug_sync_channel_id", 0) or 0)  # kenh bao ket qua (0 = tat)
 BUG_SYNC_POLL_SECONDS = int(_settings.get("bug_sync_poll_seconds", 20))  # nhip quet yeu cau sync tu web
 
+# --- Dong bo RAG (tai lieu) tu dong: chay CUNG gio voi bug sync (mac dinh 9h) -----
+RAG_SYNC_ENABLED = bool(_settings.get("rag_sync_enabled", False))
+RAG_SYNC_TIMEOUT = int(_settings.get("rag_sync_timeout_seconds", 900))  # gioi han moi skill (giay)
+_GDRIVE_KEY_DEFAULT = Path(__file__).parent.parent / "keys" / "service-account-gsheets.json"
+
 try:
     from zoneinfo import ZoneInfo
     _SYNC_TZINFO = ZoneInfo(BUG_SYNC_TZ)
     _SYNC_TIME = datetime.time(hour=BUG_SYNC_HOUR, minute=0, tzinfo=_SYNC_TZINFO)
 except Exception:
     # Khong co tzdata -> quy doi tho ve UTC (VN = UTC+7). Cai 'tzdata' de chuan.
-    log.warning("Khong load duoc timezone '%s' (thieu tzdata?), dung UTC xap xi.", BUG_SYNC_TZ)
+    log.warning("Không load được timezone '%s' (thiếu tzdata?), dùng UTC xấp xỉ.", BUG_SYNC_TZ)
     _SYNC_TIME = datetime.time(hour=(BUG_SYNC_HOUR - 7) % 24, minute=0)
 
 
@@ -167,24 +208,35 @@ def _last_json(text: str):
 
 def _build_args(prompt: str) -> list:
     """Dung danh sach tham so goi Claude CLI (tach ra cho de doc)."""
+    hints = f"{TASK_HINT}{SPRINT_HINT}{DOC_HINT}"
+    if SHEETS_MCP_ENABLED:
+        hints += SHEET_HINT
+    hints += f"{FORMAT_HINT}{MOOD_HINT}"
     args = [
         CLAUDE_CMD, "-p", prompt,
         "--output-format", "json",
         "--append-system-prompt",
         f"{SYSTEM_PROMPT}\n\nTAM TRANG HOM NAY (bat buoc nhap vai dung giong nay): "
-        f"{today_mood()}\n{TASK_HINT}{SPRINT_HINT}{FORMAT_HINT}{MOOD_HINT}",
+        f"{today_mood()}\n{hints}",
     ]
     if CLAUDE_MODEL:
         args += ["--model", CLAUDE_MODEL]
+    # Nap RIENG config MCP google-sheets cho bot (--strict-mcp-config -> bo qua .mcp.json,
+    # tranh keo theo Supabase HTTP MCP lam treo phien khong tuong tac).
+    if SHEETS_MCP_ENABLED:
+        args += ["--mcp-config", _MCP_BOT_CONFIG, "--strict-mcp-config"]
     if BYPASS_PERMISSIONS:
         args += ["--dangerously-skip-permissions"]
     else:
-        # Che do an toan: chi doc file + chay dung 2 skill task, chan lenh khac.
+        # Che do an toan: chi doc file + chay dung cac skill, chan lenh khac.
         default_tools = [
             "Read", "Glob", "Grep",
             f'Bash(python "{_SKILLS_DIR}/task_ops.py":*)',
             f'Bash(python "{_SKILLS_DIR}/sprint_report.py":*)',
+            f'Bash(python "{_SKILLS_DIR}/doc_search.py":*)',
         ]
+        if SHEETS_MCP_ENABLED:
+            default_tools += SHEET_READ_TOOLS  # chi cac tool DOC sheet
         tools = _settings.get("safe_allowed_tools") or default_tools
         args += ["--allowedTools", ",".join(tools)]
     return args
@@ -289,15 +341,69 @@ async def daily_bug_sync():
     try:
         summary = await _do_sync_all()
     except Exception:
-        log.exception("Dong bo bug tu dong that bai")
+        log.exception("Đồng bộ bug tự động thất bại")
         return
-    log.info("Dong bo bug tu dong: %s", summary)
+    log.info("Đồng bộ bug tự động: %s", summary)
     if BUG_SYNC_CHANNEL_ID:
         try:
             ch = client.get_channel(BUG_SYNC_CHANNEL_ID) or await client.fetch_channel(BUG_SYNC_CHANNEL_ID)
             await ch.send(f"🐞 Đồng bộ bug tự động ({BUG_SYNC_HOUR}h): {summary}")
         except Exception:
-            log.warning("Khong gui duoc tom tat sync bug")
+            log.warning("Không gửi được tóm tắt sync bug")
+
+
+def _gdrive_key_ready() -> bool:
+    """Co service account key cho drive_catalog khong (env GDRIVE_SERVICE_ACCOUNT > mac dinh)."""
+    raw = os.getenv("GDRIVE_SERVICE_ACCOUNT")
+    if not raw:
+        return _GDRIVE_KEY_DEFAULT.exists()
+    p = Path(raw)
+    return (p if p.is_absolute() else (Path(__file__).parent.parent / p)).exists()
+
+
+async def _run_rag_skill(script: str) -> str:
+    """Chay 1 skill RAG (python skills/<script>) bang subprocess. Tra ve dong ket qua cuoi."""
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, os.path.join(_SKILLS_DIR, script),
+        cwd=str(Path(__file__).parent),
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    try:
+        out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=RAG_SYNC_TIMEOUT)
+    except asyncio.TimeoutError:
+        proc.kill()
+        return f"timeout > {RAG_SYNC_TIMEOUT}s"
+    out = out_b.decode("utf-8", errors="replace").strip()
+    return out.splitlines()[-1] if out else f"rc={proc.returncode}"
+
+
+@tasks.loop(time=_SYNC_TIME)
+async def daily_rag_sync():
+    """9h moi ngay: nap lai tai lieu docs/ + danh muc Google Drive vao kho RAG."""
+    if not RAG_SYNC_ENABLED:
+        return
+    parts = []
+    try:
+        parts.append("docs: " + await _run_rag_skill("sync_docs.py"))
+    except Exception:
+        log.exception("Đồng bộ RAG (docs) thất bại")
+        parts.append("docs: lỗi")
+    if _gdrive_key_ready():  # chi nap Drive khi da co service account key
+        try:
+            parts.append("drive: " + await _run_rag_skill("drive_catalog.py"))
+        except Exception:
+            log.exception("Đồng bộ RAG (drive) thất bại")
+            parts.append("drive: lỗi")
+    summary = " | ".join(parts)
+    log.info("Đồng bộ RAG tự động: %s", summary)
+    if BUG_SYNC_CHANNEL_ID:
+        try:
+            ch = client.get_channel(BUG_SYNC_CHANNEL_ID) or await client.fetch_channel(BUG_SYNC_CHANNEL_ID)
+            await ch.send(f"📚 Đồng bộ RAG tự động ({BUG_SYNC_HOUR}h): {summary}")
+        except Exception:
+            log.warning("Không gửi được tóm tắt sync RAG")
 
 
 @tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
@@ -308,22 +414,22 @@ async def poll_bug_sync_requests():
     try:
         sb = get_client()
     except Exception as e:
-        log.warning("Chua cau hinh Supabase (dat SUPABASE_SERVICE_ROLE_KEY trong .env): %s", e)
+        log.warning("Chưa cấu hình Supabase (đặt SUPABASE_SERVICE_ROLE_KEY trong .env): %s", e)
         return
     # (1) app -> Discord: bug co pending_discord_push (nguoi dung doi nhan tren app).
     try:
         n = await bug_sync.push_pending(client, sb)
         if n:
-            log.info("Da day %d bug (nhan) len Discord", n)
+            log.info("Đã đẩy %d bug (nhãn) lên Discord", n)
     except Exception:
-        log.exception("Day nhan len Discord loi")
+        log.exception("Đẩy nhãn lên Discord lỗi")
     # (2) web -> yeu cau sync (nut 'Sync Discord').
     try:
         pending = await asyncio.to_thread(
             lambda: sb.table("bug_sync_requests").select("*").eq("status", "pending").order("created_at").execute().data
         )
     except Exception as e:
-        log.warning("Doc bug_sync_requests loi: %s", e)
+        log.warning("Đọc bug_sync_requests lỗi: %s", e)
         return
     for req in pending or []:
         await _process_sync_request(sb, req)
@@ -335,12 +441,12 @@ async def _process_sync_request(sb, req):
     status, result = "done", ""
     try:
         if not cfg:
-            raise RuntimeError("chua cau hinh forum cho project nay")
+            raise RuntimeError("chưa cấu hình forum cho project này")
         r = await bug_sync.sync_forum(client, sb, cfg["project_id"], int(cfg["forum_channel_id"]))
-        result = f"tao {r['created']}, cap nhat {r['updated']} (tong {r['total']})"
+        result = f"tạo {r['created']}, cập nhật {r['updated']} (tổng {r['total']})"
     except Exception as e:
         status, result = "error", str(e)[:300]
-        log.exception("Xu ly yeu cau sync bug loi")
+        log.exception("Xử lý yêu cầu sync bug lỗi")
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     try:
         await asyncio.to_thread(
@@ -349,7 +455,7 @@ async def _process_sync_request(sb, req):
             ).eq("id", req["id"]).execute()
         )
     except Exception as e:
-        log.warning("Cap nhat trang thai sync request loi: %s", e)
+        log.warning("Cập nhật trạng thái sync request lỗi: %s", e)
 
 
 @client.event
@@ -360,7 +466,10 @@ async def on_ready():
             daily_bug_sync.start()
         if not poll_bug_sync_requests.is_running():
             poll_bug_sync_requests.start()
-        log.info("Bug sync bat: %d forum, chay luc %sh (%s)", len(BUG_FORUMS), BUG_SYNC_HOUR, BUG_SYNC_TZ)
+        log.info("Bug sync bật: %d forum, chạy lúc %sh (%s)", len(BUG_FORUMS), BUG_SYNC_HOUR, BUG_SYNC_TZ)
+    if RAG_SYNC_ENABLED and not daily_rag_sync.is_running():
+        daily_rag_sync.start()
+        log.info("RAG sync bật: chạy lúc %sh (%s)", BUG_SYNC_HOUR, BUG_SYNC_TZ)
 
 
 @client.event
@@ -376,28 +485,28 @@ async def on_message(message: discord.Message):
     question = strip_mentions(message.content)
     if not question:
         await message.reply(
-            "Tag toi kem yeu cau nhe, vi du: `@bot tao task Fix login giao cho Nam, gap`"
+            "Tag tôi kèm yêu cầu nhé, ví dụ: `@bot tạo task Fix login giao cho Nam, gấp`"
         )
         return
 
     # Lenh nhanh: "@bot sync bug" -> dong bo bug tu forum ngay (khong qua Claude).
     if BUG_FORUMS and SYNC_BUG_RE.search(question) and "bug" in question.lower():
-        log.info("[#%s] %s yeu cau sync bug", message.channel, message.author)
+        log.info("[#%s] %s yêu cầu sync bug", message.channel, message.author)
         try:
             async with message.channel.typing():
                 summary = await _do_sync_all()
             await message.reply(f"🐞 Đã đồng bộ bug từ forum Discord: {summary}")
         except Exception as e:
-            log.exception("Sync bug qua lenh that bai")
+            log.exception("Sync bug qua lệnh thất bại")
             await message.reply(f"⚠️ Sync bug lỗi: `{str(e)[:250]}`")
         return
 
-    log.info("[#%s] %s hoi: %s", message.channel, message.author, question[:120])
+    log.info("[#%s] %s hỏi: %s", message.channel, message.author, question[:120])
     try:
         async with message.channel.typing():
             answer = await ask_claude(
-                f"Nguoi gui: {message.author.display_name} (Discord id {message.author.id}). "
-                f"Yeu cau: {question}",
+                f"Người gửi: {message.author.display_name} (Discord id {message.author.id}). "
+                f"Yêu cầu: {question}",
                 message.channel.id,
                 sender_id=message.author.id,
             )
@@ -407,8 +516,8 @@ async def on_message(message: discord.Message):
             else:
                 await message.channel.send(part)
     except Exception as e:
-        log.exception("Loi khi tra loi")
-        await message.reply(f"⚠️ Co loi xay ra: `{str(e)[:300]}`")
+        log.exception("Lỗi khi trả lời")
+        await message.reply(f"⚠️ Có lỗi xảy ra: `{str(e)[:300]}`")
 
 
 if __name__ == "__main__":
