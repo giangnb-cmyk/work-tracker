@@ -30,5 +30,7 @@
   "bug_sync_hour": 9,
   "bug_sync_tz": "Asia/Ho_Chi_Minh",
   "bug_sync_channel_id": 0,
-  "bug_sync_poll_seconds": 20
+  "bug_sync_poll_seconds": 20,
+  "_note_bug_mirror_videos": "false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.",
+  "bug_mirror_videos": false
 }

@@ -4,6 +4,15 @@
 
 import type { BugLabel, BugStatus } from '../types';
 
+/** Accent color per status (matches the Kanban column dots). */
+export const BUG_STATUS_COLOR: Record<BugStatus, string> = {
+  open: '#94a3b8',
+  fixing: '#fb923c',
+  pending: '#f59e0b',
+  deployed: '#6366f1',
+  done: '#22c55e',
+};
+
 /** Label name that represents each status (null = no label → "open"). */
 export const STATUS_TAG_NAME: Record<BugStatus, string | null> = {
   open: null,

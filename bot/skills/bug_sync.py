@@ -50,6 +50,9 @@ MAX_APPLIED_TAGS = 5   # Discord: 1 bai forum toi da 5 tag
 MAX_TAG_NAME = 20      # Discord: ten forum tag toi da 20 ky tu
 STORAGE_BUCKET = "attachments"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # >50MB: giu link Discord (co the het han) thay vi tai len
+# Video an dung luong (uoc tinh forum ~1GB video) -> mac dinh KHONG mirror video.
+# Xem video qua nut "Mo Discord". Bat len neu da nang Supabase Pro.
+MIRROR_VIDEOS = bool(_SETTINGS.get("bug_mirror_videos", False))
 _IMG_EXT = {"png", "jpg", "jpeg", "gif", "webp", "bmp", "avif", "svg"}
 _VID_EXT = {"mp4", "mov", "webm", "mkv", "avi", "m4v"}
 
@@ -153,6 +156,8 @@ async def _sync_attachments(sb, thread_id: str, starter, prev_atts: list) -> lis
             out.append(prev_by_src[src])
             continue
         kind = _att_kind(getattr(att, "content_type", None), att.filename)
+        if kind == "video" and not MIRROR_VIDEOS:
+            continue  # xem video qua nut "Mo Discord" (khong luu de do ton dung luong)
         entry = {"id": src, "sourceId": src, "kind": kind, "name": att.filename,
                  "provider": "discord", "url": att.url}
         if not att.size or att.size <= MAX_UPLOAD_BYTES:
