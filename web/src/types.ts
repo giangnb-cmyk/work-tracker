@@ -69,7 +69,7 @@ export interface AccessConfig {
   domains: string[];
 }
 
-export type AttachmentKind = 'image' | 'link';
+export type AttachmentKind = 'image' | 'video' | 'file' | 'link';
 
 /** An image (uploaded or by URL) or an embedded external link on a task. */
 export interface Attachment {
@@ -183,8 +183,12 @@ export interface Bug {
   assigneeId: string | null;
   assigneeName: string;
   order: number;
+  /** Images/videos/files pulled from the Discord post (mirrored to Storage). */
+  attachments: Attachment[];
   /** Source Discord forum thread id (null = created in-app). */
   discordThreadId: string | null;
+  /** Guild the thread lives in — with the thread id, builds the Discord deep link. */
+  discordGuildId: string | null;
   /** True when app-side label edits still need pushing to the Discord thread. */
   pendingDiscordPush?: boolean;
   createdAt?: Timestamp;

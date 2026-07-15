@@ -4,6 +4,7 @@ import { useSprintContext } from '../../contexts/SprintContext';
 import { createBug, deleteBug, updateBug } from '../../lib/bugWrites';
 import { createBugLabel } from '../../lib/bugLabelWrites';
 import { labelsForStatus } from '../../lib/bugStatus';
+import { openDiscordThread } from '../../lib/discordLink';
 import { formatDate } from '../../lib/format';
 import BugLabelChip from './BugLabelChip';
 import { BUG_STATUSES, BUG_STATUS_LABEL, type Bug, type BugLabel, type BugStatus } from '../../types';
@@ -150,6 +151,17 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           <select className="select bug-status-sel" value={status} onChange={(e) => changeStatus(e.target.value as BugStatus)} disabled={!canEdit}>
             {BUG_STATUSES.map((s) => <option key={s} value={s}>{BUG_STATUS_LABEL[s]}</option>)}
           </select>
+          {bug?.discordThreadId && bug?.discordGuildId && (
+            <button
+              type="button"
+              className="btn-sm bug-discord-btn"
+              onClick={() => openDiscordThread(bug.discordGuildId!, bug.discordThreadId!)}
+              title="Mở thread trong Discord (app nếu đang mở, không thì web)"
+            >
+              💬 Mở Discord
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
           <button className="tmodal-x" onClick={() => void handleClose()} aria-label="Đóng">✕</button>
         </div>
 
@@ -209,6 +221,25 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           <span>Mô tả</span>
           <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit} placeholder="Các bước tái hiện, kết quả mong đợi / thực tế…" />
         </label>
+
+        {bug && bug.attachments.length > 0 && (
+          <div className="field">
+            <span className="field-label">Ảnh / video ({bug.attachments.length})</span>
+            <div className="bug-media">
+              {bug.attachments.map((a) => (
+                a.kind === 'image' ? (
+                  <a key={a.id} className="bug-media-item" href={a.url} target="_blank" rel="noreferrer" title={a.name}>
+                    <img src={a.url} alt={a.name} loading="lazy" />
+                  </a>
+                ) : a.kind === 'video' ? (
+                  <video key={a.id} className="bug-media-item bug-media-video" src={a.url} controls preload="metadata" />
+                ) : (
+                  <a key={a.id} className="bug-media-file" href={a.url} target="_blank" rel="noreferrer" title={a.name}>📎 {a.name}</a>
+                )
+              ))}
+            </div>
+          </div>
+        )}
 
         {error && <p className="error-text">{error}</p>}
 

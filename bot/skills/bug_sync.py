@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -47,6 +48,28 @@ BUG_LABELS = "bug_labels"
 PROFILES = "profiles"
 MAX_APPLIED_TAGS = 5   # Discord: 1 bai forum toi da 5 tag
 MAX_TAG_NAME = 20      # Discord: ten forum tag toi da 20 ky tu
+STORAGE_BUCKET = "attachments"
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # >50MB: giu link Discord (co the het han) thay vi tai len
+_IMG_EXT = {"png", "jpg", "jpeg", "gif", "webp", "bmp", "avif", "svg"}
+_VID_EXT = {"mp4", "mov", "webm", "mkv", "avi", "m4v"}
+
+
+def _att_kind(content_type: str | None, filename: str) -> str:
+    ct = (content_type or "").lower()
+    if ct.startswith("image/"):
+        return "image"
+    if ct.startswith("video/"):
+        return "video"
+    ext = (filename or "").lower().rsplit(".", 1)[-1]
+    if ext in _IMG_EXT:
+        return "image"
+    if ext in _VID_EXT:
+        return "video"
+    return "file"
+
+
+def _safe_name(name: str) -> str:
+    return re.sub(r"[^\w.-]", "_", name or "file")[:80]
 
 # Tag workflow -> cot kanban (status). Uu tien: giai doan sau thang.
 _STATUS_PRECEDENCE = ["done", "deployed", "pending", "fixing"]
@@ -96,13 +119,9 @@ async def _get_forum(client, forum_channel_id: int):
     return ch
 
 
-async def _read_forum(client, forum_channel_id: int):
-    """Tra ve (items, available) — items = threads da chuan hoa; available = [(tag_id, name, emoji)]."""
-    ch = await _get_forum(client, forum_channel_id)
-    available = [(str(t.id), t.name, _emoji_str(t.emoji)) for t in ch.available_tags]
-
-    # Gom moi thread (dedupe theo id). ch.threads chi la CACHE (thuong rong luc moi
-    # khoi dong) -> lay active threads qua API cua guild moi day du.
+async def _gather_threads(ch) -> list:
+    """Moi thread cua forum (active + archived), dedupe theo id. ch.threads chi la
+    CACHE (thuong rong luc moi khoi dong) -> lay active qua API cua guild moi du."""
     threads: dict[int, discord.Thread] = {}
     try:
         for t in await ch.guild.active_threads():
@@ -110,35 +129,47 @@ async def _read_forum(client, forum_channel_id: int):
                 threads[t.id] = t
     except Exception as e:
         log.warning("Khong lay duoc active threads cua guild: %s", e)
-    for t in ch.threads:  # bo sung tu cache neu co
+    for t in ch.threads:
         threads.setdefault(t.id, t)
     try:
         async for t in ch.archived_threads(limit=None):
             threads[t.id] = t
     except Exception as e:
-        log.warning("Khong doc duoc archived threads cua %s: %s", forum_channel_id, e)
+        log.warning("Khong doc duoc archived threads cua %s: %s", ch.id, e)
+    return list(threads.values())
 
-    items = []
-    for t in threads.values():
-        desc, author = "", None
-        try:
-            starter = t.starter_message or await t.fetch_message(t.id)
-            if starter:
-                desc = starter.content or ""
-                author = starter.author
-        except Exception:
-            pass
-        owner_id = getattr(t, "owner_id", None) or (author.id if author else None)
-        applied = [str(tag.id) for tag in (getattr(t, "applied_tags", None) or []) if getattr(tag, "id", None)]
-        items.append({
-            "thread_id": str(t.id),
-            "title": (t.name or "(khong tieu de)")[:200],
-            "description": desc,
-            "owner_id": str(owner_id) if owner_id else "",
-            "author_name": (author.display_name if author else "") or "Discord",
-            "applied_tag_ids": applied,
-        })
-    return items, available
+
+async def _sync_attachments(sb, thread_id: str, starter, prev_atts: list) -> list:
+    """Anh/video/file cua bai post -> tai len Storage (URL Discord het han) va tra ve
+    danh sach attachment. Da tung tai (theo sourceId) thi tai lai."""
+    atts = list(getattr(starter, "attachments", None) or []) if starter else []
+    if not atts:
+        return prev_atts  # khong doc duoc / khong co -> giu nguyen cai cu
+    prev_by_src = {a.get("sourceId"): a for a in prev_atts if a.get("sourceId")}
+    out = []
+    for att in atts:
+        src = str(att.id)
+        if src in prev_by_src:
+            out.append(prev_by_src[src])
+            continue
+        kind = _att_kind(getattr(att, "content_type", None), att.filename)
+        entry = {"id": src, "sourceId": src, "kind": kind, "name": att.filename,
+                 "provider": "discord", "url": att.url}
+        if not att.size or att.size <= MAX_UPLOAD_BYTES:
+            try:
+                data = await att.read()
+                path = f"bug-attachments/{thread_id}-{src}-{_safe_name(att.filename)}"
+                ct = getattr(att, "content_type", None) or "application/octet-stream"
+                await asyncio.to_thread(
+                    lambda p=path, d=data, c=ct: sb.storage.from_(STORAGE_BUCKET).upload(
+                        p, d, {"content-type": c, "upsert": "true"})
+                )
+                entry["url"] = sb.storage.from_(STORAGE_BUCKET).get_public_url(path)
+                entry["storagePath"] = path
+            except Exception as e:
+                log.warning("Tai attachment '%s' loi (giu link Discord): %s", att.filename, e)
+        out.append(entry)
+    return out
 
 
 # --- Ghi Supabase (blocking; goi qua asyncio.to_thread) ---------------------
@@ -186,16 +217,12 @@ def _sync_palette(sb, project_id: str, available: list[tuple[str, str, str]]) ->
     return tag_to_label
 
 
-def _upsert_bugs(sb, project_id: str, items: list[dict], available: list) -> dict:
+def _upsert_bugs(sb, project_id: str, items: list[dict], available: list, by_thread: dict) -> dict:
     tag_to_label = _sync_palette(sb, project_id, available)
     profiles = _profiles_by_discord(sb)
     # id -> ten nhan (gom ca nhan vua tao) de suy ra cot kanban tu tag.
     id_to_name = {r["id"]: r["name"] for r in
                   sb.table(BUG_LABELS).select("id,name").eq("project_id", project_id).execute().data}
-
-    existing = sb.table(BUGS).select("id,discord_thread_id,pending_discord_push") \
-        .eq("project_id", project_id).execute().data
-    by_thread = {r["discord_thread_id"]: r for r in existing if r.get("discord_thread_id")}
 
     created = updated = 0
     for it in items:
@@ -213,7 +240,8 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list) -> dic
         if key in by_thread:
             row = by_thread[key]
             patch = {"title": it["title"], "description": it["description"],
-                     "reporter_id": reporter_id, "reporter_name": reporter_name}
+                     "reporter_id": reporter_id, "reporter_name": reporter_name,
+                     "attachments": it["attachments"], "discord_guild_id": it["guild_id"]}
             # App vua doi nhan (chua push) -> KHONG ghi de label/status; cho push xong da.
             if not row.get("pending_discord_push"):
                 patch["label_ids"] = label_ids
@@ -225,7 +253,8 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list) -> dic
                 "project_id": project_id, "title": it["title"], "description": it["description"],
                 "status": status, "label_ids": label_ids,
                 "reporter_id": reporter_id, "reporter_name": reporter_name,
-                "discord_thread_id": key,
+                "discord_thread_id": key, "discord_guild_id": it["guild_id"],
+                "attachments": it["attachments"],
             }).execute()
             created += 1
     return {"created": created, "updated": updated, "total": len(items)}
@@ -234,9 +263,43 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list) -> dic
 # --- Entry points -----------------------------------------------------------
 
 async def sync_forum(client, sb, project_id: str, forum_channel_id: int) -> dict:
-    """Discord -> app: doc forum roi upsert vao bugs."""
-    items, available = await _read_forum(client, forum_channel_id)
-    return await asyncio.to_thread(_upsert_bugs, sb, project_id, items, available)
+    """Discord -> app: doc forum (kem tai anh/video len Storage) roi upsert vao bugs."""
+    ch = await _get_forum(client, forum_channel_id)
+    available = [(str(t.id), t.name, _emoji_str(t.emoji)) for t in ch.available_tags]
+    threads = await _gather_threads(ch)
+
+    # Prefetch bug hien co (de dedupe attachment + biet co pending_discord_push).
+    existing = await asyncio.to_thread(
+        lambda: sb.table(BUGS).select("id,discord_thread_id,attachments,pending_discord_push")
+        .eq("project_id", project_id).execute().data
+    )
+    by_thread = {r["discord_thread_id"]: r for r in existing if r.get("discord_thread_id")}
+
+    items = []
+    for t in threads:
+        desc, author, starter = "", None, None
+        try:
+            starter = t.starter_message or await t.fetch_message(t.id)
+            if starter:
+                desc = starter.content or ""
+                author = starter.author
+        except Exception:
+            pass
+        owner_id = getattr(t, "owner_id", None) or (author.id if author else None)
+        applied = [str(tag.id) for tag in (getattr(t, "applied_tags", None) or []) if getattr(tag, "id", None)]
+        prev = by_thread.get(str(t.id)) or {}
+        atts = await _sync_attachments(sb, str(t.id), starter, prev.get("attachments") or [])
+        items.append({
+            "thread_id": str(t.id),
+            "title": (t.name or "(khong tieu de)")[:200],
+            "description": desc,
+            "owner_id": str(owner_id) if owner_id else "",
+            "author_name": (author.display_name if author else "") or "Discord",
+            "applied_tag_ids": applied,
+            "attachments": atts,
+            "guild_id": str(t.guild.id) if t.guild else "",
+        })
+    return await asyncio.to_thread(_upsert_bugs, sb, project_id, items, available, by_thread)
 
 
 async def sync_all(client, sb) -> list[tuple[dict, dict]]:
