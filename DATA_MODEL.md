@@ -207,7 +207,18 @@ A `BEFORE INSERT` trigger assigns `number` = next per-project running id.
 | `reporterId` / `reporterName` | string \| null / string | who filed it                       |
 | `assigneeId` / `assigneeName` | string \| null / string | who owns the fix                   |
 | `order`        | number            | sort order                                                  |
+| `discordThreadId` | string \| null | source Discord forum thread id (sync upsert key; unique)    |
 | `createdAt` / `updatedAt` | Timestamp | timestamps (`updatedAt` via trigger)                    |
+
+### Discord forum sync
+
+The bot mirrors a Discord **forum channel** into `bugs` (each post → a bug; forum
+tags → `bug_labels`; thread author → reporter). Upsert is keyed by `discordThreadId`;
+re-syncs refresh title/description/labels but **preserve** `status`/`assigneeId` (so
+Kanban moves aren't clobbered). Runs daily (default 09:00 `Asia/Ho_Chi_Minh`, config in
+`bot/settings.json → bug_forums`), on `@bot sync bug`, or when the web queues a row in
+**`bug_sync_requests`** (admin-only insert; the service-role bot drains it — see the
+"Sync Discord" button on the Bugs tab).
 
 ---
 

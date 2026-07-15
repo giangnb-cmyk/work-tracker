@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import discord
+from discord.ext import tasks
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,6 +43,12 @@ MOODS = _settings.get("moods") or ["🙂 Hom nay toi binh thuong, than thien."]
 
 _BOT_DIR = str(Path(__file__).parent)
 _SKILLS_DIR = str(Path(__file__).parent / "skills")
+
+# Skill dir tren sys.path de import truc tiep module sync bug (dung client dang chay).
+if _SKILLS_DIR not in sys.path:
+    sys.path.insert(0, _SKILLS_DIR)
+import bug_sync  # noqa: E402  — doc forum Discord -> upsert bang `bugs`
+from supabase_client import get_client  # noqa: E402
 
 # Hint: chi Claude cach + khi nao chay tung skill, kem duong dan tuyet doi.
 TASK_HINT = (
@@ -125,6 +132,22 @@ if _env_bypass is not None:
     BYPASS_PERMISSIONS = _env_bypass.strip() not in ("0", "", "false", "False")
 ALLOWED_USER_IDS = {int(x) for x in _settings.get("allowed_user_ids", [])}
 log.info("Bypass permissions: %s", BYPASS_PERMISSIONS)
+
+# --- Dong bo bug tu forum Discord --------------------------------------------
+BUG_FORUMS = _settings.get("bug_forums") or []
+BUG_SYNC_HOUR = int(_settings.get("bug_sync_hour", 9))          # gio chay tu dong (mac dinh 9h)
+BUG_SYNC_TZ = _settings.get("bug_sync_tz", "Asia/Ho_Chi_Minh")
+BUG_SYNC_CHANNEL_ID = int(_settings.get("bug_sync_channel_id", 0) or 0)  # kenh bao ket qua (0 = tat)
+BUG_SYNC_POLL_SECONDS = int(_settings.get("bug_sync_poll_seconds", 20))  # nhip quet yeu cau sync tu web
+
+try:
+    from zoneinfo import ZoneInfo
+    _SYNC_TZINFO = ZoneInfo(BUG_SYNC_TZ)
+    _SYNC_TIME = datetime.time(hour=BUG_SYNC_HOUR, minute=0, tzinfo=_SYNC_TZINFO)
+except Exception:
+    # Khong co tzdata -> quy doi tho ve UTC (VN = UTC+7). Cai 'tzdata' de chuan.
+    log.warning("Khong load duoc timezone '%s' (thieu tzdata?), dung UTC xap xi.", BUG_SYNC_TZ)
+    _SYNC_TIME = datetime.time(hour=(BUG_SYNC_HOUR - 7) % 24, minute=0)
 
 
 def _last_json(text: str):
@@ -238,9 +261,94 @@ def chunk(text: str, size: int = 1990) -> list:
     return parts
 
 
+# --- Bug sync: chay bang client dang song (doc forum + ghi Supabase) ----------
+
+SYNC_BUG_RE = re.compile(r"sync\s*bug|(dong|đồng)\s*bo|bộ\s*bug", re.IGNORECASE)
+
+
+def _summarize(results) -> str:
+    parts = []
+    for cfg, r in results:
+        if "error" in r:
+            parts.append(f"forum {cfg['forum_channel_id']}: lỗi {str(r['error'])[:80]}")
+        else:
+            parts.append(f"tạo {r['created']}, cập nhật {r['updated']} (tổng {r['total']})")
+    return "; ".join(parts) or "chưa cấu hình forum nào"
+
+
+async def _do_sync_all() -> str:
+    """Sync moi forum cau hinh; tra ve chuoi tom tat."""
+    results = await bug_sync.sync_all(client, get_client())
+    return _summarize(results)
+
+
+@tasks.loop(time=_SYNC_TIME)
+async def daily_bug_sync():
+    if not BUG_FORUMS:
+        return
+    try:
+        summary = await _do_sync_all()
+    except Exception:
+        log.exception("Dong bo bug tu dong that bai")
+        return
+    log.info("Dong bo bug tu dong: %s", summary)
+    if BUG_SYNC_CHANNEL_ID:
+        try:
+            ch = client.get_channel(BUG_SYNC_CHANNEL_ID) or await client.fetch_channel(BUG_SYNC_CHANNEL_ID)
+            await ch.send(f"🐞 Đồng bộ bug tự động ({BUG_SYNC_HOUR}h): {summary}")
+        except Exception:
+            log.warning("Khong gui duoc tom tat sync bug")
+
+
+@tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
+async def poll_bug_sync_requests():
+    """Quet bang bug_sync_requests (web bam nut 'Sync') va xu ly tung yeu cau."""
+    if not BUG_FORUMS:
+        return
+    sb = get_client()
+    try:
+        pending = await asyncio.to_thread(
+            lambda: sb.table("bug_sync_requests").select("*").eq("status", "pending").order("created_at").execute().data
+        )
+    except Exception as e:
+        log.warning("Doc bug_sync_requests loi: %s", e)
+        return
+    for req in pending or []:
+        await _process_sync_request(sb, req)
+
+
+async def _process_sync_request(sb, req):
+    pid = req.get("project_id")
+    cfg = bug_sync.forum_for_project(pid) if pid else (BUG_FORUMS[0] if len(BUG_FORUMS) == 1 else None)
+    status, result = "done", ""
+    try:
+        if not cfg:
+            raise RuntimeError("chua cau hinh forum cho project nay")
+        r = await bug_sync.sync_forum(client, sb, cfg["project_id"], int(cfg["forum_channel_id"]))
+        result = f"tao {r['created']}, cap nhat {r['updated']} (tong {r['total']})"
+    except Exception as e:
+        status, result = "error", str(e)[:300]
+        log.exception("Xu ly yeu cau sync bug loi")
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        await asyncio.to_thread(
+            lambda: sb.table("bug_sync_requests").update(
+                {"status": status, "result": result, "processed_at": now_iso}
+            ).eq("id", req["id"]).execute()
+        )
+    except Exception as e:
+        log.warning("Cap nhat trang thai sync request loi: %s", e)
+
+
 @client.event
 async def on_ready():
     log.info("Bot online: %s (id=%s)", client.user, client.user.id)
+    if BUG_FORUMS:
+        if not daily_bug_sync.is_running():
+            daily_bug_sync.start()
+        if not poll_bug_sync_requests.is_running():
+            poll_bug_sync_requests.start()
+        log.info("Bug sync bat: %d forum, chay luc %sh (%s)", len(BUG_FORUMS), BUG_SYNC_HOUR, BUG_SYNC_TZ)
 
 
 @client.event
@@ -258,6 +366,18 @@ async def on_message(message: discord.Message):
         await message.reply(
             "Tag toi kem yeu cau nhe, vi du: `@bot tao task Fix login giao cho Nam, gap`"
         )
+        return
+
+    # Lenh nhanh: "@bot sync bug" -> dong bo bug tu forum ngay (khong qua Claude).
+    if BUG_FORUMS and SYNC_BUG_RE.search(question) and "bug" in question.lower():
+        log.info("[#%s] %s yeu cau sync bug", message.channel, message.author)
+        try:
+            async with message.channel.typing():
+                summary = await _do_sync_all()
+            await message.reply(f"🐞 Đã đồng bộ bug từ forum Discord: {summary}")
+        except Exception as e:
+            log.exception("Sync bug qua lenh that bai")
+            await message.reply(f"⚠️ Sync bug lỗi: `{str(e)[:250]}`")
         return
 
     log.info("[#%s] %s hoi: %s", message.channel, message.author, question[:120])
