@@ -305,7 +305,11 @@ async def poll_bug_sync_requests():
     """Moi nhip: (1) day thay doi nhan tu app -> Discord, (2) xu ly yeu cau 'Sync' tu web."""
     if not BUG_FORUMS:
         return
-    sb = get_client()
+    try:
+        sb = get_client()
+    except Exception as e:
+        log.warning("Chua cau hinh Supabase (dat SUPABASE_SERVICE_ROLE_KEY trong .env): %s", e)
+        return
     # (1) app -> Discord: bug co pending_discord_push (nguoi dung doi nhan tren app).
     try:
         n = await bug_sync.push_pending(client, sb)
