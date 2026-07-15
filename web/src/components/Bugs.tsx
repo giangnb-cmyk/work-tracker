@@ -3,12 +3,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useBugs } from '../hooks/useBugs';
 import { useBugLabels } from '../hooks/useBugLabels';
-import { moveBug } from '../lib/bugWrites';
+import { updateBug } from '../lib/bugWrites';
 import { seedDefaultBugLabels } from '../lib/bugLabelWrites';
 import { requestBugSync } from '../lib/bugSyncWrites';
+import { labelsForStatus } from '../lib/bugStatus';
 import BugKanban from './bug/BugKanban';
 import BugList from './bug/BugList';
 import BugModal from './bug/BugModal';
+import BugLabelChip from './bug/BugLabelChip';
 import type { Bug, BugStatus } from '../types';
 
 type ViewMode = 'kanban' | 'list';
@@ -24,12 +26,37 @@ export default function Bugs() {
   const [creating, setCreating] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([]);
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const canEditBug = (b: Bug) => isAdmin || b.reporterId === user?.uid || b.assigneeId === user?.uid;
 
+  const key = (ids: string[]) => [...ids].sort().join(',');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return bugs.filter((b) => {
+      if (filterLabelIds.length && !filterLabelIds.every((id) => b.labelIds.includes(id))) return false;
+      if (!q) return true;
+      return b.title.toLowerCase().includes(q) || `#${b.number}`.includes(q) || String(b.number) === q;
+    });
+  }, [bugs, query, filterLabelIds]);
+
+  function toggleFilter(id: string) {
+    setFilterLabelIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  /** Move on the kanban: set status AND swap the matching workflow tag, so the
+   *  card's tag stays consistent (and the change pushes back to Discord). */
   function move(bug: Bug, status: BugStatus) {
-    void moveBug(bug.id, status);
+    const nextLabels = labelsForStatus(bug.labelIds, status, labels);
+    const changed = key(nextLabels) !== key(bug.labelIds);
+    void updateBug(bug.id, {
+      status,
+      labelIds: nextLabels,
+      ...(bug.discordThreadId && changed ? { pendingDiscordPush: true } : {}),
+    });
   }
 
   async function seed() {
@@ -87,12 +114,34 @@ export default function Bugs() {
 
       {syncMsg && <div className="callout-inline" style={{ marginBottom: '1rem' }}>{syncMsg}</div>}
 
+      {/* Filter: search by title/#id + toggle label chips */}
+      <div className="bug-filter">
+        <input
+          className="input bug-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="🔍 Tìm theo tên bug hoặc #số…"
+        />
+        {labels.length > 0 && (
+          <div className="bug-filter-labels">
+            {labels.map((l) => (
+              <BugLabelChip key={l.id} label={l} active={filterLabelIds.includes(l.id)} onClick={() => toggleFilter(l.id)} />
+            ))}
+          </div>
+        )}
+        {(query || filterLabelIds.length > 0) && (
+          <button className="btn-sm bug-filter-clear" onClick={() => { setQuery(''); setFilterLabelIds([]); }}>
+            Xoá lọc ({filtered.length})
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : mode === 'kanban' ? (
-        <BugKanban bugs={bugs} labelsById={labelsById} onOpen={setEditing} onMove={move} canEditBug={canEditBug} />
+        <BugKanban bugs={filtered} labelsById={labelsById} onOpen={setEditing} onMove={move} canEditBug={canEditBug} />
       ) : (
-        <BugList bugs={bugs} labelsById={labelsById} projectName={selectedProject?.name ?? ''} onOpen={setEditing} />
+        <BugList bugs={filtered} labelsById={labelsById} projectName={selectedProject?.name ?? ''} onOpen={setEditing} />
       )}
 
       {(editing || creating) && (

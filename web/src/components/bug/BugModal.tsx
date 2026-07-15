@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSprintContext } from '../../contexts/SprintContext';
 import { createBug, deleteBug, updateBug } from '../../lib/bugWrites';
 import { createBugLabel } from '../../lib/bugLabelWrites';
+import { labelsForStatus } from '../../lib/bugStatus';
 import { formatDate } from '../../lib/format';
 import BugLabelChip from './BugLabelChip';
 import { BUG_STATUSES, BUG_STATUS_LABEL, type Bug, type BugLabel, type BugStatus } from '../../types';
@@ -47,6 +48,12 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
 
   function toggleLabel(id: string) {
     setLabelIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  // Changing status swaps the matching workflow tag so the card + Discord stay in sync.
+  function changeStatus(next: BugStatus) {
+    setStatus(next);
+    setLabelIds((ids) => labelsForStatus(ids, next, labels));
   }
 
   async function persist() {
@@ -140,7 +147,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
       <div className="modal bug-modal" onClick={(e) => e.stopPropagation()}>
         <div className="bug-modal-head">
           {isEdit && bug && <span className="bug-num mono">#{bug.number}</span>}
-          <select className="select bug-status-sel" value={status} onChange={(e) => setStatus(e.target.value as BugStatus)} disabled={!canEdit}>
+          <select className="select bug-status-sel" value={status} onChange={(e) => changeStatus(e.target.value as BugStatus)} disabled={!canEdit}>
             {BUG_STATUSES.map((s) => <option key={s} value={s}>{BUG_STATUS_LABEL[s]}</option>)}
           </select>
           <button className="tmodal-x" onClick={() => void handleClose()} aria-label="Đóng">✕</button>

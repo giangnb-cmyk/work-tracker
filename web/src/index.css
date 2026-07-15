@@ -606,6 +606,12 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .bug-addlabel:hover { border-color: var(--primary); color: var(--primary); }
 .bug-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); font-weight: 700; }
 
+/* Bug filter bar: search + toggle label chips */
+.bug-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.1rem; }
+.bug-search { width: min(320px, 100%); }
+.bug-filter-labels { display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; min-width: 0; }
+.bug-filter-clear { flex-shrink: 0; }
+
 /* Status accent (kanban dots + list pill) */
 .s-open { --st: #94a3b8; }
 .s-fixing { --st: #fb923c; }

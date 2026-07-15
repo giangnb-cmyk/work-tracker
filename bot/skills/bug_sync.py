@@ -48,6 +48,18 @@ PROFILES = "profiles"
 MAX_APPLIED_TAGS = 5   # Discord: 1 bai forum toi da 5 tag
 MAX_TAG_NAME = 20      # Discord: ten forum tag toi da 20 ky tu
 
+# Tag workflow -> cot kanban (status). Uu tien: giai doan sau thang.
+_STATUS_PRECEDENCE = ["done", "deployed", "pending", "fixing"]
+
+
+def _status_from_label_names(names: list[str]) -> str:
+    """Suy ra status tu ten cac nhan da gan (khong khop -> 'open')."""
+    lowered = {(n or "").strip().lower() for n in names}
+    for s in _STATUS_PRECEDENCE:
+        if s in lowered:
+            return s
+    return "open"
+
 
 def load_forum_configs() -> list[dict]:
     """Danh sach {project_id, forum_channel_id} tu settings.json['bug_forums']."""
@@ -177,6 +189,9 @@ def _sync_palette(sb, project_id: str, available: list[tuple[str, str, str]]) ->
 def _upsert_bugs(sb, project_id: str, items: list[dict], available: list) -> dict:
     tag_to_label = _sync_palette(sb, project_id, available)
     profiles = _profiles_by_discord(sb)
+    # id -> ten nhan (gom ca nhan vua tao) de suy ra cot kanban tu tag.
+    id_to_name = {r["id"]: r["name"] for r in
+                  sb.table(BUG_LABELS).select("id,name").eq("project_id", project_id).execute().data}
 
     existing = sb.table(BUGS).select("id,discord_thread_id,pending_discord_push") \
         .eq("project_id", project_id).execute().data
@@ -189,6 +204,7 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list) -> dic
             lid = tag_to_label.get(tid)
             if lid and lid not in label_ids:
                 label_ids.append(lid)
+        status = _status_from_label_names([id_to_name.get(lid, "") for lid in label_ids])
         rep = profiles.get(it["owner_id"])
         reporter_id = rep[0] if rep else None
         reporter_name = rep[1] if rep else it["author_name"]
@@ -198,15 +214,16 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list) -> dic
             row = by_thread[key]
             patch = {"title": it["title"], "description": it["description"],
                      "reporter_id": reporter_id, "reporter_name": reporter_name}
-            # App vua doi nhan (chua push) -> KHONG ghi de label; cho push xong da.
+            # App vua doi nhan (chua push) -> KHONG ghi de label/status; cho push xong da.
             if not row.get("pending_discord_push"):
                 patch["label_ids"] = label_ids
+                patch["status"] = status
             sb.table(BUGS).update(patch).eq("id", row["id"]).execute()
             updated += 1
         else:
             sb.table(BUGS).insert({
                 "project_id": project_id, "title": it["title"], "description": it["description"],
-                "status": "open", "label_ids": label_ids,
+                "status": status, "label_ids": label_ids,
                 "reporter_id": reporter_id, "reporter_name": reporter_name,
                 "discord_thread_id": key,
             }).execute()
