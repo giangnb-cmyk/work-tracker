@@ -493,10 +493,47 @@ def run_estimate() -> int:
     return 0
 
 
+def run_perms() -> int:
+    """In quyen HIEU LUC cua bot TREN kenh forum (tinh ca channel overwrite)."""
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("LOI: thieu DISCORD_TOKEN", file=sys.stderr)
+        return 1
+    intents = discord.Intents.default()
+    intents.message_content = True
+    client = discord.Client(intents=intents)
+
+    @client.event
+    async def on_ready():
+        try:
+            for cfg in load_forum_configs():
+                try:
+                    ch = await _get_forum(client, cfg["forum_channel_id"])
+                except Exception as e:
+                    print(f"Khong lay duoc channel {cfg['forum_channel_id']}: {e}")
+                    continue
+                me = ch.guild.me
+                p = ch.permissions_for(me)
+                print(f"\nForum '{ch.name}' ({ch.id}) @ guild '{ch.guild.name}'")
+                print(f"  Bot: {me}  |  roles: {[r.name for r in me.roles]}")
+                for name in ("view_channel", "read_message_history", "manage_threads",
+                             "manage_channels", "send_messages", "send_messages_in_threads"):
+                    ok = getattr(p, name, None)
+                    print(f"  {'OK ' if ok else 'NO '} {name}")
+        finally:
+            await client.close()
+
+    client.run(token)
+    return 0
+
+
 if __name__ == "__main__":
     import argparse
 
     _p = argparse.ArgumentParser(description="Sync/uoc tinh bug tu forum Discord")
     _p.add_argument("--estimate", action="store_true", help="Chi uoc tinh dung luong media (khong tai len)")
+    _p.add_argument("--perms", action="store_true", help="In quyen hieu luc cua bot tren kenh forum")
     _args = _p.parse_args()
+    if _args.perms:
+        sys.exit(run_perms())
     sys.exit(run_estimate() if _args.estimate else run_once())
