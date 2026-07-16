@@ -14,3 +14,6 @@ beautifulsoup4>=4.12,<5.0
 # --- Danh muc Google Drive (drive_catalog.py): liet ke file Drive -> RAG. ---
 # Chi CAN neu dung drive_catalog.py. Dung service account (chi doc), goi Drive API bang requests.
 google-auth>=2.25,<3.0
+# --- Gui mail weekly report (weekly_mail.py): OAuth nguoi dung cho Gmail API. ---
+# Chi CAN cho buoc 'gmail_gateway.py --auth' (dang nhap 1 lan); gui/doc dung requests.
+google-auth-oauthlib>=1.2,<2.0

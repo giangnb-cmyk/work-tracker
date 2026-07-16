@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Avatar from './Avatar';
 import { daysUntil } from '../lib/format';
 import { taskProgress } from '../lib/sprint';
 import { MoreVerticalIcon } from './icons';
+import { useClickOutside } from '../hooks/useClickOutside';
 import {
   JOB_ROLE_ICON,
   JOB_ROLE_LABEL,
@@ -54,6 +55,9 @@ export default function TaskListRow({
   showAssignee = true,
 }: TaskListRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  useClickOutside(menuRef, closeMenu, menuOpen);
   const done = task.status === 'done';
   const progress = taskProgress(task);
   const overdue = !done && task.dueDate && (daysUntil(task.dueDate) ?? 1) < 0;
@@ -109,25 +113,22 @@ export default function TaskListRow({
 
       <span className="trow-status">{done ? 'Hoàn thành' : STATUS_LABEL[task.status]}</span>
 
-      <div className="tcard-menu-wrap" onClick={(e) => e.stopPropagation()}>
+      <div className="tcard-menu-wrap" onClick={(e) => e.stopPropagation()} ref={menuRef}>
         <button className="tcard-menu" onClick={() => setMenuOpen((o) => !o)} aria-label="Tuỳ chọn">
           <MoreVerticalIcon size={16} />
         </button>
         {menuOpen && (
-          <>
-            <div className="tcard-menu-backdrop" onClick={() => setMenuOpen(false)} />
-            <div className="tcard-menu-pop glass">
-              <button onClick={toggleDone} disabled={!canChangeStatus}>
-                {done ? 'Bỏ hoàn thành' : 'Đánh dấu hoàn thành'}
+          <div className="tcard-menu-pop glass">
+            <button onClick={toggleDone} disabled={!canChangeStatus}>
+              {done ? 'Bỏ hoàn thành' : 'Đánh dấu hoàn thành'}
+            </button>
+            <button onClick={() => { setMenuOpen(false); onOpen(task); }}>Mở chi tiết</button>
+            {onMoveSprint && !done && (
+              <button onClick={() => { setMenuOpen(false); onMoveSprint(task); }}>
+                Chuyển sang sprint…
               </button>
-              <button onClick={() => { setMenuOpen(false); onOpen(task); }}>Mở chi tiết</button>
-              {onMoveSprint && !done && (
-                <button onClick={() => { setMenuOpen(false); onMoveSprint(task); }}>
-                  Chuyển sang sprint…
-                </button>
-              )}
-            </div>
-          </>
+            )}
+          </div>
         )}
       </div>
     </div>

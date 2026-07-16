@@ -37,8 +37,13 @@ Created/merged on first Google sign-in.
 | `lastSeenAt`  | Timestamp | updated on each sign-in                                      |
 
 > **Permission role (`role`)** — an **admin** manages members, sprints, the sign-in allowlist,
-> and all tasks (create/edit/delete). A **member** can only change the status of tasks they own
-> (assignee or reporter). Promote the first user by setting `role: "admin"` in the console.
+> and all tasks (create/edit/delete). A **member** can change the status of tasks they own
+> (assignee or reporter), and on tasks they CREATED (reporter) can also edit: assignee,
+> feature, due date, subtasks, description, attachments — but **never story points**
+> (admin-only; enforced by the `tasks_guard_points` trigger, migration 0024, on top of the
+> UI gate). Title/priority/sprint/watchers stay admin-only. New tasks default their due
+> date to the sprint's last day (web TaskModal + bot `_due_window`). Promote the first
+> user by setting `role: "admin"` in the console.
 >
 > **Job role (`jobRole`)** — a separate discipline field the user picks on first sign-in:
 > `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`.
@@ -336,6 +341,29 @@ One document per recipient. Doc id is auto-generated. Created when a user confir
 
 > Read/update/delete gated to `recipientId == auth.uid`; any signed-in user may create
 > (the completer writes notices for others). No composite index — sorted in the client.
+
+---
+
+## `member_dm_requests` (hàng đợi DM test)
+
+`{ id, target_user_id, requested_by, status, result, created_at, processed_at }` — migration `0025`.
+
+Nút **🧪 Gửi test** ở tab **Cấu hình** (admin, `components/MemberDmTest.tsx`): web insert
+1 dòng, bot (service-role) quét mỗi `bug_sync_poll_seconds`, DM điểm tuần cho
+`target_user_id` (tin mở đầu bằng dòng 🧪 để member biết là test) rồi ghi lại `status`
+(`pending → done | error`) + `result`. Cùng khuôn hàng-đợi với `bug_sync_requests`.
+
+| Thao tác | Ai |
+|---|---|
+| insert | **chỉ admin** (`is_admin()`) |
+| select | **chỉ admin** — chặt hơn `bug_sync_requests` (bảng đó ai đăng nhập cũng đọc được) |
+| update / delete | **không ai** phía client — bot service-role bỏ qua RLS để ghi kết quả |
+
+> Lịch DM hằng tuần (mặc định **thứ 5** 9h) cấu hình ở `bot/settings.json > member_dm`
+> (`enabled` tắt là tắt cả lịch lẫn nút test). Nội dung DM (`bot/skills/member_dm.py`):
+> số task **đã xong trong tuần** (từ thứ 2 00:00 giờ VN, đếm qua bảng `activity` — chỉ có
+> dữ liệu từ khi áp `0007`), số task **tồn đọng** (có assignee, chưa done, kèm số trễ hạn,
+> liệt kê tối đa 5 task) + 1 câu động viên. Chỉ DM người có `profiles.discord_id`.
 
 ---
 

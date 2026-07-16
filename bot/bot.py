@@ -49,6 +49,8 @@ if _SKILLS_DIR not in sys.path:
     sys.path.insert(0, _SKILLS_DIR)
 import bug_sync  # noqa: E402  — doc forum Discord -> upsert bang `bugs`
 import weekly_report  # noqa: E402  — task Supabase -> Google Sheet cua tung project
+import weekly_mail  # noqa: E402  — soan + gui mail weekly report tu template Gmail
+import member_dm  # noqa: E402  — DM diem tuan (task xong/ton dong) cho tung member
 from supabase_client import get_client  # noqa: E402
 
 # Hint chi Claude cach + khi nao chay tung skill: xem hints.py.
@@ -139,14 +141,30 @@ _GDRIVE_KEY_DEFAULT = Path(__file__).parent.parent / "keys" / "service-account-g
 # --- Weekly report tu dong: SANG THU 2, cung gio voi bug sync (mac dinh 9h) -------
 WEEKLY_REPORT_ENABLED = bool(_settings.get("weekly_report_enabled", False))
 
+# --- Weekly MAIL tu dong: gio/thu rieng, cau hinh trong settings.json > weekly_mail ---
+WEEKLY_MAIL_CFG = _settings.get("weekly_mail", {}) or {}
+WEEKLY_MAIL_ENABLED = bool(WEEKLY_MAIL_CFG.get("enabled", False))
+_MAIL_HOUR = int(WEEKLY_MAIL_CFG.get("hour", BUG_SYNC_HOUR))
+_MAIL_WEEKDAY = int(WEEKLY_MAIL_CFG.get("weekday", 0))  # 0 = thu 2
+
+# --- DM diem tuan cho member: mac dinh THU 5, cau hinh settings.json > member_dm ------
+MEMBER_DM_CFG = _settings.get("member_dm", {}) or {}
+MEMBER_DM_ENABLED = bool(MEMBER_DM_CFG.get("enabled", False))
+_DM_HOUR = int(MEMBER_DM_CFG.get("hour", BUG_SYNC_HOUR))
+_DM_WEEKDAY = int(MEMBER_DM_CFG.get("weekday", 3))  # 3 = thu 5
+
 try:
     from zoneinfo import ZoneInfo
     _SYNC_TZINFO = ZoneInfo(BUG_SYNC_TZ)
     _SYNC_TIME = datetime.time(hour=BUG_SYNC_HOUR, minute=0, tzinfo=_SYNC_TZINFO)
+    _MAIL_TIME = datetime.time(hour=_MAIL_HOUR, minute=0, tzinfo=_SYNC_TZINFO)
+    _DM_TIME = datetime.time(hour=_DM_HOUR, minute=0, tzinfo=_SYNC_TZINFO)
 except Exception:
     # Khong co tzdata -> quy doi tho ve UTC (VN = UTC+7). Cai 'tzdata' de chuan.
     log.warning("Không load được timezone '%s' (thiếu tzdata?), dùng UTC xấp xỉ.", BUG_SYNC_TZ)
     _SYNC_TIME = datetime.time(hour=(BUG_SYNC_HOUR - 7) % 24, minute=0)
+    _MAIL_TIME = datetime.time(hour=(_MAIL_HOUR - 7) % 24, minute=0)
+    _DM_TIME = datetime.time(hour=(_DM_HOUR - 7) % 24, minute=0)
     # Phai gan: weekly_report_sync doc bien nay de biet hom nay co phai thu 2 khong.
     # None -> datetime.now(None) tra gio may, dung xap xi cung tinh than nhanh o tren.
     _SYNC_TZINFO = None
@@ -385,6 +403,190 @@ async def weekly_report_sync():
             log.warning("Không gửi được tóm tắt weekly report")
 
 
+async def _mail_channel_note(text: str):
+    """Bao ket qua weekly mail vao kenh sync (neu co cau hinh)."""
+    if not BUG_SYNC_CHANNEL_ID:
+        return
+    try:
+        ch = client.get_channel(BUG_SYNC_CHANNEL_ID) or await client.fetch_channel(BUG_SYNC_CHANNEL_ID)
+        await ch.send(text[:1900])
+    except Exception:
+        log.warning("Không gửi được thông báo weekly mail vào kênh")
+
+
+async def _weekly_mail_approvers() -> list[int]:
+    """Discord id cua nguoi duyet mail: settings.weekly_mail.approver_ids, khong co thi
+    lay MOI admin da link Discord (profiles.role=admin, discord_id khac rong)."""
+    ids = [int(x) for x in WEEKLY_MAIL_CFG.get("approver_ids", []) if str(x).strip()]
+    if ids:
+        return ids
+
+    def _fetch():
+        rows = (get_client().table("profiles").select("discord_id")
+                .eq("role", "admin").execute().data or [])
+        return [int(r["discord_id"]) for r in rows if r.get("discord_id")]
+
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception:
+        log.exception("Không lấy được danh sách admin để duyệt weekly mail")
+        return []
+
+
+class WeeklyMailApproveView(discord.ui.View):
+    """Nut ✅ Gửi / ✕ Huỷ duoi ban xem truoc DM cho admin. FAIL-CLOSED: khong bam gi
+    (het han) hoac bam Huy -> KHONG gui. Nhieu admin cung nhan DM thi ai bam truoc
+    thang — co `_done` tren dict mail dung chung de khong gui trung."""
+
+    def __init__(self, mail: dict):
+        timeout_h = float(WEEKLY_MAIL_CFG.get("approve_timeout_hours", 24))
+        super().__init__(timeout=timeout_h * 3600)
+        self.mail = mail
+        self.message: discord.Message | None = None
+
+    async def _finish(self, interaction: discord.Interaction, text: str):
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send(text)
+        self.stop()
+
+    @discord.ui.button(label="✅ Gửi mail", style=discord.ButtonStyle.success)
+    async def approve(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        if self.mail.get("_done"):
+            await self._finish(interaction, "Mail này đã được người khác xử lý rồi.")
+            return
+        self.mail["_done"] = True  # set TRUOC await de nguoi thu 2 khong gui trung
+        try:
+            msg_id = await asyncio.to_thread(weekly_mail.send_built, self.mail)
+        except Exception:
+            self.mail["_done"] = False
+            log.exception("Gửi weekly mail thất bại sau khi duyệt")
+            await self._finish(interaction, "⚠ Gửi THẤT BẠI — xem log trên máy chạy bot rồi thử lại bằng `@bot gửi mail weekly report`.")
+            return
+        await self._finish(interaction, f"📧 ĐÃ GỬI tới {', '.join(self.mail['to'])} (id {msg_id})")
+        await _mail_channel_note(f"📧 Weekly mail đã được duyệt và gửi: {self.mail['subject']}")
+
+    @discord.ui.button(label="✕ Huỷ", style=discord.ButtonStyle.danger)
+    async def reject(self, interaction: discord.Interaction, _button: discord.ui.Button):
+        self.mail["_done"] = True
+        await self._finish(interaction, "Đã huỷ — tuần này không gửi mail tự động.")
+
+    async def on_timeout(self):
+        if self.message and not self.mail.get("_done"):
+            try:
+                await self.message.reply("⌛ Hết hạn duyệt — mail tuần này KHÔNG được gửi.")
+            except Exception:
+                pass
+
+
+@tasks.loop(time=_MAIL_TIME)
+async def weekly_mail_send():
+    """Sáng thứ 2 (mặc định): soạn mail weekly report rồi DM cho admin DUYỆT —
+    chỉ gửi khi admin bấm ✅. Nội dung cùng nguồn dữ liệu với sheet."""
+    if not WEEKLY_MAIL_ENABLED:
+        return
+    # tasks.loop(time=...) chạy MỖI NGÀY — tự lọc thứ, giống weekly_report_sync.
+    if datetime.datetime.now(_SYNC_TZINFO).weekday() != _MAIL_WEEKDAY:
+        return
+    try:
+        # Chặn (gọi Gmail + Supabase đồng bộ) -> đẩy sang thread, đừng treo event loop.
+        mail = await asyncio.to_thread(weekly_mail.build_mail)
+    except Exception as e:
+        log.exception("Soạn weekly mail thất bại")
+        await _mail_channel_note(f"⚠ Soạn weekly mail thất bại: {e}")
+        return
+
+    approvers = await _weekly_mail_approvers()
+    if not approvers:
+        log.error("Weekly mail: không có ai để duyệt (admin chưa link discord_id?) — KHÔNG gửi.")
+        await _mail_channel_note("⚠ Weekly mail: không tìm được admin để DM duyệt — KHÔNG gửi.")
+        return
+
+    preview = weekly_mail.preview_text(mail)
+    reached = 0
+    for uid in approvers:
+        try:
+            user = client.get_user(uid) or await client.fetch_user(uid)
+            view = WeeklyMailApproveView(mail)
+            view.message = await user.send(preview, view=view)
+            reached += 1
+        except Exception:
+            log.warning("Không DM được người duyệt %s", uid)
+    if reached == 0:
+        await _mail_channel_note("⚠ Weekly mail: DM duyệt không tới được ai (chặn DM?) — KHÔNG gửi.")
+    else:
+        log.info("Weekly mail: đã DM bản xem trước cho %d người duyệt", reached)
+
+
+@tasks.loop(time=_DM_TIME)
+async def member_dm_weekly():
+    """Thứ 5 (mặc định): DM riêng từng member số task xong/tồn đọng + câu động viên."""
+    if not MEMBER_DM_ENABLED:
+        return
+    # tasks.loop(time=...) chạy MỖI NGÀY — tự lọc thứ, giống weekly_report_sync.
+    if datetime.datetime.now(_SYNC_TZINFO).weekday() != _DM_WEEKDAY:
+        return
+    try:
+        # build_summaries chặn (query Supabase đồng bộ) -> đẩy sang thread;
+        # send_dms thì cần event loop của client đang sống nên await trực tiếp.
+        summaries = await asyncio.to_thread(member_dm.build_summaries, get_client())
+        lines = await member_dm.send_dms(client, summaries)
+    except Exception:
+        log.exception("DM điểm tuần tự động thất bại")
+        return
+    summary = "\n".join(lines).strip()
+    log.info("DM điểm tuần tự động:\n%s", summary)
+    if BUG_SYNC_CHANNEL_ID:
+        try:
+            ch = client.get_channel(BUG_SYNC_CHANNEL_ID) or await client.fetch_channel(BUG_SYNC_CHANNEL_ID)
+            await ch.send(
+                f"💌 DM điểm tuần tự động (thứ {_DM_WEEKDAY + 2}, {_DM_HOUR}h):\n```\n{summary[:1800]}\n```"
+            )
+        except Exception:
+            log.warning("Không gửi được tóm tắt DM điểm tuần")
+
+
+@tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
+async def poll_member_dm_requests():
+    """Quét yêu cầu 'Gửi test' từ web (bảng member_dm_requests, nút ở tab Cấu hình)."""
+    if not MEMBER_DM_ENABLED:
+        return
+    try:
+        sb = get_client()
+        pending = await asyncio.to_thread(
+            lambda: sb.table("member_dm_requests").select("*").eq("status", "pending").order("created_at").execute().data
+        )
+    except Exception as e:
+        log.warning("Đọc member_dm_requests lỗi (chưa áp migration 0025?): %s", e)
+        return
+    for req in pending or []:
+        await _process_dm_request(sb, req)
+
+
+async def _process_dm_request(sb, req):
+    status, result = "done", ""
+    try:
+        # test=True: tin nhắn mở đầu bằng dòng '🧪 test' để member không tưởng lịch thật.
+        summary = await asyncio.to_thread(member_dm.summary_for, sb, req["target_user_id"], test=True)
+        line = (await member_dm.send_dms(client, [summary]))[0]
+        result = line.lstrip("- ").strip()[:300]
+        if "đã gửi DM" not in line:
+            status = "error"
+    except Exception as e:
+        status, result = "error", str(e)[:300]
+        log.exception("Xử lý yêu cầu DM test lỗi")
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        await asyncio.to_thread(
+            lambda: sb.table("member_dm_requests").update(
+                {"status": status, "result": result, "processed_at": now_iso}
+            ).eq("id", req["id"]).execute()
+        )
+    except Exception as e:
+        log.warning("Cập nhật trạng thái DM test lỗi: %s", e)
+
+
 @tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
 async def poll_bug_sync_requests():
     """Moi nhip: (1) day thay doi nhan tu app -> Discord, (2) xu ly yeu cau 'Sync' tu web."""
@@ -452,6 +654,18 @@ async def on_ready():
     if WEEKLY_REPORT_ENABLED and not weekly_report_sync.is_running():
         weekly_report_sync.start()
         log.info("Weekly report bật: thứ 2 lúc %sh (%s)", BUG_SYNC_HOUR, BUG_SYNC_TZ)
+    if WEEKLY_MAIL_ENABLED and not weekly_mail_send.is_running():
+        weekly_mail_send.start()
+        log.info("Weekly mail bật: thứ %d lúc %sh (%s)", _MAIL_WEEKDAY + 2, _MAIL_HOUR, BUG_SYNC_TZ)
+    if MEMBER_DM_ENABLED:
+        if not member_dm_weekly.is_running():
+            member_dm_weekly.start()
+        if not poll_member_dm_requests.is_running():
+            poll_member_dm_requests.start()
+        log.info(
+            "Member DM bật: thứ %d lúc %sh (%s) + quét yêu cầu test từ web mỗi %ds",
+            _DM_WEEKDAY + 2, _DM_HOUR, BUG_SYNC_TZ, BUG_SYNC_POLL_SECONDS,
+        )
 
 
 @client.event

@@ -47,9 +47,17 @@ export default function TaskModal({
   const { confirmDoneNotify } = useNotify();
   const isEdit = Boolean(task);
 
-  const canEditFields = isAdmin;
+  // 3 mức quyền, từ hẹp đến rộng:
+  // - canEditFields: title/priority/sprint/watchers/points — admin; create mode thì ai
+  //   tạo cũng phải gõ được (points vẫn khoá riêng bằng isAdmin ở dưới).
+  // - canEditOwn: người nhận, feature, hạn chót, subtask, mô tả, tài liệu — member sửa
+  //   được trên task MÌNH TẠO (reporter). Trigger DB chặn points ở tầng RLS (0024).
+  // - canChangeStatus: reporter/assignee đổi trạng thái (như cũ).
+  const isOwner = !isEdit || task?.reporterId === user?.uid;
+  const canEditFields = isAdmin || !isEdit;
+  const canEditOwn = isAdmin || isOwner;
   const canChangeStatus = isAdmin || task?.assigneeId === user?.uid || task?.reporterId === user?.uid;
-  const canSave = canEditFields || canChangeStatus;
+  const canSave = canEditFields || canEditOwn || canChangeStatus;
 
   const [title, setTitle] = useState(task?.title ?? '');
   const [description, setDescription] = useState(task?.description ?? '');
@@ -64,7 +72,13 @@ export default function TaskModal({
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? defaultAssigneeId ?? null);
   const [points, setPoints] = useState<number>(task?.points ?? 0);
-  const [due, setDue] = useState<string>(toInputDate(task?.dueDate));
+  // Tạo mới: hạn chót mặc định = ngày cuối của sprint đang chọn (cùng luật với bot,
+  // xem task_ops._due_window). Người tạo vẫn đổi tay được trước khi bấm Tạo.
+  const [due, setDue] = useState<string>(() => {
+    if (task) return toInputDate(task.dueDate);
+    const sprint = sprints.find((s) => s.id === defaultSprintId);
+    return sprint?.endDate ? toInputDate(sprint.endDate) : '';
+  });
   const [attachments, setAttachments] = useState<Attachment[]>(task?.attachments ?? []);
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
   const [watcherIds, setWatcherIds] = useState<string[]>(task?.watcherIds ?? []);
@@ -255,7 +269,7 @@ export default function TaskModal({
                 className="textarea tm-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                disabled={!canEditFields}
+                disabled={!canEditOwn}
                 placeholder="Mô tả công việc…"
               />
               <div className="tm-progress" title="Tự tính từ subtask đã hoàn thành">
@@ -267,7 +281,7 @@ export default function TaskModal({
 
             {/* Subtasks — ngay dưới thanh tiến độ (tiến độ tính từ đây) */}
             <section className="tm-section">
-              <SubtasksField subtasks={subtasks} onChange={setSubtasks} canEdit={canEditFields} canToggle={canChangeStatus} />
+              <SubtasksField subtasks={subtasks} onChange={setSubtasks} canEdit={canEditOwn} canToggle={canChangeStatus} />
             </section>
 
             {/* Thông tin — status & priority sống ở header, không lặp lại ở đây */}
@@ -283,25 +297,26 @@ export default function TaskModal({
                 </label>
                 <label className="tm-field">
                   <span>Feature</span>
-                  <select className="select" value={featureId ?? ''} onChange={(e) => setFeatureId(e.target.value || null)} disabled={!canEditFields}>
+                  <select className="select" value={featureId ?? ''} onChange={(e) => setFeatureId(e.target.value || null)} disabled={!canEditOwn}>
                     <option value="">— Chưa gắn —</option>
                     {projectFeatures.map((f) => (<option key={f.id} value={f.id}>{f.icon} {f.name}</option>))}
                   </select>
                 </label>
                 <label className="tm-field">
                   <span>Người nhận</span>
-                  <select className="select" value={assigneeId ?? ''} onChange={(e) => setAssigneeId(e.target.value || null)} disabled={!canEditFields}>
+                  <select className="select" value={assigneeId ?? ''} onChange={(e) => setAssigneeId(e.target.value || null)} disabled={!canEditOwn}>
                     <option value="">Chưa giao</option>
                     {members.map((m) => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}
                   </select>
                 </label>
                 <label className="tm-field">
                   <span>Hạn chót</span>
-                  <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditFields} />
+                  <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditOwn} />
                 </label>
                 <label className="tm-field">
                   <span>Story points</span>
-                  <input className="input" type="number" min={0} value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} disabled={!canEditFields} />
+                  {/* Story point: CHỈ admin — kể cả người tạo task (trigger 0024 chặn thêm ở DB). */}
+                  <input className="input" type="number" min={0} value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} disabled={!isAdmin} />
                 </label>
               </div>
               <WatchersField members={members} watcherIds={watcherIds} onChange={setWatcherIds} disabled={!canEditFields} />
@@ -310,7 +325,7 @@ export default function TaskModal({
             {/* Tài liệu (chỉ link) */}
             <section className="tm-section">
               <h4 className="tm-h"><PaperclipIcon size={16} /> Tài liệu</h4>
-              <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={!canEditFields} />
+              <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={!canEditOwn} />
               {isEdit && task?.notionUrl && (
                 <a className="notion-row" href={task.notionUrl} target="_blank" rel="noreferrer">📝 Mở task trên Notion →</a>
               )}
@@ -327,7 +342,7 @@ export default function TaskModal({
             </section>
 
             {/* Ref — ảnh tham khảo, section riêng ở dưới cùng */}
-            <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={!canEditFields} />
+            <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={!canEditOwn} />
 
             {/* Ref dùng chung của feature — CHỈ ĐỌC, và đọc thẳng từ feature chứ không
                 sao chép vào task: thêm ref vào feature sau này thì task cũ vẫn thấy ngay,

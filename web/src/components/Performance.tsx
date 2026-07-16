@@ -15,6 +15,7 @@ import {
 } from '../lib/performance';
 import { overtimeBreakdown } from '../lib/overtime';
 import { seriesColorMap } from '../lib/perfPalette';
+import InsertedTasksSection from './performance/InsertedTasksSection';
 import SprintRangePicker from './performance/SprintRangePicker';
 import SprintCompletionTable from './performance/SprintCompletionTable';
 import SprintDetailDrawer from './performance/SprintDetailDrawer';
@@ -37,6 +38,9 @@ const CAVEATS = [
   'OT = việc đánh dấu xong vào T7/CN (tuần làm việc T2–T6). Mốc là lần đánh dấu xong ĐẦU TIÊN của task / ngày fix xong của bug, đọc theo giờ máy đang xem — mở trang ở múi giờ khác UTC+7 thì ranh giới ngày sẽ lệch.',
   'OT đo lúc ĐÁNH DẤU xong, không phải lúc ngồi làm: fix xong tối thứ 6 mà sáng T7 mới tick thì vẫn vào OT, và ngược lại. Với bug, mốc lấy từ lần bot sync (09:00 mỗi ngày) nên bug xong chiều T6 dễ bị dồn sang T7 — hãy xem đây là chỉ báo để hỏi lại, không phải bằng chứng.',
   'Việc đã xong mà thiếu mốc thời gian không bị tính là "trong tuần": nó nằm riêng ở ô "thiếu mốc xong" và không nằm ở mẫu số của tỷ lệ OT.',
+  'Chèn việc = task TẠO MỚI từ thứ 3 trở đi (tuần bắt đầu thứ 2, theo giờ máy đang xem) — mốc là lúc TẠO task, nên task tạo cuối tuần để soạn trước kế hoạch tuần sau vẫn bị đếm là chèn của tuần tạo.',
+  '"Tự chèn" = người tạo cũng là người nhận (PM tự tạo việc cho mình cũng tính là tự chèn). "PM chèn" = admin tạo và giao cho người khác. "Khác" = member khác tạo hộ hoặc task bot tạo mà tài khoản Discord chưa liên kết. Phân loại theo role HIỆN TẠI của người tạo.',
+  'Người "bị chèn" là người ĐANG được giao — đổi người nhận thì task chèn dồn về người mới. Task chèn chưa giao ai nằm ở dòng "Chưa giao" trong bảng và không vào biểu đồ tròn, nên số giữa biểu đồ có thể nhỏ hơn ô "Task chèn".',
 ];
 
 /** Trang hiệu suất theo khoảng sprint (chỉ admin — chặn ở Sidebar + Layout). */
@@ -140,6 +144,10 @@ export default function Performance() {
         <MemberPerfTable rows={perf} colorByUid={colorByUid} />
         <OvertimeTable summary={overtime} />
       </div>
+
+      {/* Chèn việc đi theo TUẦN LỊCH (kế hoạch chốt sáng thứ 2) chứ không theo khoảng
+          sprint ở trên — nó có bộ chọn thời gian riêng và không đụng RPC task_report. */}
+      <InsertedTasksSection tasks={tasks} members={members} colorByUid={colorByUid} />
 
       <MetricCaveat items={CAVEATS} />
 

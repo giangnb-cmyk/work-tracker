@@ -4,6 +4,12 @@ Doc task tu Supabase -> ghi 2 o trong tab 'Discussion':
   - "Tiến độ / Hiện tại"        <- task DA XONG cua sprint TRUOC   ("đã hoàn thành tuần trước")
   - "Tiến độ / Tiếp theo làm gì" <- task CHUA XONG cua sprint HIEN TAI ("kế hoạch tuần tới")
 
+Neu project co GA4 property trong settings.json ("ga4_properties") thi dien them o
+"Chỉ số sản phẩm / Hiện tại": retention D1, time choi, session... tach theo Android/iOS,
+so tuan truoc trong ngoac, bold so lieu (xem ga4_metrics.py). Loi GA4 khong lam hong
+phan task — chi log. O chi so do bot ghi (bat dau "[GA4]") duoc lam moi o lan chay sau;
+o nguoi viet tay thi giu nguyen nhu luat chung.
+
 CAU TRUC SHEET (khao sat tu file that "M1 - Weekly Report"): la MA TRAN, khong phai danh
 sach. Cot A = nen tang, B = hang muc, C = cau hoi, con MOI TUAN LA MOT COT (D, E, ... AX).
 Hang 1 = ngay bat dau tuan (dd/mm/yyyy), hang 2 = ngay ket thuc.
@@ -26,14 +32,17 @@ Vi du (chay trong thu muc bot/):
 """
 
 import argparse
+import json
 import sys
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
     pass
 
+import ga4_metrics as ga4
 import permissions
 import project_repo as prepo
 import sheets_gateway as sg
@@ -44,9 +53,11 @@ from errors import PermissionDenied, ResolveError
 TAB = "Discussion"
 _HEAD_ROWS = "A1:BZ2"
 _LABEL_RANGE = "B1:C60"
+_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "settings.json"
 
 # Nhan trong sheet (so sanh qua _fold -> bo dau, thuong hoa) .
 _BLOCK_PROGRESS = _fold("Tiến độ")
+_BLOCK_METRICS = _fold("Chỉ số sản phẩm")
 _Q_CURRENT = _fold("Hiện tại")
 _Q_NEXT = _fold("Tiếp theo làm gì")
 
@@ -92,6 +103,34 @@ def bullets(tasks) -> str:
         if title:
             lines.append(f"- {title}")
     return "\n".join(lines)
+
+
+def ga4_property_for(project_id: str) -> str | None:
+    """Property id GA4 cua project tu settings.json ("ga4_properties"), None = chua cau hinh."""
+    try:
+        settings = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    for row in settings.get("ga4_properties", []):
+        if row.get("project_id") == project_id:
+            pid = str(row.get("property_id") or "").strip()
+            return pid or None
+    return None
+
+
+def build_metrics(project_id: str, week_start: date) -> tuple[list | None, str | None]:
+    """(cac dong chi so GA4, thong bao loi). Ca hai co the None: chua cau hinh thi im lang.
+
+    Loi GA4 KHONG duoc lam hong phan task — caller chi log chuoi loi roi di tiep
+    (cung tinh than fire-and-forget voi Notion/Discord sync).
+    """
+    property_id = ga4_property_for(project_id)
+    if not property_id:
+        return None, None
+    try:
+        return ga4.build_section(ga4.session(), property_id, week_start), None
+    except ga4.Ga4Error as e:
+        return None, str(e)
 
 
 def build_sections(client, previous, current) -> tuple[str, str]:
@@ -160,8 +199,25 @@ def _target_week(current, week_override: date | None) -> tuple[date, date | None
     return start, end
 
 
+def _write_metrics(sess, sheet_id, tab, col0, rows, metrics, force) -> list[str]:
+    """Ghi khoi 'Chỉ số sản phẩm / Hiện tại' (GA4). Cung luat an toan voi phan task,
+    them mot ngoai le: o bat dau bang MARKER la so lieu bot ghi lan truoc -> duoc lam moi."""
+    col = sg.col_name(col0)
+    row_m = rows.get((_BLOCK_METRICS, _Q_CURRENT))
+    if not row_m:
+        return ["- BỎ QUA Chỉ số GA4: tab không có hàng 'Chỉ số sản phẩm / Hiện tại'"]
+    cell = sg.get_values(sess, sheet_id, f"{tab}!{col}{row_m}")
+    old = (cell[0][0] if cell and cell[0] else "").strip()
+    if old and not old.startswith(ga4.MARKER) and not force:
+        return [f"- BỎ QUA Chỉ số GA4 ({col}{row_m}): ô đã có nội dung (người viết tay?). "
+                f"Dùng --force nếu muốn ghi đè."]
+    sg.update_rich(sess, sheet_id, tab, col0, row_m, metrics)
+    return [f"- Đã ghi Chỉ số GA4 vào {col}{row_m}"
+            + (" (làm mới số liệu [GA4] cũ)" if old else "")]
+
+
 def write_report(sess, sheet_id, tab, current, done_text, plan_text, force=False,
-                 week: date | None = None) -> list[str]:
+                 week: date | None = None, metrics: list | None = None) -> list[str]:
     """Ghi vao cot cua tuan `current` (hoac `week` neu chi dinh). Tra ve log de in."""
     rows = locate_rows(sess, sheet_id, tab)
     row_done = rows.get((_BLOCK_PROGRESS, _Q_CURRENT))
@@ -211,6 +267,9 @@ def write_report(sess, sheet_id, tab, current, done_text, plan_text, force=False
             continue
         _write_cell(sess, sheet_id, tab, col0, row, text)
         log.append(f"- Đã ghi {label} vào {col}{row} ({len(text.splitlines())} dòng)")
+
+    if metrics:
+        log += _write_metrics(sess, sheet_id, tab, col0, rows, metrics, force)
     return log
 
 
@@ -234,19 +293,27 @@ def run(project_token: str | None, tab: str, dry_run: bool, force: bool,
         raise sg.SheetsError("chưa có sprint nào có ngày bắt đầu — không biết ghi vào tuần nào.")
 
     done_text, plan_text = build_sections(client, previous, current)
+    week_start, _ = _target_week(current, week)
+    metrics, ga4_err = build_metrics(project["_id"], week_start)
     head = [
         f"Project: {project.get('name')} · sheet {sheet_id[:12]}…",
         f"Sprint trước: {previous.get('name') if previous else '(không có)'} → "
         f"{len(done_text.splitlines())} task đã xong",
         f"Sprint hiện tại: {current.get('name')} → {len(plan_text.splitlines())} task còn lại",
     ]
+    if ga4_err:
+        head.append(f"LỖI GA4 (bỏ qua chỉ số, phần task vẫn ghi): {ga4_err}")
+
     if dry_run:
-        return head + ["", "--- Đã hoàn thành tuần trước ---", done_text or "(trống)",
-                       "", "--- Kế hoạch tuần tới ---", plan_text or "(trống)",
-                       "", "(--dry-run: chưa ghi gì lên sheet)"]
+        out = head + ["", "--- Đã hoàn thành tuần trước ---", done_text or "(trống)",
+                      "", "--- Kế hoạch tuần tới ---", plan_text or "(trống)"]
+        if metrics:
+            out += ["", "--- Chỉ số sản phẩm (GA4) ---", ga4.plain_text(metrics)]
+        return out + ["", "(--dry-run: chưa ghi gì lên sheet)"]
 
     sess = sg.session()
-    return head + write_report(sess, sheet_id, tab, current, done_text, plan_text, force, week)
+    return head + write_report(sess, sheet_id, tab, current, done_text, plan_text,
+                               force, week, metrics)
 
 
 def run_all(tab: str = TAB, force: bool = False) -> list[str]:

@@ -136,6 +136,50 @@ def update_values(sess: requests.Session, sheet_id: str, a1: str, values: list) 
     return r.json().get("updatedCells", 0)
 
 
+def update_rich(sess: requests.Session, sheet_id: str, tab: str,
+                col0: int, row: int, lines: list) -> None:
+    """Ghi MOT o voi bold TUNG DOAN. `lines` = danh sach dong, moi dong la list
+    (doan_chu, co_bold) — xem ga4_metrics.Segment.
+
+    update_values chi ghi duoc chuoi tron; bold tung doan trong o phai dung
+    updateCells + textFormatRuns. LUU Y: startIndex cua run dem theo UTF-16 code unit —
+    tieng Viet nam tron trong BMP nen trung voi chi so Python, nhung DUNG nhet emoji
+    (ngoai BMP) vao noi dung o nay.
+    """
+    text, runs, bold_now = "", [], None
+
+    def emit(seg: str, bold: bool):
+        nonlocal text, bold_now
+        if not seg:
+            return
+        if bold_now != bold:
+            runs.append({"startIndex": len(text),
+                         "format": {"bold": True} if bold else {}})
+            bold_now = bold
+        text += seg
+
+    for i, segs in enumerate(lines):
+        if i:
+            emit("\n", False)
+        for seg, bold in segs:
+            emit(seg, bold)
+
+    tab_id, _, _ = tab_grid(sess, sheet_id, tab)
+    r = sess.post(
+        f"{_API}/{sheet_id}:batchUpdate",
+        json={"requests": [{"updateCells": {
+            "rows": [{"values": [{
+                "userEnteredValue": {"stringValue": text},
+                "textFormatRuns": runs,
+            }]}],
+            "fields": "userEnteredValue,textFormatRuns",
+            "start": {"sheetId": tab_id, "rowIndex": row - 1, "columnIndex": col0},
+        }}]},
+        timeout=_TIMEOUT,
+    )
+    _check(r, f"ghi (định dạng) ô {col_name(col0)}{row}")
+
+
 def col_name(index0: int) -> str:
     """0 -> A, 25 -> Z, 26 -> AA. Sheets khong nhan chi so cot trong dia chi A1."""
     if index0 < 0:

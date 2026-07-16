@@ -152,11 +152,32 @@ WEEKLY_REPORT_HINT = (
     f'`python "{_SKILLS_DIR}/weekly_report.py" [--project <name>] [--dry-run] [--force]`. '
     "It reads tasks from Supabase and writes two cells in the project's Google Sheet: "
     "done tasks of the PREVIOUS sprint -> 'Tiến độ / Hiện tại', and remaining tasks of the "
-    "CURRENT sprint -> 'Tiến độ / Tiếp theo làm gì'. ADMIN ONLY (it writes to the team's "
+    "CURRENT sprint -> 'Tiến độ / Tiếp theo làm gì'. If the project has a GA4 property in "
+    "settings.json (ga4_properties) it ALSO fills 'Chỉ số sản phẩm / Hiện tại' with GA4 "
+    "metrics (retention D1, playtime, sessions) split by Android/iOS — a GA4 error never "
+    "blocks the task cells. ADMIN ONLY (it writes to the team's "
     "sheet); --dry-run only reads and needs no permission. "
     "It SKIPS any cell that already has text (someone typed it by hand) — only pass --force "
     "if the user EXPLICITLY asks to overwrite. Never pass --force on your own initiative. "
-    "Relay the printed log lines as-is; they say exactly which cells were written or skipped."
+    "Relay the printed log lines as-is; they say exactly which cells were written or skipped. "
+    "WEEKLY MAIL: when asked to send the weekly report EMAIL ('gui mail weekly report', "
+    f"'mail bao cao tuan'), run `python \"{_SKILLS_DIR}/weekly_mail.py\" [--dry-run] "
+    "[--to a@b.com]`. It fills the Gmail draft template (subject contains '[TEMPLATE]') "
+    "with done/plan tasks and sends it. ADMIN ONLY to send; ALWAYS show the user a "
+    "--dry-run preview first unless they explicitly say send now."
+)
+
+MEMBER_DM_HINT = (
+    " MEMBER DM SKILL: When the user asks the bot to DM members their weekly task "
+    "summary ('nhan tin rieng cho member', 'dm diem tuan', 'gui dm task ton dong'), run "
+    f'`python "{_SKILLS_DIR}/member_dm.py" [--dry-run] [--member <name|@mention>]`. '
+    "It DMs each member (profiles with discord_id) their done-this-week count, pending "
+    "count and an encouragement line. Sending for real is ADMIN ONLY; --dry-run only "
+    "prints and needs no permission - ALWAYS show a --dry-run preview first unless the "
+    "user explicitly says send now. --member limits it to one person. It also runs "
+    "automatically per settings.json > member_dm (default Thursday morning), and admins "
+    "can send a single-person test from the web (Cau hinh tab). Relay the printed "
+    "lines as-is."
 )
 
 DOC_HINT = (
@@ -197,6 +218,8 @@ SKILL_TOOL_PATTERNS = [
     f'Bash(python "{_SKILLS_DIR}/project_ops.py":*)',
     f'Bash(python "{_SKILLS_DIR}/sprint_report.py":*)',
     f'Bash(python "{_SKILLS_DIR}/weekly_report.py":*)',
+    f'Bash(python "{_SKILLS_DIR}/weekly_mail.py":*)',
+    f'Bash(python "{_SKILLS_DIR}/member_dm.py":*)',
     f'Bash(python "{_SKILLS_DIR}/doc_search.py":*)',
 ]
 
@@ -212,6 +235,7 @@ def build_hints(sheets_enabled: bool) -> str:
         + PROJECT_HINT
         + SPRINT_REPORT_HINT
         + WEEKLY_REPORT_HINT
+        + MEMBER_DM_HINT
         + DOC_HINT
     )
     if sheets_enabled:

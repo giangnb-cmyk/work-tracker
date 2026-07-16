@@ -37,6 +37,27 @@
   "rag_sync_enabled": true,
   "_note_weekly_report": "true = SANG THU 2 luc bug_sync_hour (9h) tu dong dien weekly report vao Google Sheet cua tung project (cot 'Tien do / Hien tai' = task da xong sprint truoc, 'Tien do / Tiep theo lam gi' = task con lai sprint hien tai). Link sheet cau hinh RIENG tung project o web > Du an > 'Google Sheet weekly report' (cot projects.weekly_sheet_id), KHONG dat o day. Yeu cau: keys/service-account-gsheets.json, va sheet phai duoc Share quyen EDITOR cho email service account. Lan chay tu dong KHONG BAO GIO ghi de o da co chu (nguoi viet tay) - muon ghi de phai go tay '@bot weekly report' voi --force. Ket qua ghi log; gui Discord neu bug_sync_channel_id != 0.",
   "weekly_report_enabled": false,
+  "_note_ga4": "Chi so GA4 trong weekly report (o 'Chi so san pham / Hien tai'). Moi muc: project_id (uuid tu web) + property_id (so trong URL GA4: .../p<property_id>/...). Dung CHUNG service account voi sheets (keys/service-account-gsheets.json) — SA phai duoc them vao GA4 property quyen Viewer (Admin > Property access management) va project GCP cua SA phai bat Analytics Data API. Project khong co trong list = bo qua chi so, khong phai loi.",
+  "ga4_properties": [
+    { "project_id": "620a1a7d-d779-4c3e-b7e1-796c97e16be5", "property_id": "507574544" }
+  ],
+  "_note_weekly_mail": "Tu dong soan MAIL weekly report tu template DRAFT trong Gmail (muc Templates cua Gmail thi API khong doc duoc — soan thu tu template roi LUU NHAP, subject giu '[TEMPLATE]'). KHONG gui thang: bot DM ban xem truoc cho nguoi duyet (approver_ids; de trong = moi admin da link discord_id), bam '✅ Gui mail' moi gui — het han approve_timeout_hours hoac bam Huy la KHONG gui. Setup 1 lan: bat Gmail API + tao OAuth client Desktop -> keys/gmail-oauth-client.json, roi chay 'python skills/gmail_gateway.py --auth'. Placeholder trong draft: {{START}} {{END}} (dd/mm), {{START_FULL}} {{END_FULL}} (dd/mm/yyyy), {{DONE}} {{PLAN}} (danh sach task), {{SHEET_URL}}. weekday: 0=thu 2. Thu tay (gui truc tiep, khong qua duyet): '@bot gui mail weekly report'; xem truoc: python skills/weekly_mail.py --dry-run.",
+  "weekly_mail": {
+    "enabled": true,
+    "weekday": 1,
+    "hour": 9,
+    "template_subject": "[TEMPLATE]",
+    "to": ["bang@easygoing.vn"],
+    "cc": ["dungnc@easygoing.vn", "namds@easygoing.vn"],
+    "approver_ids": [],
+    "approve_timeout_hours": 24
+  },
   "_note_bug_mirror_videos": "false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.",
-  "bug_mirror_videos": false
+  "bug_mirror_videos": false,
+  "_note_member_dm": "DM RIENG tung member: so task DA XONG trong tuan (tinh tu thu 2 00:00 gio VN, dem qua bang activity) + so task CON TON DONG (co assignee, chua done, kem so tre han) + 1 cau dong vien. Chay tu dong vao 'hour' gio ngay 'weekday' (0=thu 2 ... 3=thu 5). Chi DM nguoi co profiles.discord_id VA co it nhat 1 task lien quan; member chan DM thi bot bao trong log. enabled cung bat/tat nut 'Gui test' tren web (tab Cau hinh, admin chon nguoi -> bot DM thu, can migration 0025). Thu tay: 'python skills/member_dm.py --dry-run' hoac tag bot nho gui.",
+  "member_dm": {
+    "enabled": true,
+    "weekday": 3,
+    "hour": 9
+  }
 }

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useVisits } from '../hooks/useVisits';
-import { periodStart, visitStats, PERIOD_LABEL, type Period } from '../lib/visitStats';
-import { formatDate, timeAgo } from '../lib/format';
+import { visitStats } from '../lib/visitStats';
+import { fmtDay, presetLabel, presetRange, startOfYear, type DateRange } from '../lib/dateRange';
+import { timeAgo } from '../lib/format';
 import { Timestamp } from '../lib/time';
 import Avatar from './Avatar';
+import DateRangePicker from './DateRangePicker';
 import MetricCaveat from './performance/MetricCaveat';
-
-const PERIODS: Period[] = ['week', 'month', 'year'];
 
 const CAVEATS = [
   '1 lượt = 1 phiên mở web (mở tab mới). Bấm F5 trong cùng tab KHÔNG tính thêm lượt, nên số này gần với "số lần vào làm việc" hơn là số lần tải trang.',
@@ -17,22 +17,27 @@ const CAVEATS = [
   'Mốc thời gian đọc theo giờ máy đang xem. Tuần bắt đầu từ THỨ 2.',
 ];
 
-/** Trang thống kê lượt truy cập web theo tuần/tháng/năm (chỉ admin — chặn ở Sidebar + Layout). */
+/** Trang thống kê lượt truy cập web theo khoảng thời gian tuỳ chọn (chỉ admin — chặn ở Sidebar + Layout). */
 export default function Visits() {
   const { members, membersLoading } = useSprintContext();
-  const [period, setPeriod] = useState<Period>('week');
+  // Mặc định "7 ngày qua" — cùng preset GA hay mở. Mốc "bây giờ" chốt lúc mount để mọi
+  // dòng trong một lần render dùng chung; đổi khoảng thì picker tự lấy Date.now() mới.
+  const [range, setRange] = useState<DateRange>(() => presetRange('d7', Date.now()));
 
-  // Một mốc duy nhất cho cả lần render — mỗi chỗ tự gọi Date.now() là các dòng có thể rơi
-  // vào hai bên nửa đêm.
-  const nowMs = useMemo(() => Date.now(), []);
-  // Luôn nạp từ đầu NĂM: đổi qua lại tuần/tháng/năm không phải gọi mạng lại.
-  const sinceMs = useMemo(() => periodStart(nowMs, 'year').getTime(), [nowMs]);
+  // Cửa sổ NẠP dữ liệu: rộng tối thiểu từ đầu năm để đổi qua lại các preset trong năm
+  // không phải gọi mạng lại; chỉ nới thêm khi người dùng chọn khoảng cũ hơn.
+  const sinceMs = useMemo(
+    () => Math.min(startOfYear(range.toMs), range.fromMs),
+    [range.fromMs, range.toMs],
+  );
   const { visits, loading } = useVisits(sinceMs);
 
   const summary = useMemo(
-    () => visitStats({ visits, members, nowMs, period }),
-    [visits, members, nowMs, period],
+    () => visitStats({ visits, members, fromMs: range.fromMs, toMs: range.toMs }),
+    [visits, members, range.fromMs, range.toMs],
   );
+
+  const rangeLabel = range.presetId ? presetLabel(range.presetId).toLowerCase() : 'khoảng đã chọn';
 
   if (membersLoading || loading) {
     return <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>;
@@ -43,21 +48,15 @@ export default function Visits() {
       <div className="view-header row between">
         <div>
           <h1>👣 Truy cập</h1>
-          <p>Chỉ admin xem được. Ai vào web bao nhiêu lần, theo tuần / tháng / năm.</p>
+          <p>Chỉ admin xem được. Ai vào web bao nhiêu lần, theo khoảng thời gian tuỳ chọn.</p>
         </div>
-        <div className="seg-toggle" role="group" aria-label="Kỳ thống kê">
-          {PERIODS.map((p) => (
-            <button key={p} className={`seg${period === p ? ' on' : ''}`} onClick={() => setPeriod(p)}>
-              {PERIOD_LABEL[p]}
-            </button>
-          ))}
-        </div>
+        <DateRangePicker value={range} onChange={setRange} />
       </div>
 
       <div className="ot-tiles">
         <div className="ot-tile">
           <span className="ot-tile-num mono">{summary.total}</span>
-          <span className="ot-tile-lb muted">Tổng lượt · {PERIOD_LABEL[period].toLowerCase()}</span>
+          <span className="ot-tile-lb muted">Tổng lượt · {rangeLabel}</span>
         </div>
         <div className="ot-tile">
           <span className="ot-tile-num mono">{summary.activeUsers}/{members.length}</span>
@@ -69,9 +68,9 @@ export default function Visits() {
         </div>
         <div className="ot-tile">
           <span className="ot-tile-num mono" style={{ fontSize: '1rem' }}>
-            {formatDate(Timestamp.fromDate(new Date(summary.fromMs)))}
+            {fmtDay(range.fromMs)} – {fmtDay(range.toMs)}
           </span>
-          <span className="ot-tile-lb muted">Tính từ ngày</span>
+          <span className="ot-tile-lb muted">Khoảng thời gian</span>
         </div>
       </div>
 
@@ -117,8 +116,8 @@ export default function Visits() {
 
       {summary.total === 0 && (
         <div className="callout-inline" style={{ marginTop: '1rem' }}>
-          Chưa ghi được lượt nào. Dữ liệu chỉ bắt đầu từ khi tính năng này lên production —
-          quá khứ không hồi tố được.
+          Không có lượt nào trong khoảng này. Dữ liệu chỉ bắt đầu từ khi tính năng lên
+          production — quá khứ không hồi tố được.
         </div>
       )}
 

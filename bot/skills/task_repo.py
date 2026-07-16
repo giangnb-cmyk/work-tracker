@@ -22,6 +22,7 @@ from errors import ResolveError  # noqa: E402,F401 — re-export: skill cu bat `
 USERS = "profiles"
 SPRINTS = "sprints"
 TASKS = "tasks"
+ACTIVITY = "activity"
 
 
 def db():
@@ -326,6 +327,35 @@ def overdue_and_due_today(client, now: datetime):
         elif start_today <= due_dt <= end_today:
             due_today.append(_map_task(r))
     return overdue, due_today
+
+
+def open_assigned_tasks(client) -> list:
+    """Task chua done VA da co assignee — nguon dem 'ton dong' theo nguoi (member_dm)."""
+    rows = client.table(TASKS).select("*").neq("status", STATUS_DONE).execute().data
+    return [_map_task(r) for r in rows if r.get("assignee_id")]
+
+
+def done_task_ids_since(client, since_iso: str) -> set:
+    """Id cac task duoc chuyen sang 'done' tu thoi diem `since_iso` (ISO, tz-aware).
+
+    Dem qua bang `activity` (trigger tasks_log_status, migration 0007) — moc thoi gian
+    la luc DOI TRANG THAI, khong phai tasks.updated_at (co the bi ghi de vi ly do khac).
+    Chi co du lieu tu khi ap 0007; task done truoc do khong duoc tinh.
+    """
+    rows = (
+        client.table(ACTIVITY).select("task_id")
+        .eq("type", "status_change").eq("body", STATUS_DONE)
+        .gte("created_at", since_iso).execute().data
+    )
+    return {r["task_id"] for r in rows}
+
+
+def tasks_by_ids(client, ids) -> list:
+    """Lay nhieu task theo danh sach id trong 1 query. Rong -> [] (khong query)."""
+    if not ids:
+        return []
+    res = client.table(TASKS).select("*").in_("id", list(ids)).execute()
+    return [_map_task(r) for r in res.data]
 
 
 def insert_task(client, fields: dict) -> str:

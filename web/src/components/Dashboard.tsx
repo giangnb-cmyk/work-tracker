@@ -96,13 +96,14 @@ export default function Dashboard() {
       </div>
 
       <div className="board" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', alignItems: 'stretch' }}>
-        <div className="glass section" style={{ padding: '1.5rem' }}>
+        <div className="glass section" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
           <h3>Phân bố trạng thái</h3>
           {stats.total === 0 ? (
             <div className="empty">Chưa có task.</div>
           ) : (
-            // Fixed-height wrapper + maintainAspectRatio:false so the canvas can't grow unbounded.
-            <div style={{ height: 260, position: 'relative' }}>
+            // flex:1 để canvas ăn hết chiều cao card (card bị stretch bằng card Burndown),
+            // legend bottom nhờ đó nằm sát đáy khung; minHeight giữ sàn khi card ngắn.
+            <div style={{ flex: 1, minHeight: 260, position: 'relative' }}>
               <Doughnut
                 data={{
                   labels: TASK_STATUSES.map((s) => STATUS_LABEL[s]),

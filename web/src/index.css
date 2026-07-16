@@ -632,7 +632,6 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tcard-menu-wrap { position: relative; flex-shrink: 0; }
 .tcard-menu { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0.25rem; border-radius: 8px; display: grid; place-items: center; }
 .tcard-menu:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
-.tcard-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
 .tcard-menu-pop {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 41; min-width: 190px;
   border-radius: 12px; padding: 0.35rem; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
@@ -1186,9 +1185,41 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 /* Ít mẫu quá thì làm mờ, đừng in số như thể chắc chắn. */
 .thin-data { opacity: 0.45; }
 
+/* ---- Chèn việc trong tuần ---- */
+/* Nâng cả thẻ lên trên các section sau nó: panel lịch của DateRangePicker (z-index 60)
+   chỉ thắng TRONG stacking context của thẻ (backdrop-filter tạo context riêng), còn giữa
+   các thẻ anh em thì thứ tự DOM quyết định — không nâng thì lịch chui dưới bảng kế tiếp. */
+.ins-section { position: relative; z-index: 20; }
+.ins-grid { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
+@media (max-width: 900px) { .ins-grid { grid-template-columns: 1fr; } }
+.badge.ins-self { background: rgba(56, 189, 248, 0.12); color: var(--sky); }
+.badge.ins-admin { background: rgba(99, 102, 241, 0.18); color: #a5b4fc; }
+.badge.ins-other { background: rgba(148, 163, 184, 0.15); color: var(--muted); }
+/* Soi một người: các dòng khác lùi hẳn về nền (mờ hơn .row-idle để phân biệt được
+   "đang bị mờ vì focus" với "không có task"). */
+.ins-row-dim { opacity: 0.3; }
+.ins-row-focus td { background: rgba(99, 102, 241, 0.1); }
+/* Tên task trong drawer — bấm được để mở TaskModal, nhìn như text thường tới khi hover. */
+.ins-task-link { background: none; border: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.ins-task-link:hover { color: var(--sky); text-decoration: underline; }
+/* Nút mở drawer — tint indigo theo accent của app (cùng công thức với .preview-exit
+   nhưng đổi tông), không phải nút viền xám như .ot-expand. */
+.ins-detail-btn {
+  background: rgba(99, 102, 241, 0.16);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  color: #a5b4fc;
+  border-radius: 8px;
+  font: inherit; font-size: 0.75rem; font-weight: 600;
+  padding: 0.2rem 0.65rem; cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ins-detail-btn:hover { background: rgba(99, 102, 241, 0.32); color: #c7d2fe; }
+
 /* .modal đặt width: min(520px,100%) ở dưới trong file này — cùng specificity thì đứa
    sau thắng, nên phải dùng 2 class để đè. */
 .modal.modal-wide { width: min(880px, 100%); }
+/* Bảng task chèn 5 cột cần rộng hơn modal-wide — chỉ drawer Chèn việc dùng cỡ này. */
+.modal.modal-xwide { width: min(1100px, 100%); }
 
 /* Ô xem trước note họp — đọc như text thô, không phải ô nhập liệu. */
 .note-preview {
@@ -1740,7 +1771,6 @@ table.data-table { width: 100%; border-collapse: collapse; }
   display: grid;
   place-items: center;
 }
-.notif-backdrop { position: fixed; inset: 0; z-index: 40; }
 .notif-panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -1786,4 +1816,79 @@ table.data-table { width: 100%; border-collapse: collapse; }
   border-left: 2px solid rgba(99, 102, 241, 0.4);
   padding-left: 0.9rem;
   margin-top: 1.25rem;
+}
+
+/* Date-range picker (Truy cập) — kiểu GA: hai ô ngày + lịch quét khoảng + cột preset */
+.drp-wrap { position: relative; }
+.drp-trigger {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.45rem 0.8rem;
+  color: var(--text); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.drp-trigger:hover { border-color: rgba(99, 102, 241, 0.5); }
+.drp-panel {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 60;
+  display: flex; align-items: stretch;
+  border-radius: 14px; padding: 0.9rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  width: max-content; max-width: min(92vw, 470px);
+}
+.drp-main { display: flex; flex-direction: column; gap: 0.6rem; }
+.drp-inputs { display: flex; align-items: center; gap: 0.45rem; }
+.drp-date { color-scheme: dark; font-size: 0.82rem; padding: 0.35rem 0.5rem; width: 8.4rem; }
+.drp-head { display: flex; align-items: center; justify-content: space-between; }
+.drp-month-label {
+  background: none; border: none; color: var(--text); font-weight: 600;
+  font-size: 0.85rem; cursor: pointer; padding: 0.25rem 0.4rem; border-radius: 8px;
+}
+.drp-month-label:hover { background: rgba(255, 255, 255, 0.06); }
+.drp-nav button, .drp-year-row button {
+  background: none; border: none; color: var(--muted); font-size: 1rem;
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+}
+.drp-nav button:hover, .drp-year-row button:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.drp-grid { display: grid; grid-template-columns: repeat(7, 34px); }
+.drp-dow {
+  height: 28px; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 0.68rem; font-weight: 600;
+}
+.drp-day {
+  height: 34px; background: none; border: none; color: var(--text);
+  font-size: 0.8rem; cursor: pointer; border-radius: 50%;
+  transition: background 0.12s ease;
+}
+.drp-day:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.drp-day.off { color: var(--muted); opacity: 0.55; }
+.drp-day:disabled { color: var(--muted); opacity: 0.3; cursor: default; }
+.drp-day.in { background: rgba(99, 102, 241, 0.22); border-radius: 0; }
+.drp-day.edge { background: var(--primary); color: #fff; font-weight: 700; }
+.drp-day.today:not(.edge) { box-shadow: inset 0 0 0 1px var(--sky); }
+.drp-months { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.4rem 0; }
+.drp-year-row { display: flex; align-items: center; justify-content: center; gap: 1rem; color: var(--text); font-weight: 600; }
+.drp-month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.drp-month-cell {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); padding: 0.5rem 0; font-size: 0.8rem; cursor: pointer;
+}
+.drp-month-cell:hover { border-color: rgba(99, 102, 241, 0.5); }
+.drp-month-cell.on { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+.drp-presets {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-left: 0.9rem; padding-left: 0.9rem; border-left: 1px solid var(--border); min-width: 128px;
+}
+.drp-preset {
+  background: none; border: none; text-align: left; color: var(--text);
+  font-size: 0.82rem; padding: 0.45rem 0.6rem; border-radius: 8px; cursor: pointer; white-space: nowrap;
+}
+.drp-preset:hover { background: rgba(255, 255, 255, 0.06); }
+.drp-preset.on { color: var(--sky); font-weight: 600; background: rgba(56, 189, 248, 0.1); }
+@media (max-width: 640px) {
+  .drp-panel { flex-direction: column; }
+  .drp-presets {
+    margin-left: 0; padding-left: 0; border-left: none;
+    border-top: 1px solid var(--border); margin-top: 0.8rem; padding-top: 0.8rem;
+    flex-direction: row; flex-wrap: wrap;
+  }
 }
