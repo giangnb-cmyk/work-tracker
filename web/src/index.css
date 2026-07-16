@@ -918,7 +918,12 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bugf { display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft); border-radius: 10px; padding: 0.5rem 0.7rem; min-width: 0; height: 44px; }
 .bugf-ic { flex-shrink: 0; width: 18px; text-align: center; font-size: 0.95rem; }
 .bugf-lb { width: 78px; flex-shrink: 0; font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bugf-sel { flex: 1; min-width: 0; margin-left: auto; background: none; border: none; color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: right; cursor: pointer; color-scheme: dark; }
+/* `flex: 0 1 auto` chứ KHÔNG phải `flex: 1`: popup của <select> gốc luôn rộng đúng bằng
+   thẻ select, nên để nó kéo dài hết ô (ô rộng ~570px ở modal 1200px) là popup thừa ra một
+   mảng trống to. Để rộng theo nội dung, `margin-left: auto` đẩy sang phải như cũ.
+   Không lo layout nhảy: select gốc luôn rộng theo lựa chọn DÀI NHẤT, không theo cái đang
+   chọn, nên đổi giá trị không làm ô co giãn. min/max-width giữ để tên dài không phá ô. */
+.bugf-sel { flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; background: none; border: none; color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: right; cursor: pointer; color-scheme: dark; }
 .bugf-sel:focus { outline: none; }
 .bugf-sel:disabled { color: var(--text); opacity: 0.9; }
 
