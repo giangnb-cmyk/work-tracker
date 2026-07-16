@@ -29,6 +29,8 @@ interface TaskRowProps {
   canChangeStatus: boolean;
   onOpen: (task: Task) => void;
   onQuickStatus: (task: Task, status: TaskStatus) => void;
+  /** Optional: chỉ màn có sprint mới cần mục "Chuyển sang sprint…". */
+  onMoveSprint?: (task: Task) => void;
 }
 
 const UNDONE_STATUS: TaskStatus = 'in_progress';
@@ -86,7 +88,14 @@ function DocTile({ doc }: { doc: Doc }) {
 }
 
 /** Rich task card matching the reference design. */
-export default function TaskRow({ task, assigneeJobRole, canChangeStatus, onOpen, onQuickStatus }: TaskRowProps) {
+export default function TaskRow({
+  task,
+  assigneeJobRole,
+  canChangeStatus,
+  onOpen,
+  onQuickStatus,
+  onMoveSprint,
+}: TaskRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const done = task.status === 'done';
   const progress = taskProgress(task);
@@ -139,6 +148,11 @@ export default function TaskRow({ task, assigneeJobRole, canChangeStatus, onOpen
                   {done ? 'Bỏ hoàn thành' : 'Đánh dấu hoàn thành'}
                 </button>
                 <button onClick={() => { setMenuOpen(false); onOpen(task); }}>Mở chi tiết</button>
+                {onMoveSprint && !done && (
+                  <button onClick={() => { setMenuOpen(false); onMoveSprint(task); }}>
+                    Chuyển sang sprint…
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -167,7 +181,8 @@ export default function TaskRow({ task, assigneeJobRole, canChangeStatus, onOpen
           <span className="tcard-tile tile-indigo"><CalendarIcon size={20} /></span>
           <div className="tcard-cell-text">
             <span className={`tcard-val mono${overdue ? ' overdue' : ''}`}>{dueText}</span>
-            <span className="tcard-lbl">Thời gian thực hiện</span>
+            {/* "Thời gian thực hiện" quá dài cho ô này ở cỡ 0.8rem — vỡ 2 dòng. */}
+            <span className="tcard-lbl">Thời gian</span>
           </div>
         </div>
         <div className="tcard-cell">
@@ -181,7 +196,7 @@ export default function TaskRow({ task, assigneeJobRole, canChangeStatus, onOpen
           <span className="tcard-tile tile-slate"><PaperclipIcon size={20} /></span>
           <div className="tcard-cell-text">
             <span className="tcard-val mono">{docs.length}</span>
-            <span className="tcard-lbl">Tài liệu đính kèm</span>
+            <span className="tcard-lbl">Tài liệu</span>
           </div>
         </div>
       </div>

@@ -43,18 +43,38 @@ This document defines the complete design style (UI/UX) for the Bot Work Tracker
 
 ## 3. Typography
 
-- **Headings (h1–h4, nav labels):** `Outfit`, sans-serif — Weights: 600, 700, 800. Rounded, modern, futuristic feel.
-- **Body Content:** `Inter`, sans-serif — Weights: 400, 500. Optimal readability at `0.85rem`–`1rem`.
-- **Numbers / IDs / Code:** `JetBrains Mono`, monospace — Always use for digits, item IDs, metric values.
+> **MỘT FONT DUY NHẤT CHO TOÀN APP — `Inter`.** Không trộn họ chữ ở bất kỳ đâu, bất kỳ
+> màn nào. Đây là quy tắc bắt buộc, thay cho hệ 3 font (Outfit / Inter / JetBrains Mono)
+> dùng trước 2026-07-15.
+
+- **Tất cả text** — `Inter`, sans-serif. Weights: 400, 500, 600, 700, 800.
+- **Phân cấp bằng WEIGHT + SIZE + COLOR**, không bằng cách đổi font.
+- **Số liệu** — vẫn `Inter`, thêm `font-variant-numeric: tabular-nums` (class `.mono`) để
+  cột số thẳng hàng. KHÔNG áp tabular-nums cho số lớn đứng một mình (`.stat-value`,
+  `.pacing-value`) — chữ số đều bề rộng làm số cỡ lớn trông rời rạc.
+
+### Quy tắc bắt buộc khi thêm font/weight
+
+1. **Weight nào CSS dùng thì `index.html` phải tải weight đó.** Thiếu → trình duyệt bơm
+   bold giả, nét méo, trông như lệch font. (Đã từng mắc: CSS dùng Inter 700 mà chỉ tải
+   tới 600.)
+2. **Canvas không ăn CSS.** Chart.js mặc định vẽ chữ bằng Helvetica → phải ép qua
+   `applyChartTheme()` (`web/src/lib/chartTheme.ts`). Vẽ tay lên canvas thì lấy font qua
+   `appFontFamily()`, không hardcode tên họ chữ.
+3. **Nguồn sự thật duy nhất:** biến `--font-ui` trong `web/src/index.css`. Các biến
+   `--font-head` / `--font-body` / `--font-mono` giữ lại làm alias cho call site cũ và
+   đều trỏ về `--font-ui`. Đổi font toàn app = sửa `--font-ui` + link trong `index.html`.
 
 ### Font Size Scale (rem-based)
+Tất cả các dòng dưới đây đều là `Inter`; chỉ khác size/weight.
+
 | Element | Size |
 |---|---|
 | View header h1 | `1.8rem` |
 | View header description | `0.95rem` |
 | Sidebar nav item | `0.9rem` |
 | Section title (h3) | `1.1rem` |
-| Stat value | `1.5rem` (bold, Mono) |
+| Stat value | `1.5rem` (bold, tabular-nums) |
 | Stat label | `0.8rem` |
 | Table cell | `0.85rem` |
 | Table header (th) | `0.75rem` uppercase |
@@ -138,7 +158,7 @@ font-size: 0.8rem;
 <div class="stat-card glass">
     <span class="stat-icon">✅</span>   <!-- font-size: 2rem -->
     <div class="stat-info">
-        <span class="stat-value">24</span>   <!-- 1.5rem, JetBrains Mono, bold -->
+        <span class="stat-value">24</span>   <!-- 1.5rem, Inter, bold -->
         <span class="stat-label">Tasks Done</span>  <!-- 0.8rem, muted -->
     </div>
 </div>
@@ -192,7 +212,7 @@ Left-border colored strip on dark card:
     background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.05));
     border: 1px solid rgba(99,102,241,0.3);
 }
-.pacing-value { font-size: 2.5rem; font-weight: 800; font-family: 'JetBrains Mono'; color: #6366f1; }
+.pacing-value { font-size: 2.5rem; font-weight: 800; font-family: var(--font-ui); color: #6366f1; }
 ```
 
 ---

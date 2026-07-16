@@ -9,7 +9,7 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // Fail loud in dev so we don't get cryptic runtime errors later.
 if (!url || !anonKey) {
   console.error(
-    'Supabase config missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in web/.env.local.',
+    'Thiếu cấu hình Supabase. Đặt VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY trong web/.env.local.',
   );
 }
 

@@ -39,7 +39,7 @@ export default function RefImagesSection({ attachments, onChange, disabled }: Pr
       for (const file of Array.from(files)) uploaded.push(await uploadImageAttachment(file));
       onChange([...attachments, ...uploaded]);
     } catch (err) {
-      console.error('Upload failed', err);
+      console.error('Tải ảnh lên thất bại', err);
       setError('Tải ảnh lên thất bại. Bật Storage, hoặc dán link ảnh vào phần Tài liệu.');
     } finally {
       setUploading(false);
@@ -89,14 +89,19 @@ export default function RefImagesSection({ attachments, onChange, disabled }: Pr
       {images.length === 0 && !disabled && <p className="st-empty">Chưa có ảnh tham khảo.</p>}
       {error && <p className="error-text">{error}</p>}
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        multiple
-        style={{ display: 'none' }}
-        onChange={(e) => onFiles(e.target.files)}
-      />
+      {/* Cũng phải theo `disabled`: ô này chỉ do nút ＋ kích hoạt (đã ẩn khi disabled) nên
+          chưa gây hại, nhưng để nó render ở chế độ chỉ-đọc là chừa sẵn đường upload vào
+          nơi không được sửa. */}
+      {!disabled && (
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => onFiles(e.target.files)}
+        />
+      )}
 
       {preview && (
         <div className="lightbox" onClick={() => setPreview(null)}>

@@ -94,6 +94,20 @@ export async function moveTask(task: Task, status: TaskStatus, order: number): P
   if (task.notionPageId) void safeNotionUpdate(task.notionPageId, { ...task, status, ...doneEnd });
 }
 
+/**
+ * Chuyển task sang sprint khác để sprint mới làm tiếp. Sprint cũ KHÔNG mất dấu vết:
+ * trigger `tasks_log_sprint` (migration 0015) tự ghi vào `task_sprints`, nhờ đó đếm được
+ * task này đã trễ mấy sprint.
+ *
+ * Cố ý không đụng `status` (task vẫn dở dang) và không đụng `due_date` (cửa sổ làm việc
+ * do người dùng đặt, chuyển sprint không phải lý do để viết lại).
+ */
+export async function moveTaskToSprint(task: Task, sprintId: string): Promise<void> {
+  if (sprintId === task.sprintId) return;
+  const { error } = await supabase.from('tasks').update({ sprint_id: sprintId }).eq('id', task.id);
+  if (error) throw error;
+}
+
 /** True only on the transition into `done` (avoids re-notifying already-done tasks). */
 export function becameDone(prev: TaskStatus, next: TaskStatus | undefined): boolean {
   return next === 'done' && prev !== 'done';
@@ -119,7 +133,7 @@ async function syncNewToNotion(
         .eq('id', id);
     }
   } catch (err) {
-    console.error('Notion create sync failed (task saved anyway)', err);
+    console.error('Đồng bộ tạo Notion thất bại (task vẫn đã lưu)', err);
   }
 }
 
@@ -132,6 +146,6 @@ async function safeNotionUpdate(
   try {
     await updateNotionPage(notionPageId, task, assigneeNotionUserId, notionProjectId);
   } catch (err) {
-    console.error('Notion update sync failed', err);
+    console.error('Đồng bộ cập nhật Notion thất bại', err);
   }
 }

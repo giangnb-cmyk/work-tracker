@@ -127,6 +127,8 @@ export interface Feature {
   icon: string; // emoji shown on the card
   color: string; // accent hex
   description: string;
+  /** Link tài liệu + ảnh ref dùng chung cho mọi task của feature (migration 0019). */
+  attachments: Attachment[];
   createdAt?: Timestamp;
   createdBy: string;
 }
@@ -148,12 +150,14 @@ export type BugStatus = 'open' | 'fixing' | 'pending' | 'deployed' | 'done';
 
 export const BUG_STATUSES: BugStatus[] = ['open', 'fixing', 'pending', 'deployed', 'done'];
 
+// Mirrors STATUS_TAG_NAME in lib/bugStatus.ts — these are the Discord forum tag
+// names, so display and sync stay on the same vocabulary.
 export const BUG_STATUS_LABEL: Record<BugStatus, string> = {
-  open: 'Mở',
-  fixing: 'Đang sửa',
-  pending: 'Chờ',
-  deployed: 'Đã deploy',
-  done: 'Xong',
+  open: 'Open',
+  fixing: 'Fixing',
+  pending: 'Pending',
+  deployed: 'Deployed',
+  done: 'Done',
 };
 
 /** A project-scoped label in the bug tag palette (Bug / High / Fixing / 1.0.x / …). */
@@ -193,6 +197,14 @@ export interface Bug {
   pendingDiscordPush?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  /**
+   * Lúc bug chuyển sang Done, do trigger DB ghi (migration 0018). Bất biến:
+   * có giá trị ⟺ status === 'done'.
+   *
+   * ĐỪNG thay bằng `updatedAt`: sync forum update MỌI bug ở MỌI lần chạy, nên
+   * updatedAt là "lần sync gần nhất" chứ không phải "lúc done".
+   */
+  doneAt?: Timestamp;
 }
 
 export interface Sprint {

@@ -50,54 +50,8 @@ if _SKILLS_DIR not in sys.path:
 import bug_sync  # noqa: E402  — doc forum Discord -> upsert bang `bugs`
 from supabase_client import get_client  # noqa: E402
 
-# Hint: chi Claude cach + khi nao chay tung skill, kem duong dan tuyet doi.
-TASK_HINT = (
-    " TASK SKILL: When the user wants to CREATE, UPDATE, ASSIGN or LIST tasks, run "
-    f'`python "{_SKILLS_DIR}/task_ops.py" <subcommand> ...`. Subcommands:\n'
-    "- create: --title (required) [--assignee <name|<@id>>] [--sprint <name|active|backlog>] "
-    "[--priority <low|medium|high|urgent, accepts Vietnamese: gap/cao/thap...>] "
-    "[--points N] [--due YYYY-MM-DD] [--desc ...]. Example 'tao task Fix login giao cho Nam, "
-    "gap, sprint dang chay' -> create --title \"Fix login\" --assignee \"Nam\" --priority gap "
-    "--sprint active.\n"
-    "- update: --id <taskId> plus any of --status (todo|in_progress|review|done, accepts "
-    "'dang lam'/'xong'/'review'/'can lam') --priority --title --assignee --points --due. "
-    "Example 'task 3f9a1b2c xong roi' -> update --id 3f9a1b2c --status xong.\n"
-    "- list: [--assignee <name|me>] [--sprint <name|active|backlog>] [--status <...>]. "
-    "'me' maps to the sender. Example 'xem task cua toi' -> list --assignee me.\n"
-    "Relay the script's printed output. The task id in [brackets] is a short id you can reuse."
-)
-SPRINT_HINT = (
-    " SPRINT REPORT SKILL: When the user asks for a sprint report / progress "
-    "('bao cao sprint', 'tien do sprint', 'sprint dang chay the nao'), run "
-    f'`python "{_SKILLS_DIR}/sprint_report.py" [--sprint <name|active>]` (omit --sprint '
-    "for the active sprint). Relay the printed report as-is."
-)
-DOC_HINT = (
-    " DOC SEARCH SKILL (RAG): When the user asks about the CONTENT of documents "
-    "(spec, tai lieu, huong dan, quy trinh, chinh sach, meeting notes) rather than "
-    "tasks/sprints, run "
-    f'`python "{_SKILLS_DIR}/doc_search.py" "<cau hoi>" [--project <id>] [--top-k N]`. '
-    "It returns the most relevant chunks with their source. Answer ONLY from those "
-    "chunks and cite the source [1],[2]...; if nothing relevant is returned, say the "
-    "document store has no matching info (do NOT invent an answer)."
-)
-SHEET_HINT = (
-    " GOOGLE SHEETS SKILL (live, CHI DOC): When the user asks about data inside a "
-    "Google Sheet in the shared Drive folder ('sheet', 'bang tinh', 'file tren drive', "
-    "'so lieu trong file ...'), use the google-sheets MCP tools: "
-    "mcp__google-sheets__list_spreadsheets de tim file, "
-    "mcp__google-sheets__list_sheets de xem cac tab, roi "
-    "mcp__google-sheets__get_sheet_data / search_spreadsheets / find_in_spreadsheet de doc. "
-    "READ ONLY - TUYET DOI khong tao/sua/xoa sheet. Tom tat gon cho Discord (khong dung bang markdown)."
-)
-FORMAT_HINT = (
-    " FORMATTING RULES for Discord: NEVER use markdown tables (Discord does not render "
-    "them). Use simple bullet lists. If script output contains Discord mention tokens "
-    "like <@123456789>, copy them VERBATIM so Discord pings that person - do NOT convert "
-    "them to plain names or change the digits. If a script prints a line starting with "
-    "'LOI:', it failed - relay that error politely and do not retry blindly."
-)
-MOOD_HINT = ""  # co the mo rong sau (bot com co set_mood skill); giu de dong bo cau truc.
+# Hint chi Claude cach + khi nao chay tung skill: xem hints.py.
+from hints import SKILL_TOOL_PATTERNS, build_hints  # noqa: E402
 
 # --- Google Sheets MCP (tuy chon, mac dinh TAT) ------------------------------
 # Bat bang "sheets_mcp_enabled": true trong settings.json SAU khi da tao service
@@ -208,10 +162,7 @@ def _last_json(text: str):
 
 def _build_args(prompt: str) -> list:
     """Dung danh sach tham so goi Claude CLI (tach ra cho de doc)."""
-    hints = f"{TASK_HINT}{SPRINT_HINT}{DOC_HINT}"
-    if SHEETS_MCP_ENABLED:
-        hints += SHEET_HINT
-    hints += f"{FORMAT_HINT}{MOOD_HINT}"
+    hints = build_hints(SHEETS_MCP_ENABLED)
     args = [
         CLAUDE_CMD, "-p", prompt,
         "--output-format", "json",
@@ -229,12 +180,8 @@ def _build_args(prompt: str) -> list:
         args += ["--dangerously-skip-permissions"]
     else:
         # Che do an toan: chi doc file + chay dung cac skill, chan lenh khac.
-        default_tools = [
-            "Read", "Glob", "Grep",
-            f'Bash(python "{_SKILLS_DIR}/task_ops.py":*)',
-            f'Bash(python "{_SKILLS_DIR}/sprint_report.py":*)',
-            f'Bash(python "{_SKILLS_DIR}/doc_search.py":*)',
-        ]
+        # Quyen GHI khong nam o day — skill tu check admin (skills/permissions.py).
+        default_tools = ["Read", "Glob", "Grep"] + SKILL_TOOL_PATTERNS
         if SHEETS_MCP_ENABLED:
             default_tools += SHEET_READ_TOOLS  # chi cac tool DOC sheet
         tools = _settings.get("safe_allowed_tools") or default_tools

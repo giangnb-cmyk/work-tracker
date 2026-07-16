@@ -56,6 +56,7 @@ const DEFAULT_LABELS: Omit<BugLabelInput, 'projectId'>[] = [
   { name: 'Performance', color: '#10b981', icon: '📈' },
   { name: 'Visual', color: '#38bdf8', icon: '👁️' },
   { name: 'Logic', color: '#a78bfa', icon: '⚙️' },
+  { name: 'Improve', color: '#84cc16', icon: '✏️' },
   { name: 'Unity', color: '#6d28d9', icon: '🎮' },
   { name: 'iOS', color: '#38bdf8', icon: '🍎' },
   { name: 'Android', color: '#22c55e', icon: '🤖' },

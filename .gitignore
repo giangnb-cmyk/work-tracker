@@ -4,10 +4,10 @@
 .env.*.local
 **/serviceAccountKey.json
 **/service-account*.json
-**/*-firebase-adminsdk-*.json
 keys/
 bot/keys/
 bot/.discord_session
+bot/mcp-bot.json
 
 # === Node / web ===
 node_modules/
@@ -33,10 +33,6 @@ bot/.pw-profile/
 Thumbs.db
 .vscode/
 .idea/
-
-# === Firebase ===
-.firebase/
-firebase-debug.log
 
 # === CodeGraph (local code-intelligence index; regenerate with `codegraph init`) ===
 .codegraph/

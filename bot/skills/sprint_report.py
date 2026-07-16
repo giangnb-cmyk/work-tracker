@@ -39,7 +39,7 @@ def _by_assignee(tasks) -> dict:
     """Gom {ten: {'total': n, 'done': n, 'points': p, 'points_done': p}}."""
     groups = {}
     for t in tasks:
-        name = t.get("assigneeName") or "Chua giao"
+        name = t.get("assigneeName") or "Chưa giao"
         g = groups.setdefault(name, {"total": 0, "done": 0, "points": 0, "points_done": 0})
         g["total"] += 1
         pts = t.get("points", 0) or 0
@@ -79,24 +79,24 @@ def _format_report(sprint, tasks, now: datetime) -> str:
     pts_total = sum(t.get("points", 0) or 0 for t in tasks)
     pts_done = sum(t.get("points", 0) or 0 for t in tasks if t.get("status") == STATUS_DONE)
 
-    lines = [f"Bao cao sprint: {sprint.get('name', '(khong ten)')}"]
+    lines = [f"Báo cáo sprint: {sprint.get('name', '(không tên)')}"]
     goal = sprint.get("goal")
     if goal:
-        lines.append(f"Muc tieu: {goal}")
+        lines.append(f"Mục tiêu: {goal}")
 
     days = _days_remaining(sprint, now)
     if days is not None:
-        when = f"con {days} ngay" if days >= 0 else f"da qua han {abs(days)} ngay"
-        lines.append(f"Thoi gian: {when} den ket thuc.")
+        when = f"còn {days} ngày" if days >= 0 else f"đã quá hạn {abs(days)} ngày"
+        lines.append(f"Thời gian: {when} đến khi kết thúc.")
 
-    lines.append(f"Tien do: {done}/{total} task done ({pct}%).")
+    lines.append(f"Tiến độ: {done}/{total} task done ({pct}%).")
     lines.append(f"Story points: {pts_done}/{pts_total} done.")
 
-    lines.append("Theo trang thai:")
+    lines.append("Theo trạng thái:")
     for status in STATUS_ORDER:
         lines.append(f"- {status}: {counts.get(status, 0)}")
 
-    lines.append("Theo nguoi:")
+    lines.append("Theo người:")
     for name, g in sorted(_by_assignee(tasks).items(), key=lambda kv: -kv[1]["total"]):
         lines.append(
             f"- {name}: {g['done']}/{g['total']} done, {g['points_done']}/{g['points']} pts"
@@ -104,12 +104,12 @@ def _format_report(sprint, tasks, now: datetime) -> str:
 
     overdue = _overdue(tasks, now)
     if overdue:
-        lines.append(f"Tre han ({len(overdue)}):")
+        lines.append(f"Trễ hạn ({len(overdue)}):")
         for t in overdue:
-            who = t.get("assigneeName") or "chua giao"
+            who = t.get("assigneeName") or "chưa giao"
             lines.append(f"- [{repo.short_id(t['_id'])}] {t.get('title', '')} ({who})")
     else:
-        lines.append("Khong co task nao tre han. 👍")
+        lines.append("Không có task nào trễ hạn. 👍")
 
     return "\n".join(lines)
 
@@ -127,10 +127,10 @@ def main():
     except repo.ResolveError as e:
         die(str(e))
     except Exception as e:
-        die(f"loi khong mong doi: {e}")
+        die(f"lỗi không mong đợi: {e}")
 
     if not tasks:
-        print(f"Sprint '{sprint.get('name')}' chua co task nao.")
+        print(f"Sprint '{sprint.get('name')}' chưa có task nào.")
         return
     print(_format_report(sprint, tasks, now))
 

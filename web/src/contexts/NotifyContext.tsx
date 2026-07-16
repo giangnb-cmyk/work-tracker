@@ -38,7 +38,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
     try {
       await createDoneNotifications(task, profile?.uid ?? '', profile?.displayName ?? 'Ai đó');
     } catch (err) {
-      console.error('Web notification dispatch failed', err);
+      console.error('Gửi thông báo web thất bại', err);
     } finally {
       setSending(false);
       setPending(null);

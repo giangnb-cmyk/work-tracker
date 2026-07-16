@@ -16,15 +16,12 @@ if str(_BOT_DIR) not in sys.path:
 
 from supabase_client import get_client  # noqa: E402
 
-from constants import STATUS_DONE  # noqa: E402
+from constants import STATUS_DONE, SPRINT_ACTIVE  # noqa: E402
+from errors import ResolveError  # noqa: E402,F401 — re-export: skill cu bat `repo.ResolveError`
 
 USERS = "profiles"
 SPRINTS = "sprints"
 TASKS = "tasks"
-
-
-class ResolveError(Exception):
-    """Loi nghiep vu khi khong phan giai duoc user/sprint -> in LOI: va thoat."""
 
 
 def db():
@@ -48,7 +45,14 @@ def _map_user(r: dict) -> dict:
 
 
 def _map_sprint(r: dict) -> dict:
-    return {"_id": r["id"], "name": r.get("name", ""), "status": r.get("status"), "goal": r.get("goal", "")}
+    return {
+        "_id": r["id"],
+        "name": r.get("name", ""),
+        "status": r.get("status"),
+        "goal": r.get("goal", ""),
+        "startDate": r.get("start_date"),
+        "endDate": r.get("end_date"),
+    }
 
 
 def _map_task(r: dict) -> dict:
@@ -59,6 +63,7 @@ def _map_task(r: dict) -> dict:
         "description": r.get("description", ""),
         "sprintId": r.get("sprint_id"),
         "projectId": r.get("project_id"),
+        "featureId": r.get("feature_id"),
         "status": r.get("status"),
         "priority": r.get("priority"),
         "assigneeId": r.get("assignee_id"),
@@ -71,6 +76,10 @@ def _map_task(r: dict) -> dict:
         "source": r.get("source"),
         "notionPageId": r.get("notion_page_id"),
         "notionUrl": r.get("notion_url"),
+        # WHY: reminder._cc_discord_ids doc 'watcherIds' de cc nguoi lien quan vao
+        # thong bao hoan thanh — thieu 2 khoa nay thi no am tham cc rong mai mai.
+        "watcherIds": r.get("watcher_ids") or [],
+        "watcherNames": r.get("watcher_names") or [],
     }
 
 
@@ -80,6 +89,7 @@ _TASK_COL = {
     "description": "description",
     "sprintId": "sprint_id",
     "projectId": "project_id",
+    "featureId": "feature_id",
     "status": "status",
     "priority": "priority",
     "assigneeId": "assignee_id",
@@ -91,6 +101,8 @@ _TASK_COL = {
     "source": "source",
     "notionPageId": "notion_page_id",
     "notionUrl": "notion_url",
+    "watcherIds": "watcher_ids",
+    "watcherNames": "watcher_names",
 }
 
 
@@ -171,13 +183,29 @@ def notion_user_id(client, assignee_id):
     return res.data[0]["notion_user_id"] if res.data else None
 
 
+def user_by_discord_id(client, discord_id):
+    """Profile khop CHINH XAC discord_id. None neu chua ai link id do.
+
+    WHY tach khoi resolve_user(): resolve_user fallback sang doan theo displayName,
+    khong duoc phep cho viec xet quyen (permissions.py) hay gan reporter.
+    """
+    if not discord_id:
+        return None
+    return _first_where(client, USERS, "discord_id", str(discord_id).strip())
+
+
+# Bang tra mapper theo ten bang. Them bang moi -> them 1 dong o day.
+# WHY: truoc day dispatch bang chuoi if long nhau voi nhanh 'else' bat-tat, nen
+# bang la se chui qua _map_task va tra ve dict rac ma khong bao loi.
+_MAPPERS = {USERS: _map_user, SPRINTS: _map_sprint, TASKS: _map_task}
+
+
 def _first_where(client, table: str, column: str, value):
-    """Tra ve dict dau tien khop column==value, hoac None."""
+    """Tra ve dict dau tien khop column==value, hoac None. KeyError neu bang chua co mapper."""
     res = client.table(table).select("*").eq(column, value).limit(1).execute()
     if not res.data:
         return None
-    row = res.data[0]
-    return _map_user(row) if table == USERS else (_map_sprint(row) if table == SPRINTS else _map_task(row))
+    return _MAPPERS[table](res.data[0])
 
 
 # --- Sprints -------------------------------------------------------------
@@ -188,12 +216,12 @@ def resolve_sprint(client, token: str):
     if token.lower() == "active":
         sprint = _first_where(client, SPRINTS, "status", "active")
         if not sprint:
-            raise ResolveError("khong co sprint nao dang active")
+            raise ResolveError("không có sprint nào đang active")
         return sprint
 
     sprint = _match_sprint_name(client, token)
     if not sprint:
-        raise ResolveError(f"khong tim thay sprint '{token}'")
+        raise ResolveError(f"không tìm thấy sprint '{token}'")
     return sprint
 
 
@@ -209,6 +237,49 @@ def _match_sprint_name(client, name: str):
         if target and target in _fold(r.get("name", "")):
             return _map_sprint(r)
     return None
+
+
+def list_sprints(client) -> list:
+    """Moi sprint, cu -> moi."""
+    rows = client.table(SPRINTS).select("*").order("created_at").execute().data
+    return [_map_sprint(r) for r in rows]
+
+
+def active_sprint(client):
+    """Sprint dang active dau tien, hoac None.
+
+    Luu y: khong co rang buoc DB nao ep chi mot sprint active (web cung chi
+    .find() cai dau tien) -> sprint_ops.py chan viec tao them cai thu hai.
+    """
+    return _first_where(client, SPRINTS, "status", SPRINT_ACTIVE)
+
+
+# camelCase (skill) -> snake_case (column) cho ghi sprint.
+_SPRINT_COL = {"name": "name", "goal": "goal", "status": "status", "createdBy": "created_by"}
+
+
+def _sprint_row(fields: dict) -> dict:
+    """Ep dict camelCase -> row snake_case cho insert/update sprint."""
+    row: dict = {}
+    for k, v in fields.items():
+        if k == "startDate":
+            row["start_date"] = _iso(v)
+        elif k == "endDate":
+            row["end_date"] = _iso(v)
+        elif k in _SPRINT_COL:
+            row[_SPRINT_COL[k]] = v
+    return row
+
+
+def insert_sprint(client, fields: dict) -> str:
+    """Chen sprint moi tu dict camelCase. Tra ve id (uuid) vua tao."""
+    res = client.table(SPRINTS).insert(_sprint_row(fields)).execute()
+    return res.data[0]["id"]
+
+
+def update_sprint(client, sprint_id: str, fields: dict) -> None:
+    """Cap nhat sprint theo id tu dict camelCase."""
+    client.table(SPRINTS).update(_sprint_row(fields)).eq("id", sprint_id).execute()
 
 
 # --- Tasks ---------------------------------------------------------------

@@ -89,5 +89,5 @@ export async function uploadImageAttachment(file: File): Promise<Attachment> {
 export async function deleteAttachmentFile(att: Attachment): Promise<void> {
   if (!att.storagePath) return;
   const { error } = await supabase.storage.from(BUCKET).remove([att.storagePath]);
-  if (error) console.warn('Could not delete storage object', att.storagePath, error);
+  if (error) console.warn('Không xoá được object trên storage', att.storagePath, error);
 }

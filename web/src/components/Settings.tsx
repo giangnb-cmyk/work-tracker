@@ -30,7 +30,7 @@ export default function Settings() {
       await saveAccessConfig({ emails: parseLines(emails), domains: parseLines(domains) });
       setSavedAt(new Date().toLocaleTimeString('vi-VN'));
     } catch (err) {
-      console.error('Save access config failed', err);
+      console.error('Lưu cấu hình truy cập thất bại', err);
       setError('Lưu thất bại (cần quyền admin).');
     } finally {
       setSaving(false);

@@ -176,6 +176,37 @@ subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `revie
 
 ---
 
+## `activity` (task feed)
+
+`{ id, task_id, actor_id, actor_name, type, body, created_at }` — migration `0007`.
+
+Ghi bằng **trigger DB**, không phải app: `tasks_log_created` (type `created`) và
+`tasks_log_status` (type `status_change`, `body` = **trạng thái MỚI** dạng enum trần, ví dụ
+`'done'` — không lưu trạng thái cũ). Client chỉ được insert `type = 'comment'` của chính mình;
+không có policy UPDATE/DELETE nên feed là bất biến.
+
+> ⚠️ Bot dùng service-role key nên `auth.uid()` là NULL → `actor_id` null, `actor_name` rỗng
+> (UI hiện "Hệ thống"). `created_at` vẫn chính xác.
+> ⚠️ Chỉ có dữ liệu **từ khi áp 0007**; `migrate_from_firestore.py` không insert vào bảng này
+> nên task từ thời Firestore vĩnh viễn không có mốc thời gian.
+
+## `task_sprints` (lịch sử sprint của task)
+
+`{ task_id, sprint_id, added_at }`, PK `(task_id, sprint_id)` — migration `0015`.
+
+`tasks.sprint_id` là sprint **hiện tại**; bảng này lưu **mọi** sprint task từng thuộc về, để
+đếm "task bị đẩy qua mấy sprint". Ghi bằng trigger `tasks_log_sprint` (`after insert or update
+of sprint_id`) nên mọi đường ghi — kể cả bot — đều được ghi nhận; client không có policy ghi.
+
+> ⚠️ Backfill của 0015 chỉ gán sprint **hiện tại** cho task cũ: task đã chuyển sprint TRƯỚC
+> migration không hồi tố được, số "trễ N sprint" chỉ đúng từ ngày áp migration.
+
+**RPC `task_report(p_project_id)`** (migration `0016`) → một dòng mỗi task:
+`{ task_id, sprint_ids[], first_in_progress_at, first_done_at }`. Gộp ở Postgres để không chạm
+trần 1000 dòng của PostgREST. Dùng bởi trang Hiệu suất (`web/src/hooks/useTaskReport.ts`).
+
+---
+
 ## `bug_labels/{labelId}` & `bugs/{bugId}`
 
 A per-project **bug tracker**. `bug_labels` is the project's tag palette; `bugs` are

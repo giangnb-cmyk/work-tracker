@@ -44,6 +44,6 @@ export async function notifyTaskDone(task: Task, sprintName?: string): Promise<v
       }),
     });
   } catch (err) {
-    console.error('Discord notify failed', err);
+    console.error('Thông báo Discord thất bại', err);
   }
 }

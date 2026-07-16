@@ -42,7 +42,7 @@ function parseMap(raw: string | undefined, fallback: Record<string, string>) {
   try {
     return { ...fallback, ...JSON.parse(raw) };
   } catch {
-    console.warn('Invalid JSON map in env; using defaults.');
+    console.warn('JSON map trong env không hợp lệ; dùng mặc định.');
     return fallback;
   }
 }

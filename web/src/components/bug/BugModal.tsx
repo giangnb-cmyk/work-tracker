@@ -8,6 +8,7 @@ import { openDiscordThread } from '../../lib/discordLink';
 import { detectProvider, hostOf, providerMeta } from '../../lib/attachments';
 import { formatDate } from '../../lib/format';
 import ProviderIcon from '../task/ProviderIcon';
+import Markdown from '../Markdown';
 import BugLabelChip from './BugLabelChip';
 import BadgeSelect from './BadgeSelect';
 import { MoreVerticalIcon } from '../icons';
@@ -37,6 +38,8 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   const [labelIds, setLabelIds] = useState<string[]>(bug?.labelIds ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bug có sẵn thì mặc định ĐỌC (Markdown đã render); bug mới thì mở thẳng ô nhập.
+  const [editingDesc, setEditingDesc] = useState(!isEdit);
 
   const grp = (g: LabelGroup) => labelsInGroup(labels, g);
   const sel = (g: LabelGroup) => selectedInGroup(labelIds, labels, g);
@@ -77,7 +80,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
       }
       onClose();
     } catch (err) {
-      console.error('Save bug failed', err);
+      console.error('Lưu bug thất bại', err);
       setError('Lưu thất bại. Kiểm tra quyền hoặc kết nối.');
       setSaving(false);
     }
@@ -141,10 +144,29 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
             </div>
           )}
 
-          {/* Mô tả */}
+          {/* Mô tả — đọc dạng Markdown, bấm "Sửa" để về ô nhập thô */}
           <section className="bugm-section">
-            <h4 className="tm-h">📝 Mô tả</h4>
-            <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit} placeholder="Các bước tái hiện, kết quả mong đợi / thực tế…" />
+            <div className="bugm-sec-head">
+              <h4 className="tm-h">📝 Mô tả</h4>
+              {canEdit && (
+                <div className="seg-toggle seg-sm" role="group" aria-label="Kiểu xem mô tả">
+                  <button type="button" className={`seg${!editingDesc ? ' on' : ''}`} onClick={() => setEditingDesc(false)}>Xem</button>
+                  <button type="button" className={`seg${editingDesc ? ' on' : ''}`} onClick={() => setEditingDesc(true)}>Sửa</button>
+                </div>
+              )}
+            </div>
+            {canEdit && editingDesc ? (
+              <textarea
+                className="textarea bugm-desc-edit"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Các bước tái hiện, kết quả mong đợi / thực tế… (hỗ trợ Markdown)"
+              />
+            ) : description.trim() ? (
+              <Markdown className="bugm-desc-view">{description}</Markdown>
+            ) : (
+              <p className="muted bugm-desc-empty">Chưa có mô tả.</p>
+            )}
           </section>
 
           {/* Thông tin */}

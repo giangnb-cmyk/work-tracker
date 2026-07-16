@@ -2,6 +2,7 @@
 // Kept in one place so hooks/writes stay declarative and the naming boundary is explicit.
 
 import { Timestamp } from './time';
+import type { TaskReport } from './performance';
 import type {
   Activity,
   AppNotification,
@@ -68,6 +69,7 @@ export function rowToFeature(r: Row): Feature {
     icon: r.icon ?? '🧩',
     color: r.color ?? '#6366f1',
     description: r.description ?? '',
+    attachments: (r.attachments ?? []) as Attachment[],
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };
@@ -106,6 +108,7 @@ export function rowToBug(r: Row): Bug {
     pendingDiscordPush: Boolean(r.pending_discord_push),
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     updatedAt: Timestamp.fromISO(r.updated_at) ?? undefined,
+    doneAt: Timestamp.fromISO(r.done_at) ?? undefined,
   };
 }
 
@@ -181,6 +184,16 @@ export function rowToActivity(r: Row): Activity {
     type: r.type,
     body: r.body ?? '',
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+  };
+}
+
+/** Một dòng từ RPC `task_report` (xem migration 0016). */
+export function rowToTaskReport(r: Row): TaskReport {
+  return {
+    taskId: r.task_id,
+    sprintIds: r.sprint_ids ?? [],
+    firstInProgressAt: Timestamp.fromISO(r.first_in_progress_at),
+    firstDoneAt: Timestamp.fromISO(r.first_done_at),
   };
 }
 

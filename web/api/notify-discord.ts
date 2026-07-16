@@ -1,6 +1,6 @@
 // POST /api/notify-discord — post a "task done" message to Discord, pinging the
 // people involved. Used by the web when a task moves to `done`.
-// Auth: Firebase ID token (web) or x-sync-secret header (bot). See _auth.ts.
+// Auth: Supabase access token (web) or x-sync-secret header (bot). See _auth.ts.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authorize } from './_auth';

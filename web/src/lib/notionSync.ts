@@ -1,5 +1,5 @@
 // Thin client for the /api/notion gateway. Isolates all network I/O so hooks/components
-// stay declarative. Every call attaches the current user's Firebase ID token.
+// stay declarative. Every call attaches the current user's Supabase access token.
 
 import { supabase } from '../supabase';
 import { toInputDate } from './format';

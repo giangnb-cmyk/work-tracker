@@ -62,7 +62,7 @@ export default function Bugs() {
     try {
       await seedDefaultBugLabels(selectedProjectId, user?.uid ?? '');
     } catch (err) {
-      console.error('Seed labels failed', err);
+      console.error('Tạo nhãn mặc định thất bại', err);
     } finally {
       setSeeding(false);
     }
@@ -75,7 +75,7 @@ export default function Bugs() {
       await requestBugSync(selectedProjectId, user?.uid ?? '');
       setSyncMsg('Đã yêu cầu — bot sẽ đồng bộ trong giây lát, danh sách tự cập nhật.');
     } catch (err) {
-      console.error('Request bug sync failed', err);
+      console.error('Yêu cầu sync bug thất bại', err);
       setSyncMsg('Gửi yêu cầu thất bại (cần quyền admin).');
     }
     setTimeout(() => setSyncMsg(null), 6000);

@@ -5,8 +5,15 @@ Service-role BO QUA row level security -> moi kiem tra quyen phai lam trong code
 """
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from supabase import create_client, Client
+
+# WHY: skill chay standalone (`python skills/task_ops.py ...`, run-*.bat) KHONG qua
+# bot.py nen chua ai nap .env. Nap ngay tai noi duy nhat can 2 bien nay -> moi skill
+# deu chay tay duoc. Khong override: env san co (bot.py truyen xuong) van thang.
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 _client: Client | None = None
 

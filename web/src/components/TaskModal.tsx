@@ -15,6 +15,9 @@ import TaskActivity from './TaskActivity';
 import { FileIcon, PaperclipIcon } from './icons';
 import type { Attachment, Subtask, Task, TaskPriority, TaskStatus } from '../types';
 
+/** Section ref của feature là CHỈ ĐỌC — onChange bắt buộc nhưng không bao giờ chạy. */
+const noop = () => {};
+
 interface TaskModalProps {
   task?: Task | null;
   defaultSprintId: string | null;
@@ -53,6 +56,9 @@ export default function TaskModal({
   // Project isn't editable in the modal — you're already inside one.
   const [projectId] = useState<string | null>(task?.projectId ?? defaultProjectId ?? null);
   const [featureId, setFeatureId] = useState<string | null>(task?.featureId ?? defaultFeatureId ?? null);
+  // Ref dùng chung của feature đang chọn — bám theo featureId nên đổi feature là đổi theo.
+  const featureOfTask = features.find((f) => f.id === featureId) ?? null;
+  const featureRefs = featureOfTask?.attachments ?? [];
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? defaultStatus ?? 'todo');
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? defaultAssigneeId ?? null);
@@ -114,7 +120,7 @@ export default function TaskModal({
       setSaveState('saved');
       if (justFinished) confirmDoneNotify(merged, sprintName);
     } catch (err) {
-      console.error('Autosave failed', err);
+      console.error('Tự động lưu thất bại', err);
       setSaveState('error');
       setError('Lưu thất bại. Kiểm tra quyền hoặc kết nối.');
     }
@@ -157,7 +163,7 @@ export default function TaskModal({
       );
       onClose();
     } catch (err) {
-      console.error('Create task failed', err);
+      console.error('Tạo task thất bại', err);
       setError('Tạo thất bại. Kiểm tra quyền hoặc kết nối.');
       setCreating(false);
     }
@@ -288,6 +294,19 @@ export default function TaskModal({
 
             {/* Ref — ảnh tham khảo, section riêng ở dưới cùng */}
             <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={!canEditFields} />
+
+            {/* Ref dùng chung của feature — CHỈ ĐỌC, và đọc thẳng từ feature chứ không
+                sao chép vào task: thêm ref vào feature sau này thì task cũ vẫn thấy ngay,
+                và không có hai bản dữ liệu trôi lệch nhau. Sửa ở màn Features. */}
+            {featureRefs.length > 0 && (
+              <section className="tm-section feature-refs">
+                <h4 className="tm-h">
+                  {featureOfTask?.icon} Dùng chung của feature “{featureOfTask?.name}”
+                </h4>
+                <AttachmentsField attachments={featureRefs} onChange={noop} disabled />
+                <RefImagesSection attachments={featureRefs} onChange={noop} disabled />
+              </section>
+            )}
 
             {error && <p className="error-text">{error}</p>}
           </div>

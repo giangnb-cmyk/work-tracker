@@ -4,7 +4,8 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
 import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
-import TaskRow from './TaskRow';
+import { sortTasksByProgress } from '../lib/taskGrouping';
+import TaskListRow from './TaskListRow';
 import TaskModal from './TaskModal';
 import FeatureModal from './FeatureModal';
 import CreateTaskCard from './CreateTaskCard';
@@ -14,7 +15,7 @@ import type { Feature, Task, TaskStatus } from '../types';
 export default function Features() {
   const { isAdmin } = useAuth();
   const { features, featuresLoading, selectedProjectId, selectedProject } = useSprintContext();
-  const { tasks } = useProjectTasks(selectedProjectId);
+  const { tasks, loading: tasksLoading } = useProjectTasks(selectedProjectId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [creating, setCreating] = useState(false);
@@ -23,9 +24,16 @@ export default function Features() {
     () => features.filter((f) => f.projectId === selectedProjectId),
     [features, selectedProjectId],
   );
-  const countByFeature = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of tasks) if (t.featureId) map.set(t.featureId, (map.get(t.featureId) ?? 0) + 1);
+  /** done/total mỗi feature — một vòng lặp cho cả con số lẫn thanh tiến độ. */
+  const statsByFeature = useMemo(() => {
+    const map = new Map<string, { done: number; total: number }>();
+    for (const t of tasks) {
+      if (!t.featureId) continue;
+      const s = map.get(t.featureId) ?? { done: 0, total: 0 };
+      s.total += 1;
+      if (t.status === 'done') s.done += 1;
+      map.set(t.featureId, s);
+    }
     return map;
   }, [tasks]);
 
@@ -39,6 +47,11 @@ export default function Features() {
     return (
       <FeatureDetail
         feature={selected}
+        // Truyền task xuống thay vì để con tự gọi useProjectTasks lần nữa: cùng projectId
+        // sẽ sinh kênh realtime TRÙNG TÊN (`live:tasks:project_id=eq.<id>`) với kênh của
+        // component này — hai channel cùng topic subscribe song song là hỏng realtime.
+        tasks={tasks}
+        loading={tasksLoading}
         onBack={() => setSelectedId(null)}
         onEdit={isAdmin ? () => setEditingFeature(selected) : undefined}
         editingFeature={editingFeature}
@@ -65,13 +78,21 @@ export default function Features() {
             <span>Tạo feature mới</span>
           </button>
         )}
-        {projectFeatures.map((f) => (
-          <button key={f.id} className="project-card glass" onClick={() => setSelectedId(f.id)}>
-            <span className="project-icon" style={{ background: `${f.color}22` }}>{f.icon}</span>
-            <span className="project-name">{f.name}</span>
-            <span className="project-meta">{countByFeature.get(f.id) ?? 0} task</span>
-          </button>
-        ))}
+        {projectFeatures.map((f) => {
+          const { done, total } = statsByFeature.get(f.id) ?? { done: 0, total: 0 };
+          const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+          return (
+            <button key={f.id} className="project-card glass" onClick={() => setSelectedId(f.id)}>
+              <span className="project-icon" style={{ background: `${f.color}22` }}>{f.icon}</span>
+              <span className="project-name">{f.name}</span>
+              <span className="project-meta">{done}/{total} task xong</span>
+              <span className="feat-prog">
+                <span className="progress"><span style={{ width: `${percent}%` }} /></span>
+                <span className="feat-pct mono">{percent}%</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {projectFeatures.length === 0 && !isAdmin && (
@@ -87,17 +108,19 @@ export default function Features() {
 
 interface DetailProps {
   feature: Feature;
+  /** Task của cả project, do component cha fetch — xem chú thích ở chỗ gọi. */
+  tasks: Task[];
+  loading: boolean;
   onBack: () => void;
   onEdit?: () => void;
   editingFeature: Feature | null;
   onCloseEdit: () => void;
 }
 
-function FeatureDetail({ feature, onBack, onEdit, editingFeature, onCloseEdit }: DetailProps) {
+function FeatureDetail({ feature, tasks, loading, onBack, onEdit, editingFeature, onCloseEdit }: DetailProps) {
   const { user, isAdmin } = useAuth();
   const { members, selectedSprintId } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
-  const { tasks, loading } = useProjectTasks(feature.projectId);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
 
@@ -106,7 +129,11 @@ function FeatureDetail({ feature, onBack, onEdit, editingFeature, onCloseEdit }:
     return (uid: string | null) => (uid ? map.get(uid) : undefined);
   }, [members]);
 
-  const featureTasks = useMemo(() => tasks.filter((t) => t.featureId === feature.id), [tasks, feature.id]);
+  // Cùng thứ tự với Bảng Sprint: chưa xong lên trước, rồi tới thứ tự thủ công.
+  const featureTasks = useMemo(
+    () => sortTasksByProgress(tasks.filter((t) => t.featureId === feature.id)),
+    [tasks, feature.id],
+  );
   const canChangeStatus = (t: Task) => isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid;
 
   function quickStatus(task: Task, status: TaskStatus) {
@@ -130,22 +157,26 @@ function FeatureDetail({ feature, onBack, onEdit, editingFeature, onCloseEdit }:
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : (
-        <div className="task-list">
-          {isAdmin && <CreateTaskCard onClick={() => setCreatingTask(true)} label="Tạo task cho feature" />}
-          {featureTasks.map((t) => (
-            <TaskRow
-              key={t.id}
-              task={t}
-              assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
-              canChangeStatus={canChangeStatus(t)}
-              onOpen={setEditingTask}
-              onQuickStatus={quickStatus}
-            />
-          ))}
-          {featureTasks.length === 0 && !isAdmin && (
+        <>
+          {isAdmin && (
+            <CreateTaskCard variant="row" onClick={() => setCreatingTask(true)} label="Tạo task cho feature" />
+          )}
+          <div className="trow-list">
+            {featureTasks.map((t) => (
+              <TaskListRow
+                key={t.id}
+                task={t}
+                assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+                canChangeStatus={canChangeStatus(t)}
+                onOpen={setEditingTask}
+                onQuickStatus={quickStatus}
+              />
+            ))}
+          </div>
+          {featureTasks.length === 0 && (
             <div className="glass empty">Feature này chưa có task.</div>
           )}
-        </div>
+        </>
       )}
 
       {(editingTask || creatingTask) && (

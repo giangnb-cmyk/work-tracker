@@ -26,6 +26,27 @@ export function CalendarIcon({ size = 20, className }: IconProps) {
   );
 }
 
+/** Con mắt — xem thử giao diện dưới góc nhìn khác. */
+export function EyeIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+/** Bia ngắm — mục tiêu / target của sprint. */
+export function TargetIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function CheckSquareIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className}>

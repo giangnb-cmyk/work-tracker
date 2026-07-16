@@ -52,7 +52,7 @@ Two-way sync between a Discord **forum channel** and `bugs`:
 | Styling | CSS3 (vanilla) | `web/src/index.css` — glassmorphism dark theme, CSS custom properties. NO CSS framework. |
 | Data / Auth | **Supabase** (Postgres + Auth + Storage + Realtime) | `web/src/supabase.ts`; Google sign-in. RLS enforces access. |
 | Charts | Chart.js via `react-chartjs-2` (npm) | sprint burndown / stats |
-| Fonts | Google Fonts (CDN) | Outfit, Inter, JetBrains Mono |
+| Fonts | Google Fonts (CDN) | **Inter only** — một font cho toàn app, không trộn họ chữ |
 | Bot | Python 3.11+, `discord.py`, `supabase-py` | `bot/` — tag → Claude CLI → skills; + bug forum sync |
 | Deploy | Vercel (web) + GitHub | bot self-hosted with a process manager / Task Scheduler |
 
@@ -61,7 +61,10 @@ Two-way sync between a Discord **forum channel** and `bugs`:
 Premium Dark Theme — Glassmorphism. Full spec in `design_system_guide.md`.
 - Background: `#0f172a` | Glass cards: `rgba(30,41,59,0.7)` + `backdrop-filter:blur(10px)`
 - Accent Indigo: `#6366f1` | Sky: `#38bdf8` | Gold: `#fbbf24` | Text: `#f8fafc` / `#94a3b8`
-- Fonts: Outfit (headings) · Inter (body) · JetBrains Mono (numbers/IDs)
+- Fonts: **Inter cho MỌI thứ** — một font duy nhất, phân cấp bằng weight/size/color chứ
+  không bằng đổi họ chữ. Số liệu dùng `.mono` (= `tabular-nums`, vẫn Inter). Nguồn sự thật:
+  `--font-ui` trong `index.css`; weight nào CSS dùng thì `index.html` phải tải weight đó;
+  canvas/Chart.js phải ép qua `lib/chartTheme.ts`.
 - Active nav = **solid `#6366f1` fill + glow**, not a tint. Tab switch = fadeIn + translateY.
 
 ## Coding Standards
@@ -138,9 +141,14 @@ bot-work-tracker/
 │   └── vercel.json
 ├── bot/                    # Python discord.py + supabase-py (self-hosted)
 │   ├── bot.py              #   tag → Claude CLI → skills; bug-sync loops
+│   ├── hints.py            #   "API docs" of the skill set, injected into Claude's prompt
 │   ├── supabase_client.py  #   supabase-py init (service-role key, bypasses RLS)
-│   ├── skills/             #   task_ops, sprint_report, reminder, task_repo,
-│   │                       #   constants, bug_sync (Discord forum ↔ bugs)
+│   ├── skills/             #   *_ops = CLI Claude runs; *_repo = data access; both split
+│   │                       #   by domain: task_ops/task_repo, feature_ops + project_ops/
+│   │                       #   project_repo, sprint_ops, sprint_report, reminder,
+│   │                       #   permissions (admin gate), errors, constants,
+│   │                       #   task_title (làm sạch tiêu đề — chặn ở code, không chỉ hint),
+│   │                       #   bug_sync (Discord forum ↔ bugs), doc_* (RAG)
 │   ├── settings.json       #   model, allowed users, channels, bug_forums
 │   └── .env.example        #   DISCORD_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 ├── supabase/
@@ -191,6 +199,12 @@ bot-work-tracker/
   put the service-role key or bot token in `web/`.
 - **The bot uses the `service_role` key** — it **bypasses RLS**, so enforce every
   permission check in bot code. Keep it out of git (`.gitignore` → `bot/.env`) and off Vercel.
+  Every skill that WRITES must gate on `skills/permissions.py` first: creating a task is open
+  to all (mirrors `tasks_insert`), **everything else is admin-only** — deliberately stricter
+  than RLS, which also lets a task's reporter/assignee edit it. Identity comes from
+  `BOT_SENDER_ID` (the real Discord author id, set by `bot.py`) matched **exactly** against
+  `profiles.discord_id` — never from message text, and never fuzzy-matched on display name.
+  An admin with no `discord_id` linked cannot use admin skills: that is fail-closed, by design.
 - **Security lives in migrations** — never ship a new query shape without the matching RLS
   policy. Add a `supabase/migrations/00NN_*.sql` file **and** apply it (Supabase MCP
   `apply_migration` or CLI). Run `get_advisors` after DDL. `SECURITY DEFINER` functions

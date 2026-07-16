@@ -1,6 +1,6 @@
 // POST /api/notion — the single Notion sync gateway used by both web and bot.
 // Body: { action: 'create' | 'update', task: NotionTaskInput, notionPageId?: string }
-// Auth: Firebase ID token (web) or x-sync-secret header (bot). See _auth.ts / _notion.ts.
+// Auth: Supabase access token (web) or x-sync-secret header (bot). See _auth.ts / _notion.ts.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authorize } from './_auth';
@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (err) {
-    console.error('Notion sync failed', err);
+    console.error('Đồng bộ Notion thất bại', err);
     return res.status(502).json({ synced: false, error: 'notion_api_error' });
   }
 }

@@ -17,18 +17,25 @@ _TIMEOUT = 10  # giay
 _GATEWAY_URL_ENV = "NOTION_GATEWAY_URL"
 _SECRET_ENV = "NOTION_SYNC_SECRET"
 
+# Sentinel: phan biet "khong truyen" voi "truyen None (go link)".
+# WHY: gateway chi dung den relation Project khi key CO MAT trong payload
+# (`input.notionProjectId !== undefined` — web/api/_notion.ts). Update ma gui
+# key = None se XOA relation, nen update khong truyen gi thi phai vang key han.
+_OMIT = object()
+
 
 def is_configured() -> bool:
     """Da dat ca URL gateway va secret hay chua."""
     return bool(os.getenv(_GATEWAY_URL_ENV) and os.getenv(_SECRET_ENV))
 
 
-def _task_payload(task: dict, assignee_notion_user_id) -> dict:
-    """Ep task Firestore ve dung shape NotionTaskInput cua gateway.
+def _task_payload(task: dict, assignee_notion_user_id, notion_project_id=_OMIT) -> dict:
+    """Ep task ve dung shape NotionTaskInput cua gateway.
 
     dueDate tra ve 'YYYY-MM-DD' hoac None; chi lay dung cac truong gateway can.
+    notion_project_id de mac dinh _OMIT -> khong dung toi relation Project.
     """
-    return {
+    payload = {
         "title": task.get("title", ""),
         "status": task.get("status", ""),
         "priority": task.get("priority", ""),
@@ -38,6 +45,9 @@ def _task_payload(task: dict, assignee_notion_user_id) -> dict:
         "dueDate": _due_str(task.get("dueDate")),
         "description": task.get("description", ""),
     }
+    if notion_project_id is not _OMIT:
+        payload["notionProjectId"] = notion_project_id
+    return payload
 
 
 def _due_str(due):
@@ -49,10 +59,27 @@ def _due_str(due):
     return str(due)[:10]
 
 
-def create_page(task: dict, assignee_notion_user_id=None) -> dict:
-    """Tao page Notion cho task moi. Tra ve {synced, notionPageId, notionUrl}."""
-    body = {"action": "create", "task": _task_payload(task, assignee_notion_user_id)}
+def create_page(task: dict, assignee_notion_user_id=None, notion_project_id=None) -> dict:
+    """Tao page Notion cho task moi. Tra ve {synced, notionPageId, notionUrl}.
+
+    notion_project_id: id page ben Notion Projects-DB (lay tu projects.notion_project_id)
+    de gan relation Project — giong het duong web di qua createTask().
+    """
+    body = {
+        "action": "create",
+        "task": _task_payload(task, assignee_notion_user_id, notion_project_id),
+    }
     return _post(body)
+
+
+def list_projects() -> list:
+    """Danh sach project ben Notion de link luc tao project: [{id, name}, ...].
+
+    Dung khi admin tao project qua Discord (giong ProjectModal ben web goi
+    listNotionProjects). Loi/chua cau hinh -> tra list rong, khong nem.
+    """
+    payload = _post({"action": "list-projects"})
+    return payload.get("projects") or []
 
 
 def update_page(notion_page_id: str, task: dict, assignee_notion_user_id=None) -> dict:
@@ -72,7 +99,7 @@ def _post(body: dict) -> dict:
     url = os.getenv(_GATEWAY_URL_ENV)
     secret = os.getenv(_SECRET_ENV)
     if not url or not secret:
-        log.warning("Notion gateway chua cau hinh (thieu %s/%s), bo qua sync.",
+        log.warning("Notion gateway chưa cấu hình (thiếu %s/%s), bỏ qua sync.",
                     _GATEWAY_URL_ENV, _SECRET_ENV)
         return {"synced": False}
 
@@ -80,7 +107,7 @@ def _post(body: dict) -> dict:
     try:
         import requests
     except ImportError:
-        log.warning("Chua cai 'requests' (pip install requests), bo qua sync Notion.")
+        log.warning("Chưa cài 'requests' (pip install requests), bỏ qua sync Notion.")
         return {"synced": False}
 
     try:
@@ -94,5 +121,5 @@ def _post(body: dict) -> dict:
         # Gateway luon tra JSON co 'synced'; chuan hoa ve dict an toan.
         return payload if isinstance(payload, dict) else {"synced": False}
     except Exception as e:  # timeout, DNS, HTTP loi, JSON hong... -> khong lam hong Firestore
-        log.warning("Notion gateway loi: %s", str(e)[:200])
+        log.warning("Notion gateway lỗi: %s", str(e)[:200])
         return {"synced": False}

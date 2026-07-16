@@ -40,7 +40,7 @@ export async function postDone(p: DonePayload): Promise<boolean> {
     });
     return res.ok;
   } catch (err) {
-    console.error('Discord webhook post failed', err);
+    console.error('Gửi Discord webhook thất bại', err);
     return false;
   }
 }

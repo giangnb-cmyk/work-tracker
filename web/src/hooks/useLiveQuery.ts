@@ -40,7 +40,7 @@ export function useLiveQuery<T>({ table, fetcher, filter, deps, enabled = true }
           }
         })
         .catch((err) => {
-          console.error(`useLiveQuery(${table}) fetch failed`, err);
+          console.error(`useLiveQuery(${table}) tải dữ liệu thất bại`, err);
           if (alive) setLoading(false);
         });
 

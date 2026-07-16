@@ -133,7 +133,7 @@ def _platform_from_title(title: str) -> str | None:
 async def _get_forum(client, forum_channel_id: int):
     ch = client.get_channel(forum_channel_id) or await client.fetch_channel(forum_channel_id)
     if not isinstance(ch, discord.ForumChannel):
-        raise RuntimeError(f"channel {forum_channel_id} khong phai Forum channel")
+        raise RuntimeError(f"channel {forum_channel_id} không phải Forum channel")
     return ch
 
 
@@ -146,14 +146,14 @@ async def _gather_threads(ch) -> list:
             if t.parent_id == ch.id:
                 threads[t.id] = t
     except Exception as e:
-        log.warning("Khong lay duoc active threads cua guild: %s", e)
+        log.warning("Không lấy được active threads của guild: %s", e)
     for t in ch.threads:
         threads.setdefault(t.id, t)
     try:
         async for t in ch.archived_threads(limit=None):
             threads[t.id] = t
     except Exception as e:
-        log.warning("Khong doc duoc archived threads cua %s: %s", ch.id, e)
+        log.warning("Không đọc được archived threads của %s: %s", ch.id, e)
     return list(threads.values())
 
 
@@ -187,7 +187,7 @@ async def _sync_attachments(sb, thread_id: str, starter, prev_atts: list) -> lis
                 entry["url"] = sb.storage.from_(STORAGE_BUCKET).get_public_url(path)
                 entry["storagePath"] = path
             except Exception as e:
-                log.warning("Tai attachment '%s' loi (giu link Discord): %s", att.filename, e)
+                log.warning("Tải attachment '%s' lỗi (giữ link Discord): %s", att.filename, e)
         out.append(entry)
     return out
 
@@ -316,7 +316,7 @@ async def sync_forum(client, sb, project_id: str, forum_channel_id: int) -> dict
         atts = await _sync_attachments(sb, str(t.id), starter, prev.get("attachments") or [])
         items.append({
             "thread_id": str(t.id),
-            "title": (t.name or "(khong tieu de)")[:200],
+            "title": (t.name or "(không tiêu đề)")[:200],
             "description": desc,
             "owner_id": str(owner_id) if owner_id else "",
             "author_name": (author.display_name if author else "") or "Discord",
@@ -333,7 +333,7 @@ async def sync_all(client, sb) -> list[tuple[dict, dict]]:
         try:
             r = await sync_forum(client, sb, cfg["project_id"], cfg["forum_channel_id"])
         except Exception as e:
-            log.exception("Sync forum %s that bai", cfg["forum_channel_id"])
+            log.exception("Sync forum %s thất bại", cfg["forum_channel_id"])
             r = {"error": str(e)}
         results.append((cfg, r))
     return results
@@ -365,7 +365,7 @@ async def push_pending(client, sb) -> int:
         try:
             ch = await _get_forum(client, cfg["forum_channel_id"])
         except Exception as e:
-            log.warning("push: khong lay duoc forum %s: %s", cfg["forum_channel_id"], e)
+            log.warning("push: không lấy được forum %s: %s", cfg["forum_channel_id"], e)
             continue
         labelrows = await asyncio.to_thread(
             lambda: sb.table(BUG_LABELS).select("id,name,icon,discord_tag_id").eq("project_id", pid).execute().data
@@ -377,7 +377,7 @@ async def push_pending(client, sb) -> int:
                 await _push_one(client, sb, ch, avail, label_info, b)
                 pushed += 1
             except Exception:
-                log.exception("push bug %s that bai", b.get("id"))
+                log.exception("push bug %s thất bại", b.get("id"))
     return pushed
 
 
@@ -394,7 +394,7 @@ async def _push_one(client, sb, ch, avail: dict, label_info: dict, bug: dict) ->
             try:
                 new_tag = await ch.create_tag(name=(info["name"] or "tag")[:MAX_TAG_NAME], emoji=partial)
             except Exception as e:
-                log.warning("Khong tao duoc forum tag '%s': %s", info.get("name"), e)
+                log.warning("Không tạo được forum tag '%s': %s", info.get("name"), e)
                 continue
             dtid = str(new_tag.id)
             avail[dtid] = new_tag
@@ -418,10 +418,10 @@ def run_once() -> int:
     """Standalone: mo 1 client ngan, sync (2 chieu) tat ca forum, roi thoat."""
     token = os.getenv("DISCORD_TOKEN")
     if not token:
-        print("LOI: thieu DISCORD_TOKEN trong .env", file=sys.stderr)
+        print("LỖI: thiếu DISCORD_TOKEN trong .env", file=sys.stderr)
         return 1
     if not load_forum_configs():
-        print("Chua cau hinh 'bug_forums' trong settings.json.")
+        print("Chưa cấu hình 'bug_forums' trong settings.json.")
         return 0
 
     sb = get_client()
@@ -436,7 +436,7 @@ def run_once() -> int:
             await push_pending(client, sb)          # day thay doi app -> Discord truoc
             state["results"] = await sync_all(client, sb)  # roi keo Discord -> app
         except Exception as e:
-            print("LOI sync:", e, file=sys.stderr)
+            print("LỖI sync:", e, file=sys.stderr)
             state["code"] = 1
         finally:
             await client.close()
@@ -444,9 +444,9 @@ def run_once() -> int:
     client.run(token)
     for cfg, r in state["results"]:
         if "error" in r:
-            print(f"Forum {cfg['forum_channel_id']}: LOI {r['error']}")
+            print(f"Forum {cfg['forum_channel_id']}: LỖI {r['error']}")
         else:
-            print(f"Forum {cfg['forum_channel_id']}: tao {r['created']}, cap nhat {r['updated']} (tong {r['total']})")
+            print(f"Forum {cfg['forum_channel_id']}: tạo {r['created']}, cập nhật {r['updated']} (tổng {r['total']})")
     return state["code"]
 
 
@@ -482,10 +482,10 @@ def run_estimate() -> int:
     """Uoc tinh dung luong media se luu, khong tai len."""
     token = os.getenv("DISCORD_TOKEN")
     if not token:
-        print("LOI: thieu DISCORD_TOKEN", file=sys.stderr)
+        print("LỖI: thiếu DISCORD_TOKEN", file=sys.stderr)
         return 1
     if not load_forum_configs():
-        print("Chua cau hinh 'bug_forums' trong settings.json.")
+        print("Chưa cấu hình 'bug_forums' trong settings.json.")
         return 0
     intents = discord.Intents.default()
     intents.message_content = True
@@ -498,7 +498,7 @@ def run_estimate() -> int:
             for cfg in load_forum_configs():
                 state["aggs"].append((cfg, await _tally_forum(client, cfg["forum_channel_id"])))
         except Exception as e:
-            print("LOI:", e, file=sys.stderr)
+            print("LỖI:", e, file=sys.stderr)
         finally:
             await client.close()
 
@@ -508,13 +508,13 @@ def run_estimate() -> int:
     for cfg, a in state["aggs"]:
         tb = a["img_b"] + a["vid_b"] + a["file_b"]
         total += tb
-        print(f"\nForum {cfg['forum_channel_id']}: {a['threads']} bai post, {a['with_media']} bai co media"
-              + (f"  [!] {a['read_fail']} bai KHONG doc duoc noi dung (thieu quyen Read Message History)" if a['read_fail'] else ""))
-        print(f"  Anh   : {a['img_n']:>4} file  ~ {mb(a['img_b']):8.1f} MB")
+        print(f"\nForum {cfg['forum_channel_id']}: {a['threads']} bài post, {a['with_media']} bài có media"
+              + (f"  [!] {a['read_fail']} bài KHÔNG đọc được nội dung (thiếu quyền Read Message History)" if a['read_fail'] else ""))
+        print(f"  Ảnh   : {a['img_n']:>4} file  ~ {mb(a['img_b']):8.1f} MB")
         print(f"  Video : {a['vid_n']:>4} file  ~ {mb(a['vid_b']):8.1f} MB")
         print(f"  File  : {a['file_n']:>4} file  ~ {mb(a['file_b']):8.1f} MB")
-        print(f"  TONG  : {mb(tb):.1f} MB")
-    print(f"\n==> TONG media (bai goc): {mb(total):.1f} MB. Free Supabase Storage = 1024 MB.")
+        print(f"  TỔNG  : {mb(tb):.1f} MB")
+    print(f"\n==> TỔNG media (bài gốc): {mb(total):.1f} MB. Free Supabase Storage = 1024 MB.")
     return 0
 
 
@@ -522,7 +522,7 @@ def run_perms() -> int:
     """In quyen HIEU LUC cua bot TREN kenh forum (tinh ca channel overwrite)."""
     token = os.getenv("DISCORD_TOKEN")
     if not token:
-        print("LOI: thieu DISCORD_TOKEN", file=sys.stderr)
+        print("LỖI: thiếu DISCORD_TOKEN", file=sys.stderr)
         return 1
     intents = discord.Intents.default()
     intents.message_content = True
@@ -535,7 +535,7 @@ def run_perms() -> int:
                 try:
                     ch = await _get_forum(client, cfg["forum_channel_id"])
                 except Exception as e:
-                    print(f"Khong lay duoc channel {cfg['forum_channel_id']}: {e}")
+                    print(f"Không lấy được channel {cfg['forum_channel_id']}: {e}")
                     continue
                 me = ch.guild.me
                 p = ch.permissions_for(me)

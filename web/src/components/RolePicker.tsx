@@ -17,7 +17,7 @@ export default function RolePicker() {
     try {
       await setJobRole(role);
     } catch (err) {
-      console.error('Set job role failed', err);
+      console.error('Đặt vai trò công việc thất bại', err);
       setError('Không lưu được. Thử lại nhé.');
       setSaving(null);
     }

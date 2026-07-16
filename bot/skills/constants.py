@@ -63,6 +63,27 @@ _STATUS_SYNONYMS = {
     "completed": STATUS_DONE,
 }
 
+_SPRINT_STATUS_SYNONYMS = {
+    "planning": SPRINT_PLANNING,
+    "plan": SPRINT_PLANNING,
+    "chuan bi": SPRINT_PLANNING,
+    "sap toi": SPRINT_PLANNING,
+    "ke hoach": SPRINT_PLANNING,
+    "len ke hoach": SPRINT_PLANNING,
+    "active": SPRINT_ACTIVE,
+    "dang chay": SPRINT_ACTIVE,
+    "chay": SPRINT_ACTIVE,
+    "dang dien ra": SPRINT_ACTIVE,
+    "mo": SPRINT_ACTIVE,
+    "completed": SPRINT_COMPLETED,
+    "complete": SPRINT_COMPLETED,
+    "xong": SPRINT_COMPLETED,
+    "da xong": SPRINT_COMPLETED,
+    "hoan thanh": SPRINT_COMPLETED,
+    "ket thuc": SPRINT_COMPLETED,
+    "dong": SPRINT_COMPLETED,
+}
+
 _PRIORITY_SYNONYMS = {
     "low": PRIORITY_LOW,
     "thap": PRIORITY_LOW,
@@ -107,3 +128,33 @@ def normalize_priority(value: str):
     if not value:
         return None
     return _PRIORITY_SYNONYMS.get(_fold(value))
+
+
+def normalize_sprint_status(value: str):
+    """Tra ve sprint status hop le hoac None neu khong nhan dien duoc."""
+    if not value:
+        return None
+    return _SPRINT_STATUS_SYNONYMS.get(_fold(value))
+
+
+def parse_ymd(value: str):
+    """'YYYY-MM-DD' -> datetime. Nem ValueError neu sai dinh dang. Pure."""
+    from datetime import datetime
+
+    return datetime.strptime(value.strip(), "%Y-%m-%d")
+
+
+def end_of_work_week(d):
+    """Thu Sau 23:59:59 cua tuan hien tai. Pure.
+
+    Cong thuc giong het endOfWorkWeek() ben web (web/src/lib/format.ts) de task tao
+    tu Discord va tu web co cung han mac dinh. Thu 7/CN -> nhay sang thu Sau tuan sau.
+    """
+    from datetime import timedelta
+
+    friday = 5
+    # isoweekday(): T2=1..CN=7. '% 7' ep ve dung he cua Date.getDay() ben JS (CN=0..T7=6).
+    diff = friday - (d.isoweekday() % 7)
+    if diff < 0:
+        diff += 7
+    return (d + timedelta(days=diff)).replace(hour=23, minute=59, second=59, microsecond=0)

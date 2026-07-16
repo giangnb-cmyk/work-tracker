@@ -32,7 +32,7 @@
   "bug_sync_hour": 9,
   "bug_sync_tz": "Asia/Ho_Chi_Minh",
   "bug_sync_channel_id": 0,
-  "bug_sync_poll_seconds": 20,
+  "bug_sync_poll_seconds": 60,
   "_note_rag_sync": "true = moi ngay luc bug_sync_hour (9h) tu dong nap lai kho RAG: chay sync_docs.py (docs/ + links.txt) va drive_catalog.py (danh muc Google Drive, neu co keys/service-account-gsheets.json). Yeu cau Ollama chay + da ap migration 0014. Ket qua ghi log; gui Discord neu bug_sync_channel_id != 0.",
   "rag_sync_enabled": true,
   "_note_bug_mirror_videos": "false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.",

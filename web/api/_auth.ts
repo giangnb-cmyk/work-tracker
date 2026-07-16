@@ -14,7 +14,7 @@ function supabaseAuthClient(): SupabaseClient | null {
   const url = env.SUPABASE_URL;
   const key = env.SUPABASE_ANON_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
-    console.warn('SUPABASE_URL / SUPABASE_ANON_KEY not set — cannot verify web tokens.');
+    console.warn('Chưa đặt SUPABASE_URL / SUPABASE_ANON_KEY — không thể xác thực token web.');
     return null;
   }
   client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -45,7 +45,7 @@ export async function authorize(headers: Record<string, unknown>): Promise<Calle
     if (error || !data.user) return { ok: false, via: 'none' };
     return { ok: true, uid: data.user.id, via: 'supabase' };
   } catch (err) {
-    console.error('Supabase token verification failed', err);
+    console.error('Xác thực token Supabase thất bại', err);
     return { ok: false, via: 'none' };
   }
 }

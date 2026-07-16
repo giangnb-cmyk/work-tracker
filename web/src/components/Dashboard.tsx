@@ -10,28 +10,57 @@ import {
   Tooltip,
 } from 'chart.js';
 import { Doughnut, Line } from 'react-chartjs-2';
+import { applyChartTheme, legendGap } from '../lib/chartTheme';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useTasks } from '../hooks/useTasks';
-import { burndownSeries, computeStats, groupByAssignee } from '../lib/sprint';
+import {
+  burndownSeries,
+  computeStats,
+  groupByAssignee,
+  rankByDone,
+  splitLeaders,
+  sprintHealth,
+} from '../lib/sprint';
 import DepartmentDonuts from './DepartmentDonuts';
+import MemberLeaderboard from './MemberLeaderboard';
+import SprintGoalBanner from './SprintGoalBanner';
+import SprintHealthBadge from './SprintHealthBadge';
 import { daysUntil } from '../lib/format';
 import { STATUS_LABEL, TASK_STATUSES } from '../types';
 
 ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+// Canvas không ăn CSS: nếu không ép, legend/nhãn trục sẽ vẽ bằng Helvetica mặc định của
+// Chart.js, lệch hẳn khỏi font của app.
+applyChartTheme();
 
 const STATUS_COLORS = ['#94a3b8', '#38bdf8', '#c084fc', '#22c55e'];
 
-/** Sprint analytics: stat tiles, status doughnut, burndown, per-assignee load. */
+/**
+ * Trang tổng quan của dự án: trạng thái sprint theo burndown, stat tiles, biểu đồ,
+ * bảng xếp hạng thành viên và khối lượng theo người.
+ */
 export default function Dashboard() {
-  const { selectedSprint, selectedSprintId, members } = useSprintContext();
-  const { tasks, loading } = useTasks(selectedSprintId);
+  const { selectedSprint, selectedSprintId, selectedProjectId, members } = useSprintContext();
+  const { tasks: sprintTasks, loading } = useTasks(selectedSprintId);
+
+  // Trang tổng quan của DỰ ÁN đang chọn, nên lọc theo project như Bảng Sprint —
+  // sprint dùng chung cho nhiều dự án nên nếu không lọc sẽ đếm cả task dự án khác.
+  const tasks = useMemo(
+    () => sprintTasks.filter((t) => t.projectId === selectedProjectId),
+    [sprintTasks, selectedProjectId],
+  );
 
   const stats = useMemo(() => computeStats(tasks), [tasks]);
   const burndown = useMemo(
     () => (selectedSprint ? burndownSeries(selectedSprint, tasks) : null),
     [selectedSprint, tasks],
   );
+  const health = useMemo(
+    () => (selectedSprint ? sprintHealth(selectedSprint, tasks) : null),
+    [selectedSprint, tasks],
+  );
   const perAssignee = useMemo(() => [...groupByAssignee(tasks).entries()], [tasks]);
+  const leaders = useMemo(() => splitLeaders(rankByDone(tasks, members)), [tasks, members]);
   const daysLeft = selectedSprint ? daysUntil(selectedSprint.endDate) : null;
 
   if (loading) {
@@ -48,6 +77,12 @@ export default function Dashboard() {
         <h1>Thống kê{selectedSprint ? ` · ${selectedSprint.name}` : ' · Backlog'}</h1>
         <p>Tiến độ và phân bổ công việc.</p>
       </div>
+
+      {/* Mục tiêu sprint đứng trên mọi con số — badge sức khoẻ nằm luôn trong đây,
+          không lặp lại ở header. */}
+      {selectedSprint && (
+        <SprintGoalBanner sprint={selectedSprint} health={health} daysLeft={daysLeft} />
+      )}
 
       <div className="stats-row">
         <StatTile icon="📦" value={stats.total} label="Tổng task" />
@@ -86,6 +121,7 @@ export default function Dashboard() {
                   cutout: '62%',
                   plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } },
                 }}
+                plugins={[legendGap(28)]}
               />
             </div>
           )}
@@ -93,6 +129,7 @@ export default function Dashboard() {
 
         <div className="glass section" style={{ padding: '1.5rem' }}>
           <h3>Burndown</h3>
+          {health && <SprintHealthBadge health={health} withDetail />}
           {!burndown || burndown.labels.length === 0 ? (
             <div className="empty">Cần sprint có ngày bắt đầu/kết thúc.</div>
           ) : (
@@ -138,6 +175,22 @@ export default function Dashboard() {
       <div className="section">
         <h3 style={{ marginBottom: '1rem' }}>% Hoàn thành theo bộ phận</h3>
         <DepartmentDonuts tasks={tasks} members={members} />
+      </div>
+
+      <div className="board" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', alignItems: 'stretch' }}>
+        <MemberLeaderboard
+          title="Hoàn thành nhiều nhất"
+          icon="🏆"
+          entries={leaders.top}
+          medals
+          emptyText="Chưa có task nào được giao trong sprint này."
+        />
+        <MemberLeaderboard
+          title="Hoàn thành ít nhất"
+          icon="🐢"
+          entries={leaders.bottom}
+          emptyText="Cần ít nhất 2 người có task để so sánh."
+        />
       </div>
 
       <div className="glass section" style={{ padding: '1.5rem' }}>

@@ -8,7 +8,7 @@ import type { BugLabel } from '../types';
 export type LabelGroup = 'severity' | 'category' | 'platform' | 'version' | 'workflow' | 'other';
 
 const SEVERITY = new Set(['low', 'medium', 'high', 'critical', 'urgent']);
-const CATEGORY = new Set(['bug', 'performance', 'visual', 'logic']);
+const CATEGORY = new Set(['bug', 'performance', 'visual', 'logic', 'improve']);
 const PLATFORM = new Set(['android', 'ios', 'web', 'pc', 'mac', 'windows', 'unity', 'html5', 'server']);
 const WORKFLOW = new Set(['fixing', 'pending', 'deployed', 'done', 're-open', 'reopen']);
 

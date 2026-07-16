@@ -1,5 +1,6 @@
 import { Doughnut } from 'react-chartjs-2';
 import type { Plugin } from 'chart.js';
+import { appFontFamily, CHART_MUTED } from '../lib/chartTheme';
 import { groupByJobRole, type DeptGroup } from '../lib/sprint';
 import { JOB_ROLE_ICON, JOB_ROLE_LABEL, type Task, type TeamMember } from '../types';
 
@@ -29,7 +30,9 @@ export default function DepartmentDonuts({
   return (
     <div
       className="board"
-      style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '1rem' }}
+      // 190px: đủ chỗ cho nhãn dài nhất ("Sound Designer", "Chưa phân loại") nằm 1 dòng.
+      // Hẹp hơn thì nhãn xuống dòng → card cao lệch nhau vì .board dùng align-items:start.
+      style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '1rem' }}
     >
       {groups.map((g) => (
         <DeptDonut key={g.key} group={g} />
@@ -53,11 +56,13 @@ function DeptDonut({ group }: { group: DeptGroup }) {
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      // Canvas không ăn CSS → phải lấy font của app qua biến, đừng hardcode họ chữ.
+      const family = appFontFamily();
       ctx.fillStyle = '#f8fafc';
-      ctx.font = '700 26px Outfit, sans-serif';
+      ctx.font = `700 26px ${family}`;
       ctx.fillText(`${group.percentDone}%`, cx, cy - 6);
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '500 12px Inter, sans-serif';
+      ctx.fillStyle = CHART_MUTED;
+      ctx.font = `500 12px ${family}`;
       ctx.fillText(`${group.done}/${group.total}`, cx, cy + 16);
       ctx.restore();
     },
@@ -65,7 +70,19 @@ function DeptDonut({ group }: { group: DeptGroup }) {
 
   return (
     <div className="glass section" style={{ padding: '1rem', textAlign: 'center' }}>
-      <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+      <div
+        style={{
+          fontWeight: 600,
+          marginBottom: '0.5rem',
+          fontSize: '0.9rem',
+          // Chốt 1 dòng: tên phòng ban dài mấy cũng không được đẩy donut tụt xuống.
+          // Tên vượt quá bề ngang thì cắt bằng '…' chứ không xuống dòng.
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+        title={label}
+      >
         <span style={{ marginRight: 4 }}>{icon}</span>
         {label}
       </div>

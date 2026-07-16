@@ -14,6 +14,13 @@ interface Props {
   /** Show a clear/none row at the top. */
   allowEmpty?: boolean;
   emptyLabel?: string;
+  /**
+   * Cách panel chiếm chỗ khi mở:
+   * - 'inflow' (mặc định): nong container ra, để modal cuộn được không cắt mất panel.
+   * - 'overlay': nổi đè lên nội dung. BẮT BUỘC dùng khi select nằm trong layout thường
+   *   (thanh lọc, hàng flex), vì 'inflow' sẽ đẩy lệch mọi thứ quanh nó khi mở.
+   */
+  panel?: 'inflow' | 'overlay';
 }
 
 /** Diacritic-insensitive lowercase fold for Vietnamese-friendly matching. */
@@ -34,6 +41,7 @@ export default function SearchableSelect({
   disabled,
   allowEmpty,
   emptyLabel = '— Không —',
+  panel = 'inflow',
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -107,7 +115,7 @@ export default function SearchableSelect({
       </button>
 
       {open && (
-        <div className="ss-panel glass">
+        <div className={`ss-panel glass${panel === 'overlay' ? ' ss-panel-overlay' : ''}`}>
           <input
             ref={inputRef}
             className="input ss-search"

@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bot Work Tracker · Trình cấu hình</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0f172a; --bg2:#0b1220;
+    --glass:rgba(30,41,59,.7); --glass-2:rgba(30,41,59,.5);
+    --border:rgba(148,163,184,.18); --border-2:rgba(148,163,184,.28);
+    --indigo:#6366f1; --indigo-2:#818cf8; --sky:#38bdf8; --gold:#fbbf24;
+    --green:#34d399; --red:#f87171;
+    --text:#f8fafc; --muted:#94a3b8; --muted-2:#64748b;
+    --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+    --head:"Outfit",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --body:"Inter",-apple-system,"Segoe UI",Roboto,sans-serif;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%,rgba(99,102,241,.16),transparent 60%),
+      radial-gradient(1000px 500px at 110% 10%,rgba(56,189,248,.12),transparent 55%),
+      var(--bg);
+    color:var(--text); font-family:var(--body);
+    font-size:14px; line-height:1.5; min-height:100vh;
+    padding:28px 22px 80px;
+  }
+  a{color:var(--indigo-2)}
+  h1{font-family:var(--head);font-weight:700;font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+  h2{font-family:var(--head);font-weight:600;font-size:16px;margin:0}
+  .wrap{max-width:1320px;margin:0 auto}
+  .sub{color:var(--muted);margin:0 0 18px;max-width:820px}
+  .code{font-family:var(--mono)}
+
+  /* Toolbar */
+  .toolbar{
+    position:sticky; top:12px; z-index:20;
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    background:var(--glass); backdrop-filter:blur(12px);
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:12px 14px; margin-bottom:20px;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  .btn{
+    font-family:var(--body); font-weight:600; font-size:13.5px;
+    color:var(--text); background:rgba(148,163,184,.1);
+    border:1px solid var(--border-2); border-radius:10px;
+    padding:9px 14px; cursor:pointer; transition:.15s; white-space:nowrap;
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn:hover{background:rgba(148,163,184,.18); transform:translateY(-1px)}
+  .btn.primary{background:var(--indigo); border-color:transparent; box-shadow:0 0 0 0 rgba(99,102,241,.5)}
+  .btn.primary:hover{background:#4f52e0; box-shadow:0 6px 22px rgba(99,102,241,.45)}
+  .btn.ghost{background:transparent}
+  .btn.small{padding:6px 10px;font-size:12px}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .status{margin-left:auto; color:var(--muted); font-size:12.5px; font-family:var(--mono)}
+  .status.ok{color:var(--green)} .status.err{color:var(--red)}
+
+  .layout{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,560px); gap:22px; align-items:start}
+  @media(max-width:1080px){.layout{grid-template-columns:1fr}}
+
+  /* Cards */
+  .card{
+    background:var(--glass); backdrop-filter:blur(10px);
+    border:1px solid var(--border); border-radius:var(--radius);
+    margin-bottom:16px; overflow:hidden;
+  }
+  .card > summary, .card-head{
+    list-style:none; cursor:pointer; user-select:none;
+    display:flex; align-items:center; gap:10px; padding:15px 18px;
+  }
+  .card > summary::-webkit-details-marker{display:none}
+  .card > summary .chev{margin-left:auto; color:var(--muted); transition:.2s}
+  .card[open] > summary .chev{transform:rotate(90deg)}
+  .card .badge{font-size:11px;color:var(--muted);font-weight:500;font-family:var(--mono);
+    background:rgba(148,163,184,.1);border:1px solid var(--border);border-radius:20px;padding:2px 9px}
+  .card .icon{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;
+    background:rgba(99,102,241,.16);color:var(--indigo-2);font-size:15px}
+  .card-body{padding:4px 18px 18px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field.wide{grid-column:1/-1}
+  label{font-size:12.5px;font-weight:500;color:var(--text)}
+  label .req{color:var(--gold);margin-left:3px}
+  label .tgt{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);font-weight:400;margin-left:6px}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:1px}
+  input[type=text],input[type=password],input[type=number],textarea,select{
+    font-family:var(--body); font-size:13px; color:var(--text);
+    background:rgba(15,23,42,.6); border:1px solid var(--border-2);
+    border-radius:9px; padding:9px 11px; width:100%; transition:.15s;
+  }
+  textarea{font-family:var(--mono);font-size:12px;resize:vertical;min-height:64px;line-height:1.55}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+  input::placeholder,textarea::placeholder{color:var(--muted-2)}
+  .row-check{display:flex;align-items:center;gap:9px}
+  .row-check input{width:16px;height:16px;accent-color:var(--indigo)}
+  .row-check label{cursor:pointer}
+
+  .forums .forum-row{display:grid;grid-template-columns:1fr 220px auto;gap:10px;align-items:end;margin-bottom:10px}
+  @media(max-width:560px){.forums .forum-row{grid-template-columns:1fr}}
+  .icon-btn{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--red);
+    border-radius:9px;width:38px;height:38px;cursor:pointer;font-size:16px;display:grid;place-items:center}
+  .icon-btn:hover{background:rgba(248,113,113,.22)}
+
+  .warn{border-left:3px solid var(--gold);background:rgba(251,191,36,.08);
+    padding:11px 14px;border-radius:8px;color:#fde68a;font-size:12.5px;margin:14px 0 2px}
+  .note{border-left:3px solid var(--sky);background:rgba(56,189,248,.07);
+    padding:11px 14px;border-radius:8px;color:#bae6fd;font-size:12.5px}
+  .note code, .warn code{background:rgba(15,23,42,.6);padding:1px 5px;border-radius:5px;font-family:var(--mono);font-size:11.5px}
+
+  /* Preview */
+  .preview{position:sticky;top:88px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .tab{font-family:var(--mono);font-size:12px;padding:7px 11px;border-radius:9px;cursor:pointer;
+    background:rgba(148,163,184,.08);border:1px solid var(--border);color:var(--muted)}
+  .tab.active{background:var(--indigo);border-color:transparent;color:#fff}
+  .out-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .out-path{font-family:var(--mono);font-size:12.5px;color:var(--sky)}
+  .out-actions{margin-left:auto;display:flex;gap:7px}
+  pre{margin:0;background:#0a0f1c;border:1px solid var(--border);border-radius:12px;
+    padding:15px 16px;overflow:auto;max-height:64vh}
+  pre code{font-family:var(--mono);font-size:12px;line-height:1.6;color:#cbd5e1;white-space:pre}
+  .k{color:#818cf8}.s{color:#7dd3fc}.n{color:#fbbf24}.c{color:#64748b}.b{color:#34d399}
+
+  footer{margin-top:26px;color:var(--muted-2);font-size:12px;text-align:center}
+  .kbd{font-family:var(--mono);font-size:11px;background:rgba(148,163,184,.12);border:1px solid var(--border);
+    border-radius:5px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚙️ Bot Work Tracker · Trình cấu hình</h1>
+  <p class="sub">
+    Điền các biến một lần, công cụ tự sinh <span class="code">web/.env</span>,
+    <span class="code">bot/.env</span>, <span class="code">bot/settings.json</span> và
+    <span class="code">bot/mcp-bot.json</span>. Khi clone sang dự án khác chỉ cần mở file này,
+    đổi giá trị rồi bấm <b>Ghi vào thư mục dự án</b>. Các biến dùng chung (Supabase URL, Notion secret)
+    chỉ điền một lần và tự bơm vào đúng các file.
+  </p>
+
+  <div class="toolbar">
+    <button class="btn primary" id="btnWrite" title="Chọn thư mục gốc repo và ghi thẳng 4 file config">📂 Ghi vào thư mục dự án</button>
+    <button class="btn" id="btnRead" title="Chọn thư mục gốc repo và nạp giá trị đang có vào form">↺ Đọc config hiện có</button>
+    <button class="btn ghost" id="btnDownload" title="Tải cả 4 file về (Downloads) — dùng khi trình duyệt không hỗ trợ ghi thẳng">⬇ Tải tất cả</button>
+    <button class="btn ghost small" id="btnSave" title="Lưu nháp vào trình duyệt">💾 Lưu nháp</button>
+    <button class="btn ghost small" id="btnClear" title="Xoá nháp + về mặc định">🗑 Xoá nháp</button>
+    <span class="status" id="status">Sẵn sàng</span>
+  </div>
+
+  <div class="layout">
+    <!-- ============ LEFT: FORM ============ -->
+    <form id="form" autocomplete="off">
+
+      <details class="card" open>
+        <summary><span class="icon">🟢</span><h2>Supabase</h2><span class="badge">web + bot</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="grid">
+            <div class="field wide">
+              <label>Supabase URL<span class="req">*</span><span class="tgt">VITE_SUPABASE_URL · SUPABASE_URL</span></label>
+              <input type="text" id="supabaseUrl" placeholder="https://xxxxxxxx.supabase.co" />
+              <span class="hint">Dùng chung cho web và bot. Dashboard → Project Settings → API.</span>
+            </div>
+            <div class="field wide">
+              <label>Anon key (public)<span class="req">*</span><span class="tgt">web · VITE_SUPABASE_ANON_KEY</span></label>
+              <input type="text" id="supabaseAnonKey" placeholder="eyJhbGciOi..." />
+              <span class="hint">Client-safe — ship trong bundle trình duyệt. RLS bảo vệ dữ liệu.</span>
+            </div>
+            <div class="field wide">
+              <label>Service role key (BÍ MẬT)<span class="req">*</span><span class="tgt">bot · SUPABASE_SERVICE_ROLE_KEY</span></label>
+              <input type="password" id="supabaseServiceKey" placeholder="eyJhbGciOi... (bỏ qua RLS)" />
+              <span class="hint">CHỈ để trong bot. Bỏ qua RLS. Tuyệt đối không đưa vào web / commit.</span>
+            </div>
+            <div class="field wide">
+              <label>Domain email cho phép (tuỳ chọn)<span class="tgt">web · VITE_ALLOWED_EMAIL_DOMAIN</span></label>
+              <input type="text" id="allowedEmailDomain" placeholder="vd: easygoing.vn — để trống = cho phép mọi tài khoản lúc đầu" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary><span class="icon">🤖</span><h2>Discord Bot</h2><span class="badge">bot/.env · settings.json</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="grid">
+            <div class="field wide">
+              <label>Discord bot token (BÍ MẬT)<span class="req">*</span><span class="tgt">bot · DISCORD_TOKEN</span></label>
+              <input type="password" id="discordToken" placeholder="Developer Portal → Bot → Reset Token" />
+            </div>
+            <div class="field wide">
+              <label>Allowed user IDs<span class="tgt">settings · allowed_user_ids</span></label>
+              <textarea id="allowedUserIds" placeholder="Mỗi ID một dòng hoặc cách nhau bởi dấu phẩy&#10;992321223558180954"></textarea>
+              <span class="hint">Discord user ID được phép ra lệnh cho bot (bắt buộc khi bật bypass).</span>
+            </div>
+            <div class="field">
+              <label>Reminder channel ID<span class="tgt">reminder_channel_id</span></label>
+              <input type="text" id="reminderChannelId" placeholder="0" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <label>Standup channel ID<span class="tgt">standup_channel_id</span></label>
+              <input type="text" id="standupChannelId" placeholder="0" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <label>Task done channel ID<span class="tgt">task_done_channel_id</span></label>
+              <input type="text" id="taskDoneChannelId" placeholder="0 = dùng reminder channel" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <label>Bug sync channel ID<span class="tgt">bug_sync_channel_id</span></label>
+              <input type="text" id="bugSyncChannelId" placeholder="0" inputmode="numeric" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary><span class="icon">🐞</span><h2>Đồng bộ Bug ↔ Forum Discord</h2><span class="badge">settings.json</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="field wide forums" style="margin-bottom:6px">
+            <label>Cặp Project ↔ Forum <span class="tgt">bug_forums[]</span></label>
+            <span class="hint">Mỗi dòng: <b>project_id</b> (UUID lấy từ web) ↔ <b>forum_channel_id</b> (ID kênh Forum Discord).</span>
+            <div id="forumRows" style="margin-top:8px"></div>
+            <button type="button" class="btn ghost small" id="btnAddForum" style="align-self:flex-start">+ Thêm forum</button>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Giờ đồng bộ<span class="tgt">bug_sync_hour</span></label>
+              <input type="number" id="bugSyncHour" value="9" min="0" max="23" />
+            </div>
+            <div class="field">
+              <label>Timezone<span class="tgt">bug_sync_tz</span></label>
+              <input type="text" id="bugSyncTz" value="Asia/Ho_Chi_Minh" />
+            </div>
+            <div class="field">
+              <label>Poll (giây)<span class="tgt">bug_sync_poll_seconds</span></label>
+              <input type="number" id="bugSyncPollSeconds" value="20" min="5" />
+            </div>
+            <div class="field" style="justify-content:flex-end">
+              <div class="row-check"><input type="checkbox" id="bugMirrorVideos" /><label for="bugMirrorVideos">Mirror video lên Storage <span class="tgt">bug_mirror_videos</span></label></div>
+              <span class="hint">Tắt = chỉ tải ảnh (tiết kiệm dung lượng gói free).</span>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="icon">✨</span><h2>Claude CLI &amp; RAG</h2><span class="badge">bot/.env</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="grid">
+            <div class="field">
+              <label>Claude command<span class="tgt">CLAUDE_CMD</span></label>
+              <input type="text" id="claudeCmd" value="claude" />
+            </div>
+            <div class="field">
+              <label>Ollama host<span class="tgt">OLLAMA_HOST</span></label>
+              <input type="text" id="ollamaHost" value="http://localhost:11434" />
+            </div>
+            <div class="field">
+              <label>RAG embed model<span class="tgt">RAG_EMBED_MODEL</span></label>
+              <input type="text" id="ragEmbedModel" value="bge-m3" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="icon">📊</span><h2>Google Drive / Sheets MCP</h2><span class="badge">bot/.env · mcp-bot.json</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="grid">
+            <div class="field" style="justify-content:flex-end">
+              <div class="row-check"><input type="checkbox" id="sheetsMcpEnabled" /><label for="sheetsMcpEnabled">Bật Sheets MCP (chỉ đọc) <span class="tgt">sheets_mcp_enabled</span></label></div>
+            </div>
+            <div class="field">
+              <label>Drive folder ID<span class="tgt">mcp · DRIVE_FOLDER_ID</span></label>
+              <input type="text" id="driveFolderId" placeholder="ID folder Drive đã share cho service account" />
+            </div>
+            <div class="field wide">
+              <label>Service account path (MCP)<span class="tgt">mcp · SERVICE_ACCOUNT_PATH</span></label>
+              <input type="text" id="mcpServiceAccountPath" placeholder="D:\Project\bot-work-tracker\keys\service-account-gsheets.json" />
+              <span class="hint">Đường dẫn file JSON credential (nên tuyệt đối trên Windows).</span>
+            </div>
+            <div class="field wide">
+              <label>Drive catalog service account<span class="tgt">bot · GDRIVE_SERVICE_ACCOUNT</span></label>
+              <input type="text" id="gdriveServiceAccount" placeholder="Để trống = keys/service-account-gsheets.json (gốc repo)" />
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px">File credential <code>keys/service-account-gsheets.json</code> là do Google cấp — tải riêng từ Google Cloud, công cụ này không sinh được. Xem <code>bot/GOOGLE_SHEETS_MCP.md</code>.</div>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="icon">🔗</span><h2>Đồng bộ Notion (tuỳ chọn)</h2><span class="badge">bot + web</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="grid">
+            <div class="field wide">
+              <label>Notion sync secret<span class="tgt">bot NOTION_SYNC_SECRET · web NOTION_SYNC_SECRET</span></label>
+              <input type="password" id="notionSyncSecret" placeholder="Chuỗi bí mật — phải KHỚP giữa bot và web/Vercel" />
+              <span class="hint">Điền một lần, tự bơm vào cả bot/.env và web/.env. Để trống cả cụm Notion = bot bỏ qua sync.</span>
+            </div>
+            <div class="field wide">
+              <label>Notion gateway URL<span class="tgt">bot · NOTION_GATEWAY_URL</span></label>
+              <input type="text" id="notionGatewayUrl" placeholder="https://your-app.vercel.app/api/notion" />
+            </div>
+            <div class="field">
+              <label>Notion token<span class="tgt">web · NOTION_TOKEN</span></label>
+              <input type="password" id="notionToken" placeholder="secret_..." />
+            </div>
+            <div class="field">
+              <label>Notion database ID<span class="tgt">web · NOTION_DATABASE_ID</span></label>
+              <input type="text" id="notionDatabaseId" />
+            </div>
+            <div class="field">
+              <label>Notion projects DB ID<span class="tgt">web · NOTION_PROJECTS_DB_ID</span></label>
+              <input type="text" id="notionProjectsDbId" />
+            </div>
+            <div class="field">
+              <label>Discord webhook URL<span class="tgt">web · DISCORD_WEBHOOK_URL</span></label>
+              <input type="text" id="discordWebhookUrl" placeholder="https://discord.com/api/webhooks/..." />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="icon">🎛️</span><h2>Hành vi bot nâng cao</h2><span class="badge">settings.json</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="grid">
+            <div class="field">
+              <label>Model<span class="tgt">model</span></label>
+              <input type="text" id="model" value="claude-opus-4-8" placeholder="'' | sonnet | opus | haiku | claude-opus-4-8" />
+            </div>
+            <div class="field">
+              <label>Timeout (giây)<span class="tgt">timeout_seconds</span></label>
+              <input type="number" id="timeoutSeconds" value="300" min="30" />
+            </div>
+            <div class="field">
+              <label>Max parallel<span class="tgt">max_parallel</span></label>
+              <input type="number" id="maxParallel" value="2" min="1" />
+            </div>
+            <div class="field" style="justify-content:flex-end">
+              <div class="row-check"><input type="checkbox" id="bypassPermissions" /><label for="bypassPermissions">bypass_permissions ⚠️</label></div>
+              <span class="hint">Bật = Claude chạy tool không hỏi. Chỉ bật khi đã điền allowed_user_ids.</span>
+            </div>
+            <div class="field">
+              <label>Mood override<span class="tgt">mood_override</span></label>
+              <input type="text" id="moodOverride" placeholder="Trống = random theo ngày; hoặc số 1..N" />
+            </div>
+            <div class="field wide">
+              <label>Standup prompt<span class="tgt">standup_prompt</span></label>
+              <textarea id="standupPrompt" placeholder="Trống = dùng prompt 3 câu mặc định"></textarea>
+            </div>
+            <div class="field wide">
+              <label>System prompt<span class="tgt">system_prompt</span></label>
+              <textarea id="systemPrompt" style="min-height:100px"></textarea>
+            </div>
+            <div class="field wide">
+              <label>Moods (mỗi dòng 1 tâm trạng)<span class="tgt">moods[]</span></label>
+              <textarea id="moods" style="min-height:110px"></textarea>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="warn">
+        🔒 <b>File sinh ra chứa bí mật</b> (service_role key, Discord token). <code>bot/.env</code> và
+        <code>web/.env</code> đã bị <code>.gitignore</code> — <b>không commit</b>. Nháp lưu trong trình duyệt
+        của bạn, không rời máy này.
+      </div>
+      <div class="note" style="margin-top:12px">
+        Công cụ này chỉ sinh file config. Vẫn cần làm thủ công: chạy migration Supabase
+        (<code>supabase/migrations/</code>), tải file <code>keys/service-account-gsheets.json</code> từ Google,
+        và đặt các biến <code>VITE_*</code>/Notion tương ứng trên <b>Vercel</b>.
+      </div>
+    </form>
+
+    <!-- ============ RIGHT: PREVIEW ============ -->
+    <div class="preview">
+      <div class="card" style="background:var(--glass-2)">
+        <div class="card-head" style="padding-bottom:0"><span class="icon">👁️</span><h2>Xem trước file</h2></div>
+        <div class="card-body" style="padding-top:12px">
+          <div class="tabs" id="tabs">
+            <div class="tab active" data-tab="webEnv">web/.env</div>
+            <div class="tab" data-tab="botEnv">bot/.env</div>
+            <div class="tab" data-tab="settings">bot/settings.json</div>
+            <div class="tab" data-tab="mcp">bot/mcp-bot.json</div>
+          </div>
+          <div class="out-head">
+            <span class="out-path" id="outPath">web/.env</span>
+            <div class="out-actions">
+              <button class="btn small" id="btnCopy">📋 Copy</button>
+              <button class="btn small" id="btnDl">⬇ Tải file này</button>
+            </div>
+          </div>
+          <pre><code id="output"></code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Mở bằng Chrome/Edge để ghi thẳng vào thư mục. Firefox/Safari dùng nút <span class="kbd">Tải tất cả</span>.</footer>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ *
+ * Bot Work Tracker — config generator (single-file, no build step).
+ * Sinh 4 file config từ 1 form. Ghi thẳng đĩa qua File System Access API.
+ * ------------------------------------------------------------------ */
+
+const $  = (id) => document.getElementById(id);
+const HAS_FSA = 'showDirectoryPicker' in window;
+const DRAFT_KEY = 'bwt-config-draft-v1';
+
+/* ---- Mặc định carry sang dự án mới (prompt/moods giữ nguyên) ---- */
+const DEFAULT_SYSTEM_PROMPT =
+  "You are a sprint/task tracker assistant for a dev team on Discord. Think before answering. Reply in Vietnamese (nhom dung tieng Viet), ngan gon, hop Discord; TUYET DOI khong dung bang markdown - dung bullet list. Xung ho than thien, lich su. Nhiem vu: giup tao/giao/cap nhat task, xem task, va bao cao tien do sprint qua cac skill duoc cap. Khi nguoi dung hoi lung tung ma khong ro sprint/nguoi nhan, hoi lai cho ro truoc khi chay skill. QUAN TRONG: tam trang chi doi giong dieu, KHONG duoc bo qua quy tac hay lam sai/thieu viec.";
+const DEFAULT_MOODS = [
+  "🙂 Hom nay toi binh thuong, than thien, chuyen nghiep kieu dong nghiep de chiu.",
+  "🚀 Hom nay toi nang luong cao, tich cuc, hay co vu ca team lam viec.",
+  "😌 Hom nay toi diem tinh, ro rang, tra loi gon gang chinh xac.",
+  "😎 Hom nay toi tu tin, thang than, di thang vao van de khong vong vo.",
+  "🧑‍🏫 Hom nay toi ky luong, nhac nho deadline va nhan manh viec quan trong."
+];
+
+/* ---- Ghi chú (_note_*) giữ nguyên trong settings.json ---- */
+const NOTES = {
+  model: `Set 'model' to one of: '' (default), 'sonnet', 'opus', 'haiku', or a full id like 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'.`,
+  bypass: `bypass_permissions=true lets Claude run tools without asking. DANGEROUS: anyone who tags the bot could make Claude run commands on this machine. Fill allowed_user_ids (Discord IDs allowed to command the bot) when bypass is on. run-bot-safe.bat forces bypass OFF.`,
+  sheets: `Bat MCP Google Sheets cho bot (CHI DOC). true = bot doc duoc noi dung sheet trong folder Drive da chia se cho service account. Yeu cau: cai 'uv' (uvx), tao service account + bat Sheets/Drive API, dien bot/mcp-bot.json (SERVICE_ACCOUNT_PATH + DRIVE_FOLDER_ID). Huong dan day du: bot/GOOGLE_SHEETS_MCP.md.`,
+  channels: `Discord channel IDs. reminder_channel_id = overdue/due-today reminders; standup_channel_id = daily standup prompt; task_done_channel_id = 'task hoan thanh' notifications (fallback to reminder_channel_id if 0).`,
+  standup: `Optional custom standup prompt; leave empty to use the default 3-question prompt.`,
+  moods: `Bo tam trang cua bot. Moi ngay bot tu chon 1 tam trang (co dinh trong ngay, doi qua ngay). Them/bot/sua thoai mai.`,
+  moodOverride: `Ep tam trang co dinh. De TRONG '' = random doi theo ngay. Dien SO thu tu (1..so luong moods) de chon 1 tam trang. Hoac go THANG mot cau mo ta tam trang tuy y.`,
+  bugForums: `Dong bo HAI CHIEU bug voi forum Discord. Moi muc: project_id (uuid tu web) + forum_channel_id (ID kenh Forum). Discord->app: moi bai post -> 1 bug, forum tags -> nhan. app->Discord: doi nhan tren app se set lai tag cua thread. Bot can quyen 'Manage Threads' (sua tag thread) + 'Manage Channels' (tao tag moi). Chay tu dong luc bug_sync_hour, khi bam 'Sync' tren web, hoac '@bot sync bug'.`,
+  bugMirror: `false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.`
+};
+
+/* ---- Bug forums: dynamic rows ---- */
+function forumRowTemplate(pid, fid){
+  const row = document.createElement('div');
+  row.className = 'forum-row';
+  row.innerHTML =
+    '<div class="field"><label>project_id (UUID)</label>'+
+      '<input type="text" class="ff-pid" placeholder="620a1a7d-...-796c97e16be5" /></div>'+
+    '<div class="field"><label>forum_channel_id</label>'+
+      '<input type="text" class="ff-fid" inputmode="numeric" placeholder="1458356915930403026" /></div>'+
+    '<button type="button" class="icon-btn" title="Xoá">✕</button>';
+  row.querySelector('.ff-pid').value = pid || '';
+  row.querySelector('.ff-fid').value = fid || '';
+  row.querySelector('.icon-btn').addEventListener('click', () => { row.remove(); render(); });
+  row.addEventListener('input', render);
+  return row;
+}
+function addForumRow(pid, fid){ $('forumRows').appendChild(forumRowTemplate(pid, fid)); }
+function getForums(){
+  return [...document.querySelectorAll('#forumRows .forum-row')].map(r => ({
+    pid: r.querySelector('.ff-pid').value.trim(),
+    fid: r.querySelector('.ff-fid').value.trim()
+  })).filter(f => f.pid || f.fid);
+}
+
+/* ---- Đọc form ---- */
+const val = (id) => ($(id) ? $(id).value.trim() : '');
+const num = (id, d) => { const n = parseInt(val(id), 10); return Number.isFinite(n) ? n : d; };
+const idOrZero = (id) => { const s = val(id).replace(/\D/g, ''); return s || '0'; };
+const listIds = (id) => val(id).split(/[\s,]+/).map(s => s.replace(/\D/g,'')).filter(Boolean);
+const lines = (id) => val(id).split('\n').map(s => s.trim()).filter(Boolean);
+
+function collect(){
+  return {
+    supabaseUrl: val('supabaseUrl'), supabaseAnonKey: val('supabaseAnonKey'),
+    supabaseServiceKey: val('supabaseServiceKey'), allowedEmailDomain: val('allowedEmailDomain'),
+    discordToken: val('discordToken'), allowedUserIds: listIds('allowedUserIds'),
+    reminderChannelId: idOrZero('reminderChannelId'), standupChannelId: idOrZero('standupChannelId'),
+    taskDoneChannelId: idOrZero('taskDoneChannelId'), bugSyncChannelId: idOrZero('bugSyncChannelId'),
+    forums: getForums(), bugSyncHour: num('bugSyncHour',9), bugSyncTz: val('bugSyncTz')||'Asia/Ho_Chi_Minh',
+    bugSyncPollSeconds: num('bugSyncPollSeconds',20), bugMirrorVideos: $('bugMirrorVideos').checked,
+    claudeCmd: val('claudeCmd')||'claude', ollamaHost: val('ollamaHost'), ragEmbedModel: val('ragEmbedModel'),
+    sheetsMcpEnabled: $('sheetsMcpEnabled').checked, driveFolderId: val('driveFolderId'),
+    mcpServiceAccountPath: val('mcpServiceAccountPath'), gdriveServiceAccount: val('gdriveServiceAccount'),
+    notionSyncSecret: val('notionSyncSecret'), notionGatewayUrl: val('notionGatewayUrl'),
+    notionToken: val('notionToken'), notionDatabaseId: val('notionDatabaseId'),
+    notionProjectsDbId: val('notionProjectsDbId'), discordWebhookUrl: val('discordWebhookUrl'),
+    model: val('model'), timeoutSeconds: num('timeoutSeconds',300), maxParallel: num('maxParallel',2),
+    bypassPermissions: $('bypassPermissions').checked, moodOverride: val('moodOverride'),
+    standupPrompt: $('standupPrompt').value, systemPrompt: $('systemPrompt').value,
+    moods: lines('moods')
+  };
+}
+
+/* ---- Builders ---- */
+const jstr = (s) => JSON.stringify(s == null ? '' : String(s));
+
+function buildWebEnv(v){
+  return [
+    '# web/.env — sinh boi config.html. Client-safe (Supabase). Dat cac bien nay tren Vercel.',
+    '# .env bi gitignore — KHONG commit.',
+    '',
+    'VITE_SUPABASE_URL='+v.supabaseUrl,
+    'VITE_SUPABASE_ANON_KEY='+v.supabaseAnonKey,
+    'VITE_ALLOWED_EMAIL_DOMAIN='+v.allowedEmailDomain,
+    '',
+    '# --- Server-side (Vercel serverless web/api/*). KHONG co tien to VITE_ nen khong vao browser. ---',
+    'NOTION_SYNC_SECRET='+v.notionSyncSecret,
+    'NOTION_TOKEN='+v.notionToken,
+    'NOTION_DATABASE_ID='+v.notionDatabaseId,
+    'NOTION_PROJECTS_DB_ID='+v.notionProjectsDbId,
+    'DISCORD_WEBHOOK_URL='+v.discordWebhookUrl,
+    '# Notion property mapping — override neu ten cot khac mac dinh (dat rong de tat cot do).',
+    'NOTION_PROP_TITLE=Name',
+    'NOTION_PROP_STATUS=Status',
+    'NOTION_STATUS_TYPE=status',
+    'NOTION_PROP_ASSIGNEE=Assignee',
+    'NOTION_ASSIGNEE_TYPE=rich_text',
+    'NOTION_PROP_DUE=Due',
+    'NOTION_PROP_PRIORITY=Priority',
+    'NOTION_PROP_PROJECT=Project',
+    ''
+  ].join('\n');
+}
+
+function buildBotEnv(v){
+  return [
+    '# bot/.env — sinh boi config.html. CANH BAO: service_role key + Discord token la BI MAT.',
+    '# .env bi gitignore — KHONG BAO GIO commit.',
+    '',
+    'DISCORD_TOKEN='+v.discordToken,
+    '',
+    '# Supabase (Admin, bo qua RLS). service_role key CHI dung o bot/server.',
+    'SUPABASE_URL='+v.supabaseUrl,
+    'SUPABASE_SERVICE_ROLE_KEY='+v.supabaseServiceKey,
+    '',
+    '# Lenh goi Claude CLI (mac dinh claude).',
+    'CLAUDE_CMD='+(v.claudeCmd||'claude'),
+    '',
+    '# --- RAG tai lieu (bge-m3 qua Ollama) ---',
+    'OLLAMA_HOST='+v.ollamaHost,
+    'RAG_EMBED_MODEL='+v.ragEmbedModel,
+    '',
+    '# --- Danh muc Google Drive (skill drive_catalog.py) ---',
+    '# De trong = mac dinh keys/service-account-gsheets.json (goc repo).',
+    'GDRIVE_SERVICE_ACCOUNT='+v.gdriveServiceAccount,
+    '',
+    '# --- Dong bo Notion (tuy chon). De trong 2 bien -> bot bo qua sync Notion. ---',
+    'NOTION_GATEWAY_URL='+v.notionGatewayUrl,
+    '# PHAI TRUNG voi NOTION_SYNC_SECRET tren Vercel cua web.',
+    'NOTION_SYNC_SECRET='+v.notionSyncSecret,
+    ''
+  ].join('\n');
+}
+
+function buildSettings(v){
+  const allowed = '[' + v.allowedUserIds.join(', ') + ']';
+  const moodsBlock = v.moods.length
+    ? '[\n' + v.moods.map(m => '    ' + jstr(m)).join(',\n') + '\n  ]'
+    : '[]';
+  const forumsBlock = v.forums.length
+    ? '[\n' + v.forums.map(f => '    { "project_id": ' + jstr(f.pid) + ', "forum_channel_id": ' + (f.fid || '0') + ' }').join(',\n') + '\n  ]'
+    : '[]';
+  return [
+    '{',
+    '  "_note_model": ' + jstr(NOTES.model) + ',',
+    '  "model": ' + jstr(v.model) + ',',
+    '  "timeout_seconds": ' + v.timeoutSeconds + ',',
+    '  "max_parallel": ' + v.maxParallel + ',',
+    '  "_note_bypass": ' + jstr(NOTES.bypass) + ',',
+    '  "bypass_permissions": ' + v.bypassPermissions + ',',
+    '  "allowed_user_ids": ' + allowed + ',',
+    '  "_note_sheets_mcp": ' + jstr(NOTES.sheets) + ',',
+    '  "sheets_mcp_enabled": ' + v.sheetsMcpEnabled + ',',
+    '  "_note_channels": ' + jstr(NOTES.channels) + ',',
+    '  "reminder_channel_id": ' + v.reminderChannelId + ',',
+    '  "standup_channel_id": ' + v.standupChannelId + ',',
+    '  "task_done_channel_id": ' + v.taskDoneChannelId + ',',
+    '  "_note_standup": ' + jstr(NOTES.standup) + ',',
+    '  "standup_prompt": ' + jstr(v.standupPrompt) + ',',
+    '  "system_prompt": ' + jstr(v.systemPrompt) + ',',
+    '  "_note_moods": ' + jstr(NOTES.moods) + ',',
+    '  "moods": ' + moodsBlock + ',',
+    '  "_note_mood_override": ' + jstr(NOTES.moodOverride) + ',',
+    '  "mood_override": ' + jstr(v.moodOverride) + ',',
+    '  "_note_bug_forums": ' + jstr(NOTES.bugForums) + ',',
+    '  "bug_forums": ' + forumsBlock + ',',
+    '  "bug_sync_hour": ' + v.bugSyncHour + ',',
+    '  "bug_sync_tz": ' + jstr(v.bugSyncTz) + ',',
+    '  "bug_sync_channel_id": ' + v.bugSyncChannelId + ',',
+    '  "bug_sync_poll_seconds": ' + v.bugSyncPollSeconds + ',',
+    '  "_note_bug_mirror_videos": ' + jstr(NOTES.bugMirror) + ',',
+    '  "bug_mirror_videos": ' + v.bugMirrorVideos,
+    '}',
+    ''
+  ].join('\n');
+}
+
+function buildMcp(v){
+  const path = v.mcpServiceAccountPath || 'keys/service-account-gsheets.json';
+  return [
+    '{',
+    '  "mcpServers": {',
+    '    "google-sheets": {',
+    '      "command": "uvx",',
+    '      "args": ["mcp-google-sheets@latest"],',
+    '      "env": {',
+    '        "SERVICE_ACCOUNT_PATH": ' + jstr(path) + ',',
+    '        "DRIVE_FOLDER_ID": ' + jstr(v.driveFolderId || 'PASTE_DRIVE_FOLDER_ID_HERE'),
+    '      }',
+    '    }',
+    '  }',
+    '}',
+    ''
+  ].join('\n');
+}
+
+/* ---- 4 file đích ---- */
+const FILES = {
+  webEnv:   { path: 'web/.env',           dir: ['web'], name: '.env',          build: buildWebEnv },
+  botEnv:   { path: 'bot/.env',           dir: ['bot'], name: '.env',          build: buildBotEnv },
+  settings: { path: 'bot/settings.json',  dir: ['bot'], name: 'settings.json', build: buildSettings },
+  mcp:      { path: 'bot/mcp-bot.json',   dir: ['bot'], name: 'mcp-bot.json',  build: buildMcp }
+};
+
+let OUT = {};          // { webEnv:'...', ... }
+let activeTab = 'webEnv';
+
+/* ---- Highlight nhẹ cho preview ---- */
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function highlightEnv(s){
+  return esc(s).split('\n').map(line => {
+    if (line.trim().startsWith('#')) return '<span class="c">'+line+'</span>';
+    const i = line.indexOf('=');
+    if (i < 0) return line;
+    return '<span class="k">'+line.slice(0,i)+'</span>=<span class="s">'+line.slice(i+1)+'</span>';
+  }).join('\n');
+}
+function highlightJson(s){
+  return esc(s)
+    .replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)/g, '<span class="k">$1</span>$2')
+    .replace(/:(\s*)(&quot;(?:[^&]|&(?!quot;))*?&quot;)/g, ':$1<span class="s">$2</span>')
+    .replace(/:(\s*)(-?\d+)/g, ':$1<span class="n">$2</span>')
+    .replace(/:(\s*)(true|false)/g, ':$1<span class="b">$2</span>');
+}
+
+function render(){
+  const v = collect();
+  for (const key in FILES) OUT[key] = FILES[key].build(v);
+  const f = FILES[activeTab];
+  $('outPath').textContent = f.path;
+  $('output').innerHTML = (activeTab === 'webEnv' || activeTab === 'botEnv')
+    ? highlightEnv(OUT[activeTab]) : highlightJson(OUT[activeTab]);
+  saveDraft(v, true);
+}
+
+/* ---- Trạng thái ---- */
+let statusTimer = null;
+function setStatus(msg, kind){
+  const el = $('status');
+  el.textContent = msg; el.className = 'status' + (kind ? ' ' + kind : '');
+  if (statusTimer) clearTimeout(statusTimer);
+  if (kind) statusTimer = setTimeout(() => { el.textContent = 'Sẵn sàng'; el.className = 'status'; }, 4000);
+}
+
+/* ---- File System Access: ghi thẳng đĩa ---- */
+async function writeToFolder(){
+  if (!HAS_FSA) return setStatus('Trình duyệt không hỗ trợ ghi thẳng — dùng "Tải tất cả".', 'err');
+  render();
+  try{
+    const root = await window.showDirectoryPicker({ mode: 'readwrite', id: 'bwt-repo' });
+    const written = [];
+    for (const key in FILES){
+      const f = FILES[key];
+      let dir = root;
+      for (const d of f.dir) dir = await dir.getDirectoryHandle(d, { create: true });
+      const fh = await dir.getFileHandle(f.name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(OUT[key]); await w.close();
+      written.push(f.path);
+    }
+    setStatus('✓ Đã ghi: ' + written.join(', '), 'ok');
+  }catch(err){
+    if (err && err.name === 'AbortError') return setStatus('Đã huỷ.', '');
+    setStatus('Lỗi ghi: ' + (err && err.message || err), 'err');
+  }
+}
+
+/* ---- File System Access: đọc config hiện có vào form ---- */
+function parseEnv(text){
+  const map = {};
+  text.split('\n').forEach(line => {
+    const t = line.trim();
+    if (!t || t.startsWith('#')) return;
+    const i = t.indexOf('=');
+    if (i < 0) return;
+    map[t.slice(0, i).trim()] = t.slice(i + 1).trim();
+  });
+  return map;
+}
+function grabNum(text, key){ const m = text.match(new RegExp('"'+key+'"\\s*:\\s*(\\d+)')); return m ? m[1] : ''; }
+function grabStr(text, key){ const m = text.match(new RegExp('"'+key+'"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"')); return m ? JSON.parse('"'+m[1]+'"') : ''; }
+function grabBool(text, key){ const m = text.match(new RegExp('"'+key+'"\\s*:\\s*(true|false)')); return m ? m[1] === 'true' : false; }
+
+function setVal(id, value){ if ($(id) != null && value != null) $(id).value = value; }
+function setChk(id, b){ if ($(id) != null) $(id).checked = !!b; }
+
+function applyBotEnv(m){
+  if (m.DISCORD_TOKEN) setVal('discordToken', m.DISCORD_TOKEN);
+  if (m.SUPABASE_URL) setVal('supabaseUrl', m.SUPABASE_URL);
+  if (m.SUPABASE_SERVICE_ROLE_KEY) setVal('supabaseServiceKey', m.SUPABASE_SERVICE_ROLE_KEY);
+  if (m.CLAUDE_CMD) setVal('claudeCmd', m.CLAUDE_CMD);
+  if (m.OLLAMA_HOST) setVal('ollamaHost', m.OLLAMA_HOST);
+  if (m.RAG_EMBED_MODEL) setVal('ragEmbedModel', m.RAG_EMBED_MODEL);
+  if ('GDRIVE_SERVICE_ACCOUNT' in m) setVal('gdriveServiceAccount', m.GDRIVE_SERVICE_ACCOUNT);
+  if ('NOTION_GATEWAY_URL' in m) setVal('notionGatewayUrl', m.NOTION_GATEWAY_URL);
+  if ('NOTION_SYNC_SECRET' in m) setVal('notionSyncSecret', m.NOTION_SYNC_SECRET);
+}
+function applyWebEnv(m){
+  if (m.VITE_SUPABASE_URL) setVal('supabaseUrl', m.VITE_SUPABASE_URL);
+  if (m.VITE_SUPABASE_ANON_KEY) setVal('supabaseAnonKey', m.VITE_SUPABASE_ANON_KEY);
+  if ('VITE_ALLOWED_EMAIL_DOMAIN' in m) setVal('allowedEmailDomain', m.VITE_ALLOWED_EMAIL_DOMAIN);
+  if ('NOTION_SYNC_SECRET' in m && m.NOTION_SYNC_SECRET) setVal('notionSyncSecret', m.NOTION_SYNC_SECRET);
+  if ('NOTION_TOKEN' in m) setVal('notionToken', m.NOTION_TOKEN);
+  if ('NOTION_DATABASE_ID' in m) setVal('notionDatabaseId', m.NOTION_DATABASE_ID);
+  if ('NOTION_PROJECTS_DB_ID' in m) setVal('notionProjectsDbId', m.NOTION_PROJECTS_DB_ID);
+  if ('DISCORD_WEBHOOK_URL' in m) setVal('discordWebhookUrl', m.DISCORD_WEBHOOK_URL);
+}
+function applySettings(text){
+  // ID lớn -> đọc raw bằng regex để không mất chính xác (> 2^53).
+  setVal('model', grabStr(text, 'model'));
+  const t = grabNum(text, 'timeout_seconds'); if (t) setVal('timeoutSeconds', t);
+  const mp = grabNum(text, 'max_parallel'); if (mp) setVal('maxParallel', mp);
+  setChk('bypassPermissions', grabBool(text, 'bypass_permissions'));
+  setChk('sheetsMcpEnabled', grabBool(text, 'sheets_mcp_enabled'));
+  setChk('bugMirrorVideos', grabBool(text, 'bug_mirror_videos'));
+  setVal('reminderChannelId', grabNum(text, 'reminder_channel_id'));
+  setVal('standupChannelId', grabNum(text, 'standup_channel_id'));
+  setVal('taskDoneChannelId', grabNum(text, 'task_done_channel_id'));
+  setVal('bugSyncChannelId', grabNum(text, 'bug_sync_channel_id'));
+  const bh = grabNum(text, 'bug_sync_hour'); if (bh !== '') setVal('bugSyncHour', bh);
+  const bt = grabStr(text, 'bug_sync_tz'); if (bt) setVal('bugSyncTz', bt);
+  const bp = grabNum(text, 'bug_sync_poll_seconds'); if (bp) setVal('bugSyncPollSeconds', bp);
+  setVal('moodOverride', grabStr(text, 'mood_override'));
+  setVal('standupPrompt', grabStr(text, 'standup_prompt'));
+  setVal('systemPrompt', grabStr(text, 'system_prompt'));
+  // allowed_user_ids
+  const au = text.match(/"allowed_user_ids"\s*:\s*\[([\s\S]*?)\]/);
+  if (au) setVal('allowedUserIds', (au[1].match(/\d+/g) || []).join('\n'));
+  // moods
+  const mm = text.match(/"moods"\s*:\s*\[([\s\S]*?)\]/);
+  if (mm){
+    const arr = mm[1].match(/"((?:[^"\\]|\\.)*)"/g);
+    if (arr) setVal('moods', arr.map(s => JSON.parse(s)).join('\n'));
+  }
+  // bug_forums
+  const bf = text.match(/"bug_forums"\s*:\s*\[([\s\S]*?)\]/);
+  $('forumRows').innerHTML = '';
+  if (bf){
+    const re = /"project_id"\s*:\s*"([^"]+)"\s*,\s*"forum_channel_id"\s*:\s*(\d+)/g;
+    let m, any = false;
+    while ((m = re.exec(bf[1])) !== null){ addForumRow(m[1], m[2]); any = true; }
+    if (!any) addForumRow('', '');
+  } else addForumRow('', '');
+}
+function applyMcp(text){
+  try{
+    const j = JSON.parse(text);
+    const env = j.mcpServers && j.mcpServers['google-sheets'] && j.mcpServers['google-sheets'].env;
+    if (env){
+      if (env.SERVICE_ACCOUNT_PATH) setVal('mcpServiceAccountPath', env.SERVICE_ACCOUNT_PATH);
+      if (env.DRIVE_FOLDER_ID && env.DRIVE_FOLDER_ID !== 'PASTE_DRIVE_FOLDER_ID_HERE')
+        setVal('driveFolderId', env.DRIVE_FOLDER_ID);
+    }
+  }catch(e){}
+}
+async function readDirFile(root, dirs, name){
+  let dir = root;
+  for (const d of dirs) dir = await dir.getDirectoryHandle(d);
+  const fh = await dir.getFileHandle(name);
+  return (await fh.getFile()).text();
+}
+async function readFromFolder(){
+  if (!HAS_FSA) return setStatus('Trình duyệt không hỗ trợ đọc thư mục.', 'err');
+  try{
+    const root = await window.showDirectoryPicker({ id: 'bwt-repo' });
+    const loaded = [];
+    const tryLoad = async (dirs, name, fn) => {
+      try { fn(await readDirFile(root, dirs, name)); loaded.push(dirs.concat(name).join('/')); }
+      catch(e){ /* file không tồn tại — bỏ qua */ }
+    };
+    await tryLoad(['bot'], '.env', t => applyBotEnv(parseEnv(t)));
+    await tryLoad(['bot'], 'settings.json', applySettings);
+    await tryLoad(['bot'], 'mcp-bot.json', applyMcp);
+    // web: .env rồi .env.local
+    let webOk = false;
+    for (const n of ['.env', '.env.local']){
+      try { applyWebEnv(parseEnv(await readDirFile(root, ['web'], n))); loaded.push('web/'+n); webOk = true; break; }
+      catch(e){}
+    }
+    render();
+    setStatus(loaded.length ? '✓ Đã nạp: ' + loaded.join(', ') : 'Không tìm thấy file config nào.', loaded.length ? 'ok' : 'err');
+  }catch(err){
+    if (err && err.name === 'AbortError') return setStatus('Đã huỷ.', '');
+    setStatus('Lỗi đọc: ' + (err && err.message || err), 'err');
+  }
+}
+
+/* ---- Tải / copy ---- */
+function downloadFile(name, content){
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function downloadAll(){
+  render();
+  // Tên file phẳng để tránh trùng: giữ .env riêng cho web/bot.
+  downloadFile('web.env.txt', OUT.webEnv);
+  downloadFile('bot.env.txt', OUT.botEnv);
+  downloadFile('settings.json', OUT.settings);
+  downloadFile('mcp-bot.json', OUT.mcp);
+  setStatus('✓ Đã tải 4 file về Downloads. Đổi web.env.txt→web/.env, bot.env.txt→bot/.env.', 'ok');
+}
+
+/* ---- Nháp (localStorage) ---- */
+function saveDraft(v, silent){
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(v)); if (!silent) setStatus('✓ Đã lưu nháp.', 'ok'); }
+  catch(e){ if (!silent) setStatus('Không lưu được nháp.', 'err'); }
+}
+function restore(v){
+  setVal('supabaseUrl', v.supabaseUrl); setVal('supabaseAnonKey', v.supabaseAnonKey);
+  setVal('supabaseServiceKey', v.supabaseServiceKey); setVal('allowedEmailDomain', v.allowedEmailDomain);
+  setVal('discordToken', v.discordToken);
+  setVal('allowedUserIds', (v.allowedUserIds || []).join('\n'));
+  setVal('reminderChannelId', v.reminderChannelId === '0' ? '' : v.reminderChannelId);
+  setVal('standupChannelId', v.standupChannelId === '0' ? '' : v.standupChannelId);
+  setVal('taskDoneChannelId', v.taskDoneChannelId === '0' ? '' : v.taskDoneChannelId);
+  setVal('bugSyncChannelId', v.bugSyncChannelId === '0' ? '' : v.bugSyncChannelId);
+  setVal('bugSyncHour', v.bugSyncHour); setVal('bugSyncTz', v.bugSyncTz);
+  setVal('bugSyncPollSeconds', v.bugSyncPollSeconds); setChk('bugMirrorVideos', v.bugMirrorVideos);
+  setVal('claudeCmd', v.claudeCmd); setVal('ollamaHost', v.ollamaHost); setVal('ragEmbedModel', v.ragEmbedModel);
+  setChk('sheetsMcpEnabled', v.sheetsMcpEnabled); setVal('driveFolderId', v.driveFolderId);
+  setVal('mcpServiceAccountPath', v.mcpServiceAccountPath); setVal('gdriveServiceAccount', v.gdriveServiceAccount);
+  setVal('notionSyncSecret', v.notionSyncSecret); setVal('notionGatewayUrl', v.notionGatewayUrl);
+  setVal('notionToken', v.notionToken); setVal('notionDatabaseId', v.notionDatabaseId);
+  setVal('notionProjectsDbId', v.notionProjectsDbId); setVal('discordWebhookUrl', v.discordWebhookUrl);
+  setVal('model', v.model); setVal('timeoutSeconds', v.timeoutSeconds); setVal('maxParallel', v.maxParallel);
+  setChk('bypassPermissions', v.bypassPermissions); setVal('moodOverride', v.moodOverride);
+  setVal('standupPrompt', v.standupPrompt); setVal('systemPrompt', v.systemPrompt);
+  setVal('moods', (v.moods || []).join('\n'));
+  $('forumRows').innerHTML = '';
+  (v.forums && v.forums.length ? v.forums : [{ pid: '', fid: '' }]).forEach(f => addForumRow(f.pid, f.fid));
+}
+
+/* ---- Init ---- */
+function init(){
+  // Mặc định các textarea dài
+  $('systemPrompt').value = DEFAULT_SYSTEM_PROMPT;
+  $('moods').value = DEFAULT_MOODS.join('\n');
+  addForumRow('', '');
+
+  // Khôi phục nháp nếu có
+  try{
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) restore(JSON.parse(raw));
+  }catch(e){}
+
+  // Tabs
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active'); activeTab = t.dataset.tab; render();
+  }));
+
+  // Sự kiện form
+  $('form').addEventListener('input', render);
+  $('btnAddForum').addEventListener('click', () => { addForumRow('', ''); });
+
+  // Toolbar
+  $('btnWrite').addEventListener('click', writeToFolder);
+  $('btnRead').addEventListener('click', readFromFolder);
+  $('btnDownload').addEventListener('click', downloadAll);
+  $('btnSave').addEventListener('click', () => saveDraft(collect(), false));
+  $('btnClear').addEventListener('click', () => {
+    localStorage.removeItem(DRAFT_KEY);
+    location.reload();
+  });
+  $('btnCopy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(OUT[activeTab]); setStatus('✓ Đã copy ' + FILES[activeTab].path, 'ok'); }
+    catch(e){ setStatus('Không copy được (clipboard bị chặn trên file://).', 'err'); }
+  });
+  $('btnDl').addEventListener('click', () => {
+    const f = FILES[activeTab];
+    const nm = activeTab === 'webEnv' ? 'web.env.txt' : activeTab === 'botEnv' ? 'bot.env.txt' : f.name;
+    downloadFile(nm, OUT[activeTab]);
+  });
+
+  if (!HAS_FSA){
+    $('btnWrite').disabled = true; $('btnWrite').title = 'Chỉ hỗ trợ trên Chrome/Edge';
+    $('btnRead').disabled = true;  $('btnRead').title  = 'Chỉ hỗ trợ trên Chrome/Edge';
+    setStatus('Trình duyệt này không ghi thẳng được — dùng "Tải tất cả".', 'err');
+  }
+
+  render();
+}
+init();
+</script>
+</body>
+</html>

@@ -19,7 +19,7 @@ export default function Team() {
     try {
       await deleteMember(m.uid);
     } catch (err) {
-      console.error('Delete member failed', err);
+      console.error('Xoá thành viên thất bại', err);
       alert('Xoá thất bại (cần quyền admin).');
     }
   }

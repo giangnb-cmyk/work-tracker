@@ -37,7 +37,7 @@ log = logging.getLogger("reminder")
 
 
 def die(message: str):
-    print(f"LOI: {message}")
+    print(f"LỖI: {message}")
     sys.exit(1)
 
 
@@ -46,7 +46,7 @@ def die(message: str):
 def _mention_or_name(client, task, user_cache: dict) -> str:
     """Ping qua <@discordId> neu biet, khong thi dung ten thuong."""
     assignee_id = task.get("assigneeId")
-    name = task.get("assigneeName") or "Chua giao"
+    name = task.get("assigneeName") or "Chưa giao"
     if not assignee_id:
         return name
     if assignee_id not in user_cache:
@@ -62,12 +62,12 @@ def build_reminder_message(client, now: datetime) -> str:
         return ""
 
     user_cache = {}
-    lines = ["📋 Nhac task hang ngay:"]
+    lines = ["📋 Nhắc task hằng ngày:"]
     if overdue:
-        lines.append(f"⏰ Tre han ({len(overdue)}):")
+        lines.append(f"⏰ Trễ hạn ({len(overdue)}):")
         lines += _group_lines(client, overdue, user_cache)
     if due_today:
-        lines.append(f"📅 Den han hom nay ({len(due_today)}):")
+        lines.append(f"📅 Đến hạn hôm nay ({len(due_today)}):")
         lines += _group_lines(client, due_today, user_cache)
     return "\n".join(lines)
 
@@ -90,8 +90,8 @@ def _group_lines(client, tasks, user_cache) -> list:
 def build_standup_message() -> str:
     """Cau hoi standup hang ngay (co the tuy chinh trong settings.json)."""
     return _SETTINGS.get("standup_prompt") or (
-        "🧭 Standup hom nay! Moi nguoi tra loi nhanh 3 y:\n"
-        "- Hom qua lam gi?\n- Hom nay lam gi?\n- Co vuong mac gi khong?"
+        "🧭 Standup hôm nay! Mọi người trả lời nhanh 3 ý:\n"
+        "- Hôm qua làm gì?\n- Hôm nay làm gì?\n- Có vướng mắc gì không?"
     )
 
 
@@ -118,7 +118,7 @@ def build_done_message(client, task: dict) -> str:
     cache = {}
     assignee_did = _discord_id(client, task.get("assigneeId"), cache)
 
-    title = task.get("title", "(khong ten)")
+    title = task.get("title", "(không tên)")
     sprint = _sprint_name(client, task.get("sprintId"))
     parts = [f'✅ Task đã hoàn thành: "{title}" (sprint {sprint}).']
     if assignee_did:
@@ -151,17 +151,17 @@ def notify_done(task_or_id) -> bool:
     """
     token = os.getenv("DISCORD_TOKEN")
     if not token:
-        log.warning("Thieu DISCORD_TOKEN, bo qua thong bao task hoan thanh.")
+        log.warning("Thiếu DISCORD_TOKEN, bỏ qua thông báo task hoàn thành.")
         return False
     channel_id = _done_channel_id()
     if not channel_id:
-        log.warning("Chua dat task_done_channel_id/reminder_channel_id, bo qua thong bao.")
+        log.warning("Chưa đặt task_done_channel_id/reminder_channel_id, bỏ qua thông báo.")
         return False
 
     client = repo.db()
     task = task_or_id if isinstance(task_or_id, dict) else repo.get_task(client, task_or_id)
     if not task:
-        log.warning("Khong tim thay task de thong bao hoan thanh.")
+        log.warning("Không tìm thấy task để thông báo hoàn thành.")
         return False
 
     content = build_done_message(client, task)
@@ -190,9 +190,9 @@ def post_to_discord(token: str, channel_id: int, content: str) -> int:
                 content=content,
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
-            print("Da gui vao kenh", channel_id)
+            print("Đã gửi vào kênh", channel_id)
         except Exception as e:
-            print("Loi gui Discord:", e, file=sys.stderr)
+            print("Lỗi gửi Discord:", e, file=sys.stderr)
             state["code"] = 1
         finally:
             await client.close()
@@ -206,7 +206,7 @@ def _channel_id(standup: bool) -> int:
     key = "standup_channel_id" if standup else "reminder_channel_id"
     value = _SETTINGS.get(key)
     if not value:
-        die(f"chua dat '{key}' trong settings.json")
+        die(f"chưa đặt '{key}' trong settings.json")
     return int(value)
 
 
@@ -222,9 +222,9 @@ def main():
         try:
             content = build_reminder_message(repo.db(), datetime.now(timezone.utc))
         except Exception as e:
-            die(f"loi truy van Firestore: {e}")
+            die(f"lỗi truy vấn dữ liệu: {e}")
         if not content:
-            print("Khong co task tre han / den han hom nay. Khong gui gi.")
+            print("Không có task trễ hạn / đến hạn hôm nay. Không gửi gì.")
             return
 
     if args.dry_run:
@@ -233,7 +233,7 @@ def main():
 
     token = os.getenv("DISCORD_TOKEN")
     if not token:
-        die("thieu DISCORD_TOKEN trong .env")
+        die("thiếu DISCORD_TOKEN trong .env")
     sys.exit(post_to_discord(token, _channel_id(args.standup), content))
 
 

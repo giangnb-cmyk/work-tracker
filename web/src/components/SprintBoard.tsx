@@ -2,48 +2,56 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useTasks } from '../hooks/useTasks';
+import { useSprintHistory } from '../hooks/useSprintHistory';
 import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
-import { STATUS_ORDER } from '../lib/sprint';
-import TaskRow from './TaskRow';
+import { groupTasksByDept } from '../lib/taskGrouping';
+import TaskListRow from './TaskListRow';
 import TaskModal from './TaskModal';
+import MeetingNoteModal from './MeetingNoteModal';
+import MoveSprintModal from './task/MoveSprintModal';
 import CreateTaskCard from './CreateTaskCard';
-import { JOB_ROLES, type JobRole, type Task, type TaskStatus } from '../types';
+import type { Task, TaskStatus } from '../types';
 
 /**
- * Sprint task LIST (not Kanban — the team is lazy about moving cards). Shows every
- * task with a progress bar and an inline quick-status control, filterable by the
- * assignee's team discipline (jobRole).
+ * Sprint task LIST (not Kanban — the team is lazy about moving cards).
+ *
+ * Chia SẴN theo bộ phận thay vì cho lọc: người dùng vào là thấy ngay phần việc của từng
+ * bộ phận, không phải bấm lọc rồi bấm lại để so. Thứ tự mục cố định theo JOB_ROLES nên
+ * không nhảy chỗ giữa các sprint.
  */
 export default function SprintBoard() {
   const { user, isAdmin } = useAuth();
-  const { selectedSprintId, selectedSprint, selectedProjectId, members } = useSprintContext();
+  const { selectedSprintId, selectedSprint, selectedProjectId, members, sprints } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
   const { tasks, loading } = useTasks(selectedSprintId);
+  const { everTasks } = useSprintHistory(selectedSprintId);
   const [editing, setEditing] = useState<Task | null>(null);
   const [creating, setCreating] = useState(false);
-  const [filterRole, setFilterRole] = useState<JobRole | 'all'>('all');
-  const [filterDone, setFilterDone] = useState<'all' | 'done' | 'open'>('all');
+  const [moving, setMoving] = useState<Task | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
 
-  // uid → jobRole, so we can filter tasks by who they're assigned to.
+  // Task từng thuộc sprint này nhưng đã được chuyển đi làm tiếp ở sprint khác.
+  const carriedAway = useMemo(
+    () =>
+      everTasks.filter((t) => t.projectId === selectedProjectId && t.sprintId !== selectedSprintId),
+    [everTasks, selectedProjectId, selectedSprintId],
+  );
+  const sprintNameOf = useMemo(() => {
+    const byId = new Map(sprints.map((s) => [s.id, s.name]));
+    return (id: string | null) => (id ? byId.get(id) ?? 'sprint khác' : 'Backlog');
+  }, [sprints]);
+  // uid → jobRole, để gắn icon chuyên môn lên từng dòng.
   const jobRoleOf = useMemo(() => {
     const map = new Map(members.map((m) => [m.uid, m.jobRole]));
     return (uid: string | null) => (uid ? map.get(uid) : undefined);
   }, [members]);
 
-  const visible = useMemo(() => {
-    // Scope the board to the selected project.
-    let rows = tasks.filter((t) => t.projectId === selectedProjectId);
-    if (filterRole !== 'all') rows = rows.filter((t) => jobRoleOf(t.assigneeId) === filterRole);
-    if (filterDone === 'done') rows = rows.filter((t) => t.status === 'done');
-    else if (filterDone === 'open') rows = rows.filter((t) => t.status !== 'done');
-    // Order: by status stage (todo → done), then by manual order.
-    return [...rows].sort(
-      (a, b) =>
-        STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) ||
-        (a.order ?? 0) - (b.order ?? 0),
-    );
-  }, [tasks, filterRole, filterDone, selectedProjectId, jobRoleOf]);
+  const projectTasks = useMemo(
+    () => tasks.filter((t) => t.projectId === selectedProjectId),
+    [tasks, selectedProjectId],
+  );
+  const groups = useMemo(() => groupTasksByDept(projectTasks, members), [projectTasks, members]);
 
   const canChangeStatus = (t: Task) =>
     isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid;
@@ -57,57 +65,68 @@ export default function SprintBoard() {
 
   return (
     <div className="fade-in">
-      <div className="view-header">
-        <h1>{selectedSprint ? selectedSprint.name : 'Backlog'}</h1>
-        <p>{selectedSprint?.goal || 'Danh sách công việc và tiến độ. Đổi trạng thái ngay ở cột phải.'}</p>
-      </div>
-
-      <div className="filter-bar">
-        <span className="muted" style={{ fontSize: '0.85rem' }}>Bộ phận:</span>
-        <select
-          className="select"
-          style={{ width: 'auto' }}
-          value={filterRole}
-          onChange={(e) => setFilterRole(e.target.value as JobRole | 'all')}
-        >
-          <option value="all">Tất cả</option>
-          {JOB_ROLES.map((r) => (<option key={r.id} value={r.id}>{r.icon} {r.label}</option>))}
-        </select>
-
-        <span className="muted" style={{ fontSize: '0.85rem', marginLeft: '0.5rem' }}>Trạng thái:</span>
-        <select
-          className="select"
-          style={{ width: 'auto' }}
-          value={filterDone}
-          onChange={(e) => setFilterDone(e.target.value as 'all' | 'done' | 'open')}
-        >
-          <option value="all">Tất cả</option>
-          <option value="open">Chưa hoàn thành</option>
-          <option value="done">Đã hoàn thành</option>
-        </select>
-
-        <span className="muted" style={{ fontSize: '0.8rem' }}>{visible.length} task</span>
+      <div className="view-header row between">
+        <div>
+          <h1>{selectedSprint ? selectedSprint.name : 'Backlog'}</h1>
+          <p>{selectedSprint?.goal || 'Danh sách công việc và tiến độ. Đổi trạng thái ngay ở cột phải.'}</p>
+        </div>
+        {groups.length > 0 && (
+          <button className="btn-sm" onClick={() => setNoteOpen(true)} title="Xuất danh sách theo bộ phận để dán vào note họp">
+            📋 Note họp
+          </button>
+        )}
       </div>
 
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : (
-        <div className="task-list">
-          {isAdmin && <CreateTaskCard onClick={() => setCreating(true)} />}
-          {visible.map((t) => (
-            <TaskRow
-              key={t.id}
-              task={t}
-              assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
-              canChangeStatus={canChangeStatus(t)}
-              onOpen={setEditing}
-              onQuickStatus={quickStatus}
-            />
+        <>
+          {isAdmin && <CreateTaskCard variant="row" onClick={() => setCreating(true)} />}
+
+          {groups.map((g) => (
+            <section key={g.key} className="dept-group">
+              <div className="dept-head">
+                <span className="dept-icon">{g.icon}</span>
+                <h3 className="dept-name">{g.label}</h3>
+                <span className="dept-count mono">{g.done}/{g.tasks.length}</span>
+              </div>
+              <div className="trow-list">
+                {g.tasks.map((t) => (
+                  <TaskListRow
+                    key={t.id}
+                    task={t}
+                    assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+                    canChangeStatus={canChangeStatus(t)}
+                    onOpen={setEditing}
+                    onQuickStatus={quickStatus}
+                    onMoveSprint={selectedSprintId && canChangeStatus(t) ? setMoving : undefined}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
-          {visible.length === 0 && !isAdmin && (
-            <div className="glass empty">Không có task nào{filterRole !== 'all' ? ' cho bộ phận này' : ''}.</div>
+
+          {groups.length === 0 && (
+            <div className="glass empty">Sprint này chưa có task nào.</div>
           )}
-        </div>
+        </>
+      )}
+
+      {carriedAway.length > 0 && (
+        <details className="carried glass">
+          <summary>Đã chuyển sang sprint khác ({carriedAway.length})</summary>
+          <p className="muted" style={{ fontSize: '0.78rem', margin: '0 0 0.6rem' }}>
+            Task từng thuộc sprint này nhưng chưa xong nên được sprint sau làm tiếp. Vẫn tính vào
+            số liệu trễ của sprint này.
+          </p>
+          {carriedAway.map((t) => (
+            <button key={t.id} className="carried-row" onClick={() => setEditing(t)}>
+              <span className="carried-title">{t.title}</span>
+              <span className="muted" style={{ fontSize: '0.8rem' }}>{t.assigneeName || 'Chưa giao'}</span>
+              <span className="badge status-completed">→ {sprintNameOf(t.sprintId)}</span>
+            </button>
+          ))}
+        </details>
       )}
 
       {(editing || creating) && (
@@ -116,6 +135,16 @@ export default function SprintBoard() {
           defaultSprintId={selectedSprintId}
           defaultProjectId={selectedProjectId}
           onClose={() => { setEditing(null); setCreating(false); }}
+        />
+      )}
+
+      {moving && <MoveSprintModal task={moving} onClose={() => setMoving(null)} />}
+
+      {noteOpen && (
+        <MeetingNoteModal
+          title={selectedSprint?.name ?? 'Backlog'}
+          groups={groups}
+          onClose={() => setNoteOpen(false)}
         />
       )}
     </div>

@@ -31,9 +31,16 @@
   --radius: 16px;
   --radius-sm: 8px;
 
-  --font-head: 'Outfit', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* MỘT font duy nhất cho toàn app — không trộn họ chữ ở bất kỳ đâu.
+     Inter được chọn vì nó vốn đã là font dùng nhiều nhất, đọc tốt ở cỡ 0.85rem của
+     bảng dữ liệu, và có tabular-nums nên cột số vẫn thẳng hàng mà không cần font mono.
+     Ba biến dưới đây giữ nguyên TÊN để mọi call site cũ (var(--font-head)/(--font-mono))
+     vẫn chạy, nhưng đều trỏ về một họ: đổi font toàn app = sửa đúng --font-ui.
+     Đổi kèm index.html (phải tải đủ mọi weight CSS dùng). */
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-head: var(--font-ui);
+  --font-body: var(--font-ui);
+  --font-mono: var(--font-ui);
 }
 
 * {
@@ -213,6 +220,11 @@ a:hover { text-decoration: underline; }
 .view-header { margin-bottom: 1.5rem; }
 .view-header h1 { font-size: 1.8rem; }
 .view-header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.25rem; }
+
+/* Tiêu đề khối phụ trong một view (vd: "Bug được giao" ở trang Task của tôi). */
+.mt-subhead { margin: 2rem 0 0.85rem; padding-top: 1.5rem; border-top: 1px solid var(--border-soft); }
+.mt-subhead h2 { font-size: 1.15rem; font-weight: 700; }
+.mt-subhead p { font-size: 0.85rem; margin-top: 0.2rem; }
 
 /* ============================================================================
    Buttons, inputs, badges
@@ -425,8 +437,40 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border);
   border-radius: 999px; padding: 0.25rem 0.6rem 0.25rem 0.25rem; font-size: 0.8rem; color: var(--text); cursor: pointer;
 }
-.watcher-chip.active { background: rgba(99, 102, 241, 0.18); border-color: var(--primary); }
-.watcher-chip:disabled { cursor: default; opacity: 0.7; }
+/* Nút × bỏ người khỏi chip. */
+.watcher-x {
+  background: none; border: none; padding: 0 0 0 0.1rem; margin-left: 0.1rem;
+  color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer;
+  transition: color 0.18s ease;
+}
+.watcher-x:hover { color: var(--text); }
+
+/* Nút tròn "+" mở danh sách thêm người. Nét đứt = ô còn trống, phân biệt với chip thật. */
+.watcher-add {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04); border: 1px dashed var(--border);
+  color: var(--muted); font-size: 1.05rem; line-height: 1; cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.watcher-add:hover { background: rgba(99, 102, 241, 0.12); border-color: var(--primary); color: var(--primary); }
+
+/* In-flow (không absolute) vì field nằm trong modal cuộn được — xem chú thích .ss-panel. */
+.watcher-pop {
+  margin-top: 0.5rem; border-radius: 12px; padding: 0.35rem;
+  max-height: 200px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0.1rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+.watcher-opt {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left;
+  background: none; border: none; border-radius: 8px;
+  padding: 0.4rem 0.5rem; color: var(--text); font-size: 0.84rem; cursor: pointer;
+  transition: background 0.18s ease;
+}
+.watcher-opt:hover { background: rgba(99, 102, 241, 0.12); }
+.watcher-role { font-size: 0.68rem; }
+.watcher-hint { font-size: 0.82rem; }
 
 .notion-row {
   display: inline-block; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);
@@ -442,6 +486,78 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   display: block; height: 100%; min-width: 2px;
   background: linear-gradient(90deg, var(--primary), var(--sky));
   border-radius: 999px; transition: width 0.3s;
+}
+
+/* ============================================================================
+   Task ở dạng DÒNG (Bảng Sprint + tuỳ chọn "Danh sách" ở Task của tôi)
+   ========================================================================== */
+/* Mục theo bộ phận — chia sẵn, không có bộ lọc. */
+.dept-group { margin-bottom: 1.75rem; }
+.dept-head { display: flex; align-items: center; gap: 0.55rem; margin-bottom: 0.6rem; }
+.dept-icon { font-size: 1rem; }
+.dept-name { font-size: 0.95rem; font-weight: 700; margin: 0; }
+.dept-count { font-size: 0.75rem; color: var(--muted); }
+
+/* Nút tạo task dạng dòng — cùng mật độ với danh sách bên dưới. */
+.trow-add {
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  width: 100%; padding: 0.6rem; margin-bottom: 1.5rem;
+  background: transparent; border: 1px dashed var(--border); border-radius: 10px;
+  color: var(--muted); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.trow-add:hover {
+  border-color: rgba(99, 102, 241, 0.5); color: var(--text); background: rgba(99, 102, 241, 0.06);
+}
+
+.trow-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.trow {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.5rem 0.75rem; border-radius: 10px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.trow:hover { border-color: rgba(99, 102, 241, 0.45); background: rgba(99, 102, 241, 0.08); }
+.trow.done { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.22); }
+.trow.done .trow-title { color: var(--muted); text-decoration: line-through; }
+
+.trow-check {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 18px; height: 18px; padding: 0; border-radius: 5px; cursor: pointer;
+  background: transparent; border: 1.5px solid var(--border);
+  color: transparent; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.trow-check svg { width: 11px; height: 11px; }
+.trow-check:hover:not(:disabled) { border-color: var(--green); color: rgba(255, 255, 255, 0.35); }
+.trow-check:disabled { cursor: default; opacity: 0.45; }
+.trow.done .trow-check { background: var(--green); border-color: var(--green); color: #fff; }
+
+.trow-icon { flex-shrink: 0; width: 20px; text-align: center; font-size: 0.95rem; }
+.trow-title {
+  flex: 1; min-width: 0; font-weight: 600; font-size: 0.88rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.trow-prio { flex-shrink: 0; }
+.trow-who { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; width: 150px; }
+.trow-who-name { font-size: 0.78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow-due { flex-shrink: 0; width: 58px; font-size: 0.74rem; color: var(--muted); text-align: right; }
+.trow-due.overdue { color: var(--red); }
+.trow-prog { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; width: 110px; }
+.trow-prog .progress { flex: 1; height: 6px; }
+.trow-pct { font-size: 0.7rem; color: var(--muted); width: 30px; text-align: right; }
+.trow-status { flex-shrink: 0; width: 92px; font-size: 0.75rem; color: var(--muted); }
+
+/* Hẹp dần thì bỏ cột phụ trước, giữ tiêu đề + tick + menu tới cùng. */
+@media (max-width: 1180px) {
+  .trow-status { display: none; }
+}
+@media (max-width: 980px) {
+  .trow-prog { display: none; }
+}
+@media (max-width: 820px) {
+  .trow-who { display: none; }
+  .trow-prio { display: none; }
 }
 
 /* Task cards (compact — denser grid, smaller type/tiles) */
@@ -471,13 +587,16 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 }
 .tcard-title {
   flex: 1; min-width: 0; margin: 0;
-  font-family: var(--font-body); font-weight: 700; font-size: 1.02rem; line-height: 1.25; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-body); font-weight: 700; font-size: 1rem; line-height: 1.35; color: var(--text);
+  /* Cho xuống 2 dòng rồi mới cắt. Trước đây nowrap + ellipsis: thẻ chỉ rộng ~300px mà
+     còn chứa icon + pill ưu tiên + menu, nên tên task bị cụt còn ~15 ký tự
+     ('Đồng bộ forum Disc…') — đọc không ra việc gì. */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .prio-pill {
   display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0;
   background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 999px;
-  padding: 0.22rem 0.55rem; font-size: 0.72rem; font-weight: 600;
+  padding: 0.24rem 0.6rem; font-size: 0.8rem; font-weight: 600;
 }
 .prio-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .tcard-menu-wrap { position: relative; flex-shrink: 0; }
@@ -498,8 +617,11 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 /* Progress + status */
 .tcard-progrow { display: flex; align-items: center; gap: 0.6rem; }
 .tcard-progrow .progress { flex: 1; height: 7px; }
-.tcard-pct { font-weight: 700; font-size: 0.82rem; color: var(--text); min-width: 36px; text-align: right; }
-.tcard-status { font-size: 0.76rem; color: var(--muted); margin-top: -0.3rem; }
+/* Thang cỡ chữ của thẻ task — CHỈ 3 mức, dùng lại ở mọi chỗ:
+   1rem = tiêu đề · 0.9rem = giá trị · 0.8rem = nhãn/badge.
+   Trước đây một thẻ có tới 6 cỡ (1.02/0.84/0.82/0.76/0.72/0.68rem), nhỏ nhất 10.88px. */
+.tcard-pct { font-weight: 700; font-size: 0.9rem; color: var(--text); min-width: 38px; text-align: right; }
+.tcard-status { font-size: 0.8rem; color: var(--muted); margin-top: -0.3rem; }
 
 .tcard-divider { height: 1px; background: var(--border-soft); }
 
@@ -518,10 +640,12 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tile-green { background: rgba(34, 197, 94, 0.14); color: #4ade80; }
 .tile-slate { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
 .tcard-cell-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.tcard-val { font-weight: 650; font-size: 0.84rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tcard-val { font-weight: 650; font-size: 0.9rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tcard-val.mono { font-family: var(--font-mono); }
 .tcard-val.overdue { color: var(--red); }
-.tcard-lbl { font-size: 0.68rem; color: var(--muted); }
+/* Nhãn phải nằm 1 dòng: ô lưới chỉ rộng ~90px sau khi trừ tile icon, nhãn xuống dòng là
+   các thẻ cao lệch nhau ngay. */
+.tcard-lbl { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tcard-cell .avatar { width: 34px; height: 34px; font-size: 0.8rem; flex-shrink: 0; }
 
 /* Docs row */
@@ -688,8 +812,7 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bug-row-updated { font-size: 0.74rem; white-space: nowrap; }
 .bug-row-unassigned { color: var(--muted); font-size: 1.1rem; }
 
-/* Bug modal extras */
-.bug-modal { width: min(620px, 100%); }
+/* Bug modal extras — bề rộng nằm ở khối "Redesigned bug detail modal" bên dưới. */
 .bug-modal-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
 .bug-status-sel { width: auto; }
 .bug-title-input { width: 100%; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; color: var(--text); font-size: 1.02rem; font-weight: 600; margin-bottom: 0.35rem; }
@@ -720,14 +843,20 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bug-media-file:hover { border-color: var(--primary); text-decoration: none; }
 
 /* ---- Redesigned bug detail modal (header badges · info grid · docs) ---- */
-.bug-modal { width: min(640px, 100%); padding: 0; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
+/* Rộng ~940px: mô tả Markdown là phần dài nhất, ở 640px nó bị bó thành cột hẹp. */
+.bug-modal { width: min(940px, 100%); padding: 0; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
 .bugm-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.9rem 1.15rem; border-bottom: 1px solid var(--border-soft); }
 .bugm-icon { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); font-size: 1rem; }
 .bugm-head-spacer { flex: 1; }
 .bugm-iconbtn { width: 32px; height: 32px; display: grid; place-items: center; background: none; border: none; border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 0.9rem; transition: background 0.15s ease, color 0.15s ease; }
 .bugm-iconbtn:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
-.bugm-scroll { flex: 1; overflow-y: auto; padding: 1.1rem 1.15rem; display: flex; flex-direction: column; gap: 1.05rem; }
+.bugm-scroll { flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.05rem; }
 .bugm-section { display: flex; flex-direction: column; gap: 0.55rem; }
+.bugm-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.seg-sm .seg { font-size: 0.74rem; padding: 0.2rem 0.6rem; }
+.bugm-desc-edit { min-height: 220px; line-height: 1.65; }
+.bugm-desc-view { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-soft); border-radius: 12px; padding: 0.85rem 1rem; }
+.bugm-desc-empty { padding: 0.8rem 1rem; border: 1px dashed var(--border); border-radius: 12px; font-size: 0.85rem; }
 .bugm-quick { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .bugm-others { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.2rem; }
 .bugm-footer { display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1.15rem; border-top: 1px solid var(--border-soft); }
@@ -772,6 +901,37 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bug-modal .doc-card > svg { color: var(--muted); flex-shrink: 0; }
 .doc-card-btn { width: 100%; font: inherit; text-align: left; }
 @media (max-width: 560px) { .bug-info { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   Markdown body — dùng chung cho mọi chỗ render Markdown (components/Markdown.tsx).
+   Vẫn một họ chữ Inter: code phân biệt bằng nền + viền, không đổi font.
+   ========================================================================== */
+.md-body { font-size: 0.9rem; line-height: 1.65; color: var(--text); overflow-wrap: anywhere; }
+.md-body > *:first-child { margin-top: 0; }
+.md-body > *:last-child { margin-bottom: 0; }
+.md-body p { margin: 0.6rem 0; }
+.md-body h1, .md-body h2, .md-body h3, .md-body h4, .md-body h5, .md-body h6 { margin: 1.05rem 0 0.5rem; font-weight: 700; line-height: 1.3; color: var(--text); }
+.md-body h1 { font-size: 1.15rem; }
+.md-body h2 { font-size: 1.05rem; }
+.md-body h3 { font-size: 0.98rem; }
+.md-body h4, .md-body h5, .md-body h6 { font-size: 0.9rem; color: var(--muted); }
+.md-body ul, .md-body ol { margin: 0.6rem 0; padding-left: 1.35rem; }
+.md-body li { margin: 0.22rem 0; }
+.md-body li::marker { color: var(--muted); }
+.md-body a { color: var(--sky); text-decoration: none; }
+.md-body a:hover { text-decoration: underline; }
+.md-body code { font-family: var(--font-mono); font-size: 0.86em; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--border-soft); border-radius: 6px; padding: 0.08em 0.35em; }
+.md-body pre { margin: 0.7rem 0; padding: 0.75rem 0.9rem; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border-soft); border-radius: 10px; overflow-x: auto; }
+.md-body pre code { background: none; border: none; padding: 0; font-size: 0.82rem; line-height: 1.55; }
+.md-body blockquote { margin: 0.7rem 0; padding: 0.15rem 0 0.15rem 0.85rem; border-left: 3px solid var(--primary); color: var(--muted); }
+.md-body hr { margin: 1rem 0; border: none; border-top: 1px solid var(--border); }
+.md-body img { max-width: 100%; border-radius: 10px; display: block; margin: 0.6rem 0; }
+/* Bảng rộng cuộn ngang trong khung của nó — không đẩy modal giãn ra. */
+.md-body table { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 0.7rem 0; font-size: 0.85rem; }
+.md-body th, .md-body td { border: 1px solid var(--border-soft); padding: 0.4rem 0.6rem; text-align: left; }
+.md-body th { background: rgba(255, 255, 255, 0.04); font-weight: 600; }
+.md-body ul:has(input[type='checkbox']) { list-style: none; padding-left: 0.2rem; }
+.md-body input[type='checkbox'] { margin-right: 0.4rem; accent-color: var(--primary); }
 
 /* Project-select landing page */
 .project-select { min-height: 100vh; display: flex; flex-direction: column; }
@@ -820,6 +980,192 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .badge.prio-medium { background: rgba(56, 189, 248, 0.12); color: var(--sky); }
 .badge.prio-high { background: rgba(245, 158, 11, 0.14); color: var(--amber); }
 .badge.prio-urgent { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+
+/* Header dính của khung chính: gói .preview-bar + .topbar lại làm một.
+   Cần thiết vì phần tử cuộn thật sự là CỬA SỔ, không phải .tab-scroller (.app-shell dùng
+   min-height:100vh nên nó cao theo nội dung). Không sticky thì thanh xem thử trôi mất. */
+.main-head { position: sticky; top: 0; z-index: 50; }
+
+/* Chế độ xem thử của admin — dùng tông cảnh báo (amber) để không nhầm với UI thường. */
+.preview-bar {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 1.5rem;
+  /* Nền tint amber ĐẶT TRÊN nền đục của topbar + blur: thanh này sticky nên nội dung
+     trôi phía sau, chỉ tint 14% thì chữ xuyên qua trông như vỡ giao diện. */
+  background: linear-gradient(rgba(245, 158, 11, 0.16), rgba(245, 158, 11, 0.16)),
+    rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+  flex-shrink: 0;
+}
+.preview-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+.preview-text { flex: 1; min-width: 0; font-size: 0.8rem; color: #fcd34d; }
+.preview-text strong { font-weight: 700; }
+.preview-exit {
+  flex-shrink: 0; cursor: pointer;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fde68a;
+  font-size: 0.78rem; font-weight: 600;
+  padding: 0.3rem 0.7rem; border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+.preview-exit:hover { background: rgba(245, 158, 11, 0.32); }
+
+.preview-toggle {
+  display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+  width: 100%; margin-top: 0.4rem;
+}
+
+/* Mục tiêu sprint — treatment "nổi bật" của design system (Pacing Cards):
+   gradient indigo + viền indigo, không phải thẻ glass thường. */
+.goal-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.15rem 1.35rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.05));
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+.goal-tile {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #a5b4fc;
+}
+.goal-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.goal-label {
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #a5b4fc;
+}
+/* Nội dung chứ không phải tiêu đề mục → Inter đậm, KHÔNG dùng --font-head. */
+.goal-text { font-family: var(--font-body); font-weight: 700; font-size: 1.15rem; line-height: 1.35; margin: 0; }
+.goal-empty { font-weight: 500; color: var(--muted); font-size: 0.95rem; }
+.goal-meta { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.15rem; flex-wrap: wrap; }
+.goal-when { display: inline-flex; align-items: center; gap: 0.35rem; font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); }
+.goal-days { font-size: 0.74rem; font-weight: 600; color: var(--sky); }
+.goal-days.overdue { color: var(--red); }
+
+@media (max-width: 720px) {
+  .goal-banner { align-items: flex-start; flex-wrap: wrap; }
+}
+
+/* Sprint health — tint/border derive from the health colour passed as --c */
+.health-wrap { flex-shrink: 0; }
+.health-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap;
+  padding: 0.34rem 0.8rem; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 600; line-height: 1;
+  color: color-mix(in srgb, var(--c) 72%, #fff);
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+}
+.health-icon { font-size: 0.9rem; }
+.health-detail { margin: 0.55rem 0 0.9rem; font-size: 0.8rem; color: var(--muted); }
+
+/* Trang Hiệu suất */
+/* z-index để panel dropdown nổi trên các thẻ glass bên dưới (backdrop-filter tạo
+   stacking context riêng). */
+.perf-range { position: relative; z-index: 30; }
+.perf-range-lbl { font-size: 0.85rem; color: var(--muted); }
+/* Rộng CỐ ĐỊNH: nhãn sprint dài ngắn khác nhau, để co giãn thì mỗi lần chọn xong cả
+   hàng lại nhảy. */
+.perf-range-field { width: 250px; flex-shrink: 0; }
+.perf-range-count { font-size: 0.8rem; color: var(--muted); margin-left: auto; }
+
+.perf-who { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.perf-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.perf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Khớp .avatar.sm (24px) để dòng không avatar vẫn thẳng hàng với dòng có avatar. */
+.perf-noavatar { width: 24px; flex-shrink: 0; }
+/* Số phụ đứng cạnh số chính trong cùng một ô, để bảng không phình thêm cột. */
+.perf-sub { font-size: 0.72rem; color: var(--muted); margin-left: 0.3rem; }
+.perf-hint { font-size: 0.82rem; color: var(--muted); margin-bottom: 1rem; }
+.perf-when { font-size: 0.78rem; white-space: nowrap; }
+/* Header bảng dính lại khi drawer cuộn — theo design_system_guide mục Data Tables. */
+.perf-drawer-scroll { max-height: 55vh; overflow-y: auto; }
+.perf-drawer-scroll .data-table th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+/* Tải lại: giữ nguyên bản render cũ, chỉ mờ đi — không nháy skeleton gây nhảy layout. */
+.perf-body { transition: opacity 0.15s ease; }
+.perf-body.reloading { opacity: 0.5; }
+
+.row-click { cursor: pointer; }
+.row-click:hover td { background: rgba(99, 102, 241, 0.1); }
+/* Người không có task nào trong khoảng — vẫn phải hiện, đó chính là phát hiện cần thấy. */
+.row-idle { opacity: 0.55; }
+
+/* ---- Bảng OT (việc xong cuối tuần) ---- */
+.ot-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin: 0.9rem 0 1.1rem; }
+.ot-tile { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.75rem 0.9rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft); border-radius: 12px; }
+/* Chỉ tô cảnh báo khi thật sự có OT — 0 OT là tin tốt, đừng nhuộm đỏ. */
+.ot-tile-hot { background: rgba(251, 191, 36, 0.08); border-color: rgba(251, 191, 36, 0.3); }
+.ot-tile-num { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+.ot-tile-hot .ot-tile-num { color: var(--gold); }
+.ot-tile-lb { font-size: 0.75rem; line-height: 1.35; }
+
+.ot-row-hot { cursor: pointer; }
+.ot-row-hot:hover td { background: rgba(99, 102, 241, 0.1); }
+.ot-row-open td { background: rgba(99, 102, 241, 0.08); }
+.ot-row-hot .ot-num { color: var(--gold); font-weight: 700; }
+.ot-expand { background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font: inherit; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; cursor: pointer; }
+.ot-expand:hover { color: var(--text); border-color: var(--primary); }
+
+.ot-detail-row td { background: rgba(0, 0, 0, 0.25); }
+.ot-items { list-style: none; display: flex; flex-direction: column; gap: 0.35rem; padding: 0.25rem 0 0.25rem 0.5rem; }
+.ot-items li { display: flex; align-items: center; gap: 0.55rem; font-size: 0.82rem; }
+.ot-item-kind { flex-shrink: 0; }
+.ot-item-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ot-item-when { flex-shrink: 0; font-size: 0.75rem; }
+@media (max-width: 720px) { .ot-tiles { grid-template-columns: repeat(2, 1fr); } }
+/* Ít mẫu quá thì làm mờ, đừng in số như thể chắc chắn. */
+.thin-data { opacity: 0.45; }
+
+/* .modal đặt width: min(520px,100%) ở dưới trong file này — cùng specificity thì đứa
+   sau thắng, nên phải dùng 2 class để đè. */
+.modal.modal-wide { width: min(880px, 100%); }
+
+/* Ô xem trước note họp — đọc như text thô, không phải ô nhập liệu. */
+.note-preview {
+  width: 100%; min-height: 340px; max-height: 55vh; resize: vertical;
+  font-size: 0.85rem; line-height: 1.6; white-space: pre; overflow: auto;
+  margin-bottom: 0.75rem;
+}
+
+.caveat { margin: 0 0 2rem; padding-left: 1.1rem; color: var(--muted); font-size: 0.78rem; line-height: 1.6; }
+.caveat li { margin-bottom: 0.3rem; }
+
+/* Mục "Đã chuyển sang sprint khác" ở cuối Bảng Sprint */
+.carried { padding: 1rem 1.25rem; margin-top: 1.5rem; }
+.carried summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.carried-row {
+  display: flex; align-items: center; gap: 0.75rem; width: 100%;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft);
+  border-radius: 10px; padding: 0.5rem 0.7rem; margin-bottom: 0.4rem;
+  color: var(--text); text-align: left; cursor: pointer;
+}
+.carried-row:hover { background: rgba(99, 102, 241, 0.12); }
+.carried-title { flex: 1; min-width: 0; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Member leaderboard rows */
+.lb-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.lb-row {
+  display: flex; align-items: center; gap: 0.7rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+}
+.lb-rank { width: 1.4rem; flex-shrink: 0; text-align: center; font-size: 0.9rem; font-weight: 700; color: var(--muted); }
+.lb-name { flex: 1; min-width: 0; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-pts { flex-shrink: 0; font-size: 0.74rem; }
+.lb-score { flex-shrink: 0; font-size: 0.95rem; font-weight: 700; }
 
 .badge.status-planning { background: rgba(148, 163, 184, 0.15); color: var(--muted); }
 .badge.status-active { background: rgba(34, 197, 94, 0.14); color: var(--green); }
@@ -1179,7 +1525,12 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .row { display: flex; align-items: center; gap: 0.5rem; }
 .between { justify-content: space-between; }
 .muted { color: var(--muted); }
-.mono { font-family: var(--font-mono); }
+/* `.mono` KHÔNG còn đổi họ chữ (cả app một font) — nhiệm vụ duy nhất còn lại là căn cột
+   số cho thẳng hàng, thứ trước đây JetBrains Mono gánh. Giữ nguyên tên class vì đã dùng
+   ở hàng chục chỗ.
+   Cố ý KHÔNG áp tabular-nums cho số lớn đứng một mình (.stat-value, .pacing-value): chữ
+   số đều bề rộng làm số cỡ lớn trông rời rạc. */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .empty { color: var(--muted); text-align: center; padding: 2rem; font-size: 0.9rem; }
 .error-text { color: var(--red); font-size: 0.85rem; margin-top: 0.75rem; }
 .section { margin-bottom: 2rem; }
@@ -1196,7 +1547,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
   text-align: left;
 }
 .ss-trigger:disabled { opacity: 0.6; cursor: not-allowed; }
-.ss-caret { color: var(--muted); font-size: 0.7rem; }
+/* Nhãn dài phải cắt bằng ellipsis, không được xuống dòng: trigger cao lên là cả hàng
+   flex cao theo và mọi thứ bên dưới bị đẩy xuống mỗi lần chọn. */
+.ss-trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-caret { color: var(--muted); font-size: 0.7rem; flex-shrink: 0; }
 .ss-panel {
   /* In-flow (not absolute) so a scrollable modal never clips it; it expands the
      modal and the modal scrolls. */
@@ -1206,6 +1560,19 @@ table.data-table { width: 100%; border-collapse: collapse; }
   border-radius: 12px;
   padding: 0.4rem;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+/* Biến thể nổi: dùng khi select nằm trong layout thường (thanh lọc). Mặc định in-flow
+   sẽ nong hàng flex ra và đẩy lệch cả trang mỗi lần mở dropdown. */
+.ss-panel-overlay {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  margin-top: 0;
+  /* Nở theo nội dung chứ không bó theo trigger: trigger hẹp thì tên sprint bị cắt
+     ellipsis và không phân biệt nổi lựa chọn nào với lựa chọn nào. */
+  min-width: 100%;
+  width: max-content;
+  max-width: 420px;
 }
 .ss-search { margin-bottom: 0.4rem; }
 .ss-list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
@@ -1249,6 +1616,19 @@ table.data-table { width: 100%; border-collapse: collapse; }
 }
 .project-name { font-family: var(--font-head); font-weight: 600; font-size: 1rem; line-height: 1.25; }
 .project-meta { color: var(--muted); font-size: 0.75rem; margin-top: auto; }
+/* Hàng tên ở đáy sidebar: là nút mở hồ sơ, nhưng phải trông y như cũ khi chưa hover. */
+.profile-btn {
+  width: 100%; padding: 0.5rem; border: none; border-radius: 10px;
+  background: none; color: inherit; font: inherit; cursor: pointer;
+  transition: background 0.18s ease;
+}
+.profile-btn:hover { background: rgba(255, 255, 255, 0.05); }
+
+/* Tiến độ trên card feature: dùng lại .progress của task cho đồng bộ, chỉ mảnh hơn. */
+.feat-prog { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
+.feat-prog .progress { flex: 1; height: 7px; }
+.feat-pct { font-size: 0.72rem; color: var(--muted); flex-shrink: 0; }
+
 .project-card-new {
   background: transparent;
   border: 1.5px dashed var(--border);
@@ -1327,4 +1707,12 @@ table.data-table { width: 100%; border-collapse: collapse; }
   .board { grid-template-columns: 1fr; }
   .tab-scroller { padding: 1rem; }
   .topbar { padding: 0 1rem; }
+}
+
+/* Ref dùng chung của feature trong TaskModal — chỉ đọc, tách khỏi ref riêng của task
+   bằng viền trái để không ai tưởng sửa được ở đây. */
+.feature-refs {
+  border-left: 2px solid rgba(99, 102, 241, 0.4);
+  padding-left: 0.9rem;
+  margin-top: 1.25rem;
 }

@@ -42,6 +42,64 @@ export function groupByAssignee(tasks: Task[]): Map<string, Task[]> {
   return map;
 }
 
+/** Thành tích của một thành viên trong phạm vi task được truyền vào (thường là 1 sprint). */
+export interface MemberScore {
+  uid: string;
+  name: string;
+  photoURL: string;
+  done: number;
+  total: number;
+  /** Story points của riêng phần task đã hoàn thành. */
+  donePoints: number;
+  percentDone: number; // 0..100
+}
+
+/**
+ * Xếp hạng thành viên theo số task đã hoàn thành, nhiều nhất trước.
+ * Chỉ tính task đã có người nhận — ai không có task nào trong phạm vi này thì không lên bảng.
+ */
+export function rankByDone(tasks: Task[], members: TeamMember[]): MemberScore[] {
+  const memberByUid = new Map(members.map((m) => [m.uid, m]));
+  const buckets = new Map<string, Omit<MemberScore, 'uid' | 'percentDone'>>();
+
+  for (const t of tasks) {
+    if (!t.assigneeId) continue; // task chưa giao không thuộc về ai
+    const member = memberByUid.get(t.assigneeId);
+    const b = buckets.get(t.assigneeId) ?? {
+      name: member?.displayName || t.assigneeName || 'Không rõ',
+      photoURL: member?.photoURL ?? '',
+      done: 0,
+      total: 0,
+      donePoints: 0,
+    };
+    b.total += 1;
+    if (t.status === 'done') {
+      b.done += 1;
+      b.donePoints += t.points ?? 0;
+    }
+    buckets.set(t.assigneeId, b);
+  }
+
+  return [...buckets.entries()]
+    .map(([uid, b]) => ({
+      uid,
+      ...b,
+      percentDone: b.total === 0 ? 0 : Math.round((b.done / b.total) * 100),
+    }))
+    .sort((a, b) => b.done - a.done || b.donePoints - a.donePoints || a.name.localeCompare(b.name, 'vi'));
+}
+
+/**
+ * Cắt bảng xếp hạng thành hai đầu (nhiều nhất / ít nhất) sao cho không ai đứng cả hai bên:
+ * đội càng ít người thì mỗi đầu càng co lại, dưới 2 người thì bỏ hẳn đầu "ít nhất".
+ * Khúc giữa bị giấu là có chủ ý — bảng "Khối lượng theo người" bên dưới vẫn liệt kê đủ.
+ */
+export function splitLeaders(ranked: MemberScore[], size = 5): { top: MemberScore[]; bottom: MemberScore[] } {
+  if (ranked.length < 2) return { top: ranked, bottom: [] };
+  const n = Math.min(size, Math.floor(ranked.length / 2));
+  return { top: ranked.slice(0, n), bottom: ranked.slice(-n).reverse() };
+}
+
 /** Job-role bucket key: a concrete JobRole, or 'unknown' when the assignee has none. */
 export type DeptKey = JobRole | 'unknown';
 
@@ -90,6 +148,7 @@ export function burndownSeries(sprint: Sprint, tasks: Task[]) {
 
   const dayMs = 86_400_000;
   const days = Math.min(30, Math.round((end.getTime() - start.getTime()) / dayMs) + 1);
+  const span = days - 1; // số khoảng ngày; sprint gói trong 1 ngày → span = 0
   const total = tasks.length;
   const labels: string[] = [];
   const ideal: number[] = [];
@@ -99,7 +158,7 @@ export function burndownSeries(sprint: Sprint, tasks: Task[]) {
   for (let i = 0; i < days; i++) {
     const day = new Date(start.getTime() + i * dayMs);
     labels.push(day.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }));
-    ideal.push(Math.round((total * (days - 1 - i)) / (days - 1)));
+    ideal.push(span === 0 ? 0 : Math.round((total * (span - i)) / span));
 
     // Actual remaining = tasks not "done" by the end of this day. Only up to today.
     if (day.getTime() > now) {
@@ -115,6 +174,86 @@ export function burndownSeries(sprint: Sprint, tasks: Task[]) {
   }
 
   return { labels, ideal, actual };
+}
+
+/** Sức khoẻ sprint đọc từ đường burndown tại thời điểm hôm nay. */
+export type SprintHealthKey =
+  | 'unknown'      // thiếu ngày bắt đầu/kết thúc, hoặc sprint rỗng
+  | 'not_started'  // chưa tới ngày bắt đầu
+  | 'done'         // không còn task nào tồn đọng
+  | 'ahead'        // dưới đường lý tưởng
+  | 'on_track'
+  | 'at_risk'
+  | 'behind';
+
+export interface SprintHealth {
+  key: SprintHealthKey;
+  /** Số task còn lại hôm nay (điểm cuối của đường "Thực tế"). */
+  remaining: number;
+  /** Đường "Lý tưởng" đang ở đâu hôm nay. */
+  ideal: number;
+  /** ideal − remaining: >0 là sớm hơn kế hoạch, <0 là chậm hơn. */
+  variance: number;
+  /** Phần trăm thời gian sprint đã trôi qua (0..100). */
+  percentElapsed: number;
+}
+
+// Lệch trong khoảng ±10% tổng số task vẫn coi là bám sát đường lý tưởng.
+const HEALTH_TOLERANCE_RATIO = 0.1;
+
+/**
+ * Trạng thái sprint suy ra từ chính chuỗi burndown, nên badge luôn khớp biểu đồ:
+ * so khoảng cách giữa "Thực tế" và "Lý tưởng" tại ngày gần nhất có dữ liệu.
+ */
+export function sprintHealth(sprint: Sprint, tasks: Task[]): SprintHealth {
+  const { ideal, actual } = burndownSeries(sprint, tasks);
+  const percentElapsed = elapsedPercent(sprint);
+  const today = todayIndex(actual);
+
+  if (ideal.length === 0) {
+    return { key: 'unknown', remaining: tasks.length, ideal: 0, variance: 0, percentElapsed };
+  }
+  if (today < 0) {
+    return { key: 'not_started', remaining: tasks.length, ideal: ideal[0] ?? 0, variance: 0, percentElapsed };
+  }
+
+  const remaining = actual[today] ?? 0;
+  const idealNow = ideal[today] ?? 0;
+  const variance = idealNow - remaining;
+  return {
+    key: healthKey(remaining, variance, tasks.length, percentElapsed),
+    remaining,
+    ideal: idealNow,
+    variance,
+    percentElapsed,
+  };
+}
+
+/** Ngày gần nhất còn dữ liệu thực tế; −1 khi sprint chưa bắt đầu (mọi điểm đều null). */
+function todayIndex(actual: (number | null)[]): number {
+  for (let i = actual.length - 1; i >= 0; i--) {
+    if (actual[i] !== null) return i;
+  }
+  return -1;
+}
+
+function elapsedPercent(sprint: Sprint): number {
+  const start = sprint.startDate?.toDate().getTime();
+  const end = sprint.endDate?.toDate().getTime();
+  if (!start || !end || end <= start) return 0;
+  const ratio = (Date.now() - start) / (end - start);
+  return Math.round(Math.min(1, Math.max(0, ratio)) * 100);
+}
+
+/** Quy khoảng lệch hôm nay thành một trạng thái; dung sai co giãn theo cỡ sprint. */
+function healthKey(remaining: number, variance: number, total: number, percentElapsed: number): SprintHealthKey {
+  if (total === 0) return 'unknown';
+  if (remaining === 0) return 'done';
+  if (percentElapsed >= 100) return 'behind'; // hết hạn mà vẫn còn task tồn
+  const tolerance = Math.max(1, Math.round(total * HEALTH_TOLERANCE_RATIO));
+  if (variance > tolerance) return 'ahead';
+  if (variance >= -tolerance) return 'on_track';
+  return variance < -tolerance * 2 ? 'behind' : 'at_risk';
 }
 
 export const STATUS_ORDER = TASK_STATUSES;

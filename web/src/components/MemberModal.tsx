@@ -42,7 +42,7 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
       }
       onClose();
     } catch (err) {
-      console.error('Save member failed', err);
+      console.error('Lưu thành viên thất bại', err);
       setError('Lưu thất bại. Cần quyền admin.');
       setSaving(false);
     }

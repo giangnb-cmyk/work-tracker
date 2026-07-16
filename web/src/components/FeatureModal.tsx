@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { createFeature, updateFeature, type FeatureInput } from '../lib/featureWrites';
 import { useAuth } from '../contexts/AuthContext';
-import type { Feature } from '../types';
+import AttachmentsField from './task/AttachmentsField';
+import RefImagesSection from './task/RefImagesSection';
+import type { Attachment, Feature } from '../types';
 
 interface FeatureModalProps {
   feature?: Feature | null; // null = create
@@ -16,6 +18,9 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
   const [name, setName] = useState(feature?.name ?? '');
   const [icon, setIcon] = useState(feature?.icon ?? '🧩');
   const [description, setDescription] = useState(feature?.description ?? '');
+  // Cùng mảng `attachments` với task (phân biệt bằng `kind`), nên dùng lại nguyên
+  // AttachmentsField (link) + RefImagesSection (ảnh) của TaskModal.
+  const [attachments, setAttachments] = useState<Attachment[]>(feature?.attachments ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,14 +33,18 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
     setError(null);
     try {
       if (isEdit && feature) {
-        await updateFeature(feature.id, { name: name.trim(), icon, description: description.trim() });
+        await updateFeature(feature.id, {
+          name: name.trim(), icon, description: description.trim(), attachments,
+        });
       } else {
-        const input: FeatureInput = { projectId, name, icon, color: feature?.color ?? '#6366f1', description };
+        const input: FeatureInput = {
+          projectId, name, icon, color: feature?.color ?? '#6366f1', description, attachments,
+        };
         await createFeature(input, user?.uid ?? '');
       }
       onClose();
     } catch (err) {
-      console.error('Save feature failed', err);
+      console.error('Lưu feature thất bại', err);
       setError('Lưu thất bại. Cần quyền admin.');
       setSaving(false);
     }
@@ -43,7 +52,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? 'Sửa feature' : 'Feature mới'}</h2>
 
         <div className="grid-2">
@@ -61,6 +70,12 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
           <span>Mô tả</span>
           <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
+
+        <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={saving} />
+        <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={saving} />
+        <p className="perf-hint" style={{ marginTop: '0.75rem' }}>
+          Mọi task thuộc feature này sẽ tự thấy các link và ảnh ở trên.
+        </p>
 
         {error && <p className="error-text">{error}</p>}
 

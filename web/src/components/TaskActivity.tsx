@@ -39,7 +39,7 @@ export default function TaskActivity({ taskId, actorId, actorName }: Props) {
       await addComment(taskId, actorId, actorName, body);
       setText('');
     } catch (err) {
-      console.error('Add comment failed', err);
+      console.error('Thêm bình luận thất bại', err);
     } finally {
       setSending(false);
     }

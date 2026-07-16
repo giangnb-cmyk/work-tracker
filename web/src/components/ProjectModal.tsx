@@ -28,7 +28,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
     let alive = true;
     listNotionProjects()
       .then((rows) => alive && setNotionProjects(rows))
-      .catch((err) => console.error('List Notion projects failed', err))
+      .catch((err) => console.error('Lấy danh sách project Notion thất bại', err))
       .finally(() => alive && setLoadingNotion(false));
     return () => {
       alive = false;
@@ -62,7 +62,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       }
       onClose();
     } catch (err) {
-      console.error('Save project failed', err);
+      console.error('Lưu project thất bại', err);
       setError('Lưu thất bại. Cần quyền admin.');
       setSaving(false);
     }
