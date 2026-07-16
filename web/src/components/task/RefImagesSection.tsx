@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { uploadImageAttachment } from '../../lib/attachments';
+import Lightbox from '../Lightbox';
 import type { Attachment } from '../../types';
 
 interface Props {
@@ -19,16 +20,6 @@ export default function RefImagesSection({ attachments, onChange, disabled }: Pr
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  // Esc closes the lightbox.
-  useEffect(() => {
-    if (!preview) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setPreview(null);
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [preview]);
 
   async function onFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -104,10 +95,7 @@ export default function RefImagesSection({ attachments, onChange, disabled }: Pr
       )}
 
       {preview && (
-        <div className="lightbox" onClick={() => setPreview(null)}>
-          <img src={preview.url} alt={preview.name} onClick={(e) => e.stopPropagation()} />
-          <span className="lightbox-name mono">{preview.name}</span>
-        </div>
+        <Lightbox url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
       )}
     </section>
   );

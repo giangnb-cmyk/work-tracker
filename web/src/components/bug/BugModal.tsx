@@ -11,10 +11,11 @@ import ProviderIcon from '../task/ProviderIcon';
 import Markdown from '../Markdown';
 import CollapsibleBox from '../CollapsibleBox';
 import ConfirmDialog from '../ConfirmDialog';
+import Lightbox from '../Lightbox';
 import BugLabelChip from './BugLabelChip';
 import BadgeSelect from './BadgeSelect';
 import { MoreVerticalIcon } from '../icons';
-import { BUG_STATUSES, BUG_STATUS_LABEL, type Bug, type BugLabel, type BugStatus } from '../../types';
+import { BUG_STATUSES, BUG_STATUS_LABEL, type Attachment, type Bug, type BugLabel, type BugStatus } from '../../types';
 
 interface Props {
   bug?: Bug | null;
@@ -43,6 +44,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   // Bug có sẵn thì mặc định ĐỌC (Markdown đã render); bug mới thì mở thẳng ô nhập.
   const [editingDesc, setEditingDesc] = useState(!isEdit);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [preview, setPreview] = useState<Attachment | null>(null);
 
   const grp = (g: LabelGroup) => labelsInGroup(labels, g);
   const sel = (g: LabelGroup) => selectedInGroup(labelIds, labels, g);
@@ -218,9 +220,15 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
               {images.length > 0 && (
                 <div className="bug-media">
                   {images.map((a) => (
-                    <a key={a.id} className="bug-media-item" href={a.url} target="_blank" rel="noreferrer" title={a.name}>
+                    <button
+                      key={a.id}
+                      type="button"
+                      className="bug-media-item"
+                      onClick={() => setPreview(a)}
+                      title={`Xem ảnh: ${a.name}`}
+                    >
                       <img src={a.url} alt={a.name} loading="lazy" />
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}
@@ -263,6 +271,10 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           )}
         </div>
       </div>
+
+      {preview && (
+        <Lightbox url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
+      )}
 
       {confirmDelete && bug && (
         <ConfirmDialog
