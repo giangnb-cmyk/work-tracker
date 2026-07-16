@@ -95,8 +95,32 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `color`           | string         | accent token/hex for the card                             |
 | `description`     | string         | optional short description                                |
 | `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
+| `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
 | `createdAt`       | Timestamp      | creation time                                             |
 | `createdBy`       | string         | uid of creator                                            |
+
+### Weekly report (`weeklySheetId`)
+
+Bot điền báo cáo tuần vào **một Google Sheet riêng cho mỗi project** — đặt ở đây chứ không
+phải `bot/settings.json` để admin sửa ngay trên web (popup **Dự án**), không phải đụng máy
+chạy bot. Lưu **id**, không lưu URL: web bóc id từ link người dùng dán
+(`extractSheetId` trong `lib/projectWrites.ts`). Rỗng = project chưa bật, bot bỏ qua im lặng.
+
+Cấu trúc sheet đích (tab `Discussion`) là **ma trận**: cột A = nền tảng, B = hạng mục,
+C = câu hỏi, và **mỗi tuần là một CỘT** (hàng 1 = ngày bắt đầu `dd/mm/yyyy`, hàng 2 = ngày
+kết thúc). `bot/skills/weekly_report.py` ghi 2 ô:
+
+| Ô đích (hàng dò theo NHÃN cột B/C, không hardcode số hàng) | Nguồn |
+|---|---|
+| `Tiến độ` / `Hiện tại` | task **đã xong** của sprint **trước** |
+| `Tiến độ` / `Tiếp theo làm gì` | task **chưa xong** của sprint **hiện tại** |
+
+> ⚠️ Ô này người thật đang viết tay. Skill **không bao giờ** ghi nội dung rỗng đè lên ô có
+> chữ, và bỏ qua ô đã có nội dung trừ khi `--force`. Lần chạy tự động (thứ 2, `bot.py`)
+> luôn `force=False`.
+> ⚠️ `GOOGLE_SHEETS_MCP.md` thiết kế service account là **chỉ đọc** (share Viewer). Weekly
+> report cần **GHI**, nên từng file sheet phải được share riêng quyền **Editor** cho email
+> service account — chỉ share đúng file cần ghi, đừng nâng cả folder lên Editor.
 
 > The Notion project list is fetched on demand via `POST /api/notion { action: 'list-projects' }`
 > (reads `NOTION_PROJECTS_DB_ID`). Tasks reference a project by `projectId`.
@@ -173,6 +197,31 @@ subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `revie
 - Backlog (board dropdown): `tasks where sprintId == null`
 - Backlog **tab** (unassigned + unscheduled): `tasks where sprintId == null and assigneeId == null` (scoped to the current project)
 - Overdue (bot reminder): `tasks where status != done and dueDate <= now`
+
+---
+
+## `visits` (thống kê truy cập web)
+
+`{ id, user_id, at }` — migration `0023`. **Append-only**: 1 dòng = **1 phiên mở web**
+(mở tab mới). F5 trong cùng tab không tính lại — chặn bằng `sessionStorage` trong
+`lib/visitWrites.ts`. Cố ý **không** lưu đường dẫn/tab: câu hỏi cần trả lời là "ai vào bao
+nhiêu lần", không phải theo dõi từng thao tác.
+
+RLS **chặt hơn phần còn lại của dự án** (các bảng khác đều `select using (true)`):
+
+| Thao tác | Ai |
+|---|---|
+| insert | chính chủ (`user_id = auth.uid()`) |
+| select | **chỉ admin** (`is_admin()`) |
+| update / delete | **không ai** — không có policy, nên client không sửa được lịch sử |
+
+Ghi ở `AuthContext` **sau** cửa allowlist (người bị chặn không tính là một lượt). Đọc bằng
+`hooks/useVisits.ts`; gom nhóm ở `lib/visitStats.ts` (thuần, tuần bắt đầu **thứ 2**). Hiển
+thị ở tab **Truy cập** (`components/Visits.tsx`, admin-only).
+
+> ⚠️ Chỉ có dữ liệu **từ khi áp `0023`** — quá khứ không hồi tố được.
+> ⚠️ `profiles.last_seen_at` vẫn tồn tại nhưng bị **ghi đè** mỗi lần mở app: nó chỉ trả lời
+> "lần cuối vào là bao giờ", không đếm được. Đừng nhầm hai thứ.
 
 ---
 

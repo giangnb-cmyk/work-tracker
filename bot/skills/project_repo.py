@@ -37,6 +37,8 @@ def _map_project(r: dict) -> dict:
         "color": r.get("color", "#6366f1"),
         "description": r.get("description", ""),
         "notionProjectId": r.get("notion_project_id"),
+        # Google Sheet cho weekly report (migration 0022). Rong = project chua bat.
+        "weeklySheetId": r.get("weekly_sheet_id"),
     }
 
 

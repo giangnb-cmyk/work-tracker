@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createProject, updateProject, type ProjectInput } from '../lib/projectWrites';
+import { createProject, extractSheetId, updateProject, type ProjectInput } from '../lib/projectWrites';
 import { listNotionProjects, type NotionProjectOption } from '../lib/notionSync';
 import { useAuth } from '../contexts/AuthContext';
 import SearchableSelect from './SearchableSelect';
@@ -22,6 +22,12 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const [loadingNotion, setLoadingNotion] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Giữ nguyên thứ người dùng dán (link đầy đủ) — chỉ bóc id lúc lưu, để họ vẫn đọc được
+  // đúng cái mình vừa dán thay vì thấy nó biến thành một chuỗi lạ.
+  const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
+
+  const sheetId = extractSheetId(sheetInput);
+  const sheetInvalid = sheetInput.trim().length > 0 && !sheetId;
 
   // Load the linkable Notion projects once when the dialog opens.
   useEffect(() => {
@@ -40,6 +46,10 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       setError('Cần nhập tên project.');
       return;
     }
+    if (sheetInvalid) {
+      setError('Link Google Sheet không hợp lệ. Dán link dạng docs.google.com/spreadsheets/d/…');
+      return;
+    }
     setSaving(true);
     setError(null);
     const input: ProjectInput = {
@@ -48,6 +58,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       color: project?.color ?? '#6366f1',
       description,
       notionProjectId: notionProjectId || null,
+      weeklySheetId: sheetId,
     };
     try {
       if (isEdit && project) {
@@ -56,6 +67,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           icon,
           description: description.trim(),
           notionProjectId: notionProjectId || null,
+          weeklySheetId: sheetId,
         });
       } else {
         await createProject(input, user?.uid ?? '');
@@ -103,6 +115,26 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
         </label>
         <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
           💡 Liên kết để khi tạo task trong project này, Notion tự set đúng quan hệ Project.
+        </p>
+
+        <label className="field">
+          <span>Google Sheet weekly report</span>
+          <input
+            className="input"
+            value={sheetInput}
+            onChange={(e) => setSheetInput(e.target.value)}
+            placeholder="Dán link sheet: https://docs.google.com/spreadsheets/d/…"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {sheetInvalid ? (
+            <span className="error-text">⚠ Không đọc được id từ link này.</span>
+          ) : sheetId ? (
+            <>✅ Sheet id: <span className="mono">{sheetId}</span> — mỗi project một sheet riêng.</>
+          ) : (
+            <>💡 Bot điền “đã hoàn thành tuần trước” + “kế hoạch tuần tới” vào sheet này mỗi
+              sáng thứ 2. Nhớ Share sheet cho service account của bot với quyền <b>Editor</b>.</>
+          )}
         </p>
 
         {error && <p className="error-text">{error}</p>}

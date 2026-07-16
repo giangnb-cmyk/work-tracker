@@ -129,6 +129,36 @@ export async function deleteTask(task: Pick<Task, 'id' | 'notionPageId'>): Promi
   if (task.notionPageId) void safeNotionArchive(task.notionPageId);
 }
 
+/**
+ * Tạo trang Notion cho một task ĐÃ tồn tại — nút "Sync Notion" ở task chi tiết.
+ *
+ * KHÁC `syncNewToNotion` ở một điểm quan trọng: hàm này **không nuốt lỗi**. Lúc tạo task,
+ * Notion hỏng mà im lặng là đúng (Postgres là nguồn sự thật, đừng chặn việc tạo task).
+ * Nhưng khi người dùng CHỦ ĐỘNG bấm nút, im lặng là tệ nhất — họ bấm xong không thấy gì
+ * và không biết vì sao. Ném lỗi để modal hiện ra.
+ */
+export async function syncTaskToNotion(
+  task: Task,
+  assigneeNotionUserId?: string | null,
+  notionProjectId?: string | null,
+): Promise<{ notionPageId: string; notionUrl: string }> {
+  if (task.notionPageId) throw new Error('Task này đã có trang Notion rồi.');
+  const r = await createNotionPage(task, assigneeNotionUserId, notionProjectId);
+  if (!r.synced || !r.notionPageId) {
+    throw new Error(
+      r.reason === 'notion_not_configured'
+        ? 'Server chưa cấu hình Notion (thiếu NOTION_TOKEN / NOTION_DATABASE_ID).'
+        : `Notion không nhận task này (${r.reason ?? 'không rõ lý do'}).`,
+    );
+  }
+  const { error } = await supabase
+    .from('tasks')
+    .update({ notion_page_id: r.notionPageId, notion_url: r.notionUrl ?? null })
+    .eq('id', task.id);
+  if (error) throw error;
+  return { notionPageId: r.notionPageId, notionUrl: r.notionUrl ?? '' };
+}
+
 async function syncNewToNotion(
   id: string,
   task: Task,

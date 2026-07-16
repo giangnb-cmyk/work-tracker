@@ -146,6 +146,19 @@ SPRINT_REPORT_HINT = (
     "for the active sprint). Relay the printed report as-is."
 )
 
+WEEKLY_REPORT_HINT = (
+    " WEEKLY REPORT SKILL: When the user asks to fill/update the weekly report sheet "
+    "('weekly report', 'bao cao tuan', 'dien report tuan vao sheet'), run "
+    f'`python "{_SKILLS_DIR}/weekly_report.py" [--project <name>] [--dry-run] [--force]`. '
+    "It reads tasks from Supabase and writes two cells in the project's Google Sheet: "
+    "done tasks of the PREVIOUS sprint -> 'Tiến độ / Hiện tại', and remaining tasks of the "
+    "CURRENT sprint -> 'Tiến độ / Tiếp theo làm gì'. ADMIN ONLY (it writes to the team's "
+    "sheet); --dry-run only reads and needs no permission. "
+    "It SKIPS any cell that already has text (someone typed it by hand) — only pass --force "
+    "if the user EXPLICITLY asks to overwrite. Never pass --force on your own initiative. "
+    "Relay the printed log lines as-is; they say exactly which cells were written or skipped."
+)
+
 DOC_HINT = (
     " DOC SEARCH SKILL (RAG): When the user asks about the CONTENT of documents "
     "(spec, tai lieu, huong dan, quy trinh, chinh sach, meeting notes) rather than "
@@ -183,6 +196,7 @@ SKILL_TOOL_PATTERNS = [
     f'Bash(python "{_SKILLS_DIR}/sprint_ops.py":*)',
     f'Bash(python "{_SKILLS_DIR}/project_ops.py":*)',
     f'Bash(python "{_SKILLS_DIR}/sprint_report.py":*)',
+    f'Bash(python "{_SKILLS_DIR}/weekly_report.py":*)',
     f'Bash(python "{_SKILLS_DIR}/doc_search.py":*)',
 ]
 
@@ -197,6 +211,7 @@ def build_hints(sheets_enabled: bool) -> str:
         + SPRINT_OPS_HINT
         + PROJECT_HINT
         + SPRINT_REPORT_HINT
+        + WEEKLY_REPORT_HINT
         + DOC_HINT
     )
     if sheets_enabled:

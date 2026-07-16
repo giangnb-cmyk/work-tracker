@@ -188,6 +188,28 @@ a:hover { text-decoration: underline; }
 }
 .nav-item .icon { font-size: 1.1rem; width: 1.2rem; text-align: center; }
 
+/* ---- Nhóm "Quản trị" xổ ra (gom các tab admin lại) ---- */
+.nav-group { display: flex; flex-direction: column; }
+.nav-group-head { width: 100%; }
+/* Đầu nhóm KHÔNG bao giờ tô nền solid như .nav-item.active — nó chỉ là cái nắp, không
+   phải một trang. Tô đậm ở đây là người dùng tưởng đang đứng ở "Quản trị". */
+.nav-group-head.open { color: var(--text); }
+.nav-group-caret { margin-left: auto; font-size: 0.7rem; opacity: 0.7; }
+.nav-group-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
+  margin-left: auto; box-shadow: 0 0 8px rgba(99, 102, 241, 0.8);
+}
+/* Có chấm rồi thì caret về đúng khoảng cách, đừng để margin-left:auto đẩy cả hai. */
+.nav-group-dot + .nav-group-caret { margin-left: 0.5rem; }
+.nav-sub {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  margin: 0.15rem 0 0.35rem 0.75rem; padding-left: 0.5rem;
+  border-left: 1px solid var(--border-soft);
+  animation: fadeIn 0.15s ease;
+}
+.nav-sub-item { padding: 0.55rem 0.8rem; font-size: 0.85rem; }
+.nav-sub-item .icon { font-size: 0.95rem; }
+
 .sidebar-footer {
   margin-top: auto;
   border-top: 1px solid var(--border);
@@ -480,6 +502,10 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   display: inline-block; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: 8px; padding: 0.5rem 0.8rem; font-size: 0.85rem;
 }
+/* Nút tạo trang Notion khi task chưa có (đường bù cho lần sync lúc tạo bị hỏng). */
+.notion-sync-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+/* Thông báo lỗi ở đây có thể dài (nêu tên biến env còn thiếu) — cho xuống dòng, đừng cắt. */
+.notion-sync-msg { font-size: 0.78rem; line-height: 1.45; flex: 1; min-width: 0; }
 
 /* Progress bar — clearer: taller, subtle track border, % label overlaid */
 .progress {

@@ -142,6 +142,8 @@ export interface Project {
   description: string;
   /** Notion Projects DB page id — lets task syncs set the Notion "Project" relation. */
   notionProjectId: string | null;
+  /** Google Spreadsheet **id** (không phải URL) bot điền weekly report vào. Rỗng = chưa bật. */
+  weeklySheetId: string | null;
   createdAt?: Timestamp;
   createdBy: string;
 }

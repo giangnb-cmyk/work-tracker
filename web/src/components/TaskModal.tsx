@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Timestamp } from '../lib/time';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
-import { becameDone, createTask, deleteTask, updateTask } from '../lib/taskWrites';
+import { becameDone, createTask, deleteTask, syncTaskToNotion, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDateRange, timeAgo, toInputDate } from '../lib/format';
 import AttachmentsField from './task/AttachmentsField';
@@ -72,6 +72,8 @@ export default function TaskModal({
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [notionSyncing, setNotionSyncing] = useState(false);
+  const [notionMsg, setNotionMsg] = useState<string | null>(null);
 
   const sprintName = sprints.find((s) => s.id === sprintId)?.name ?? 'Backlog';
   const projectName = projects.find((p) => p.id === projectId)?.name;
@@ -168,6 +170,25 @@ export default function TaskModal({
       console.error('Tạo task thất bại', err);
       setError('Tạo thất bại. Kiểm tra quyền hoặc kết nối.');
       setCreating(false);
+    }
+  }
+
+  async function handleSyncNotion() {
+    if (!task) return;
+    setNotionSyncing(true);
+    setNotionMsg(null);
+    const assignee = members.find((m) => m.uid === assigneeId) ?? null;
+    const project = projects.find((p) => p.id === projectId);
+    try {
+      await syncTaskToNotion(task, assignee?.notionUserId ?? null, project?.notionProjectId ?? null);
+      // useLiveQuery sẽ tự nạp lại task (notion_page_id vừa đổi) -> link Notion hiện ra,
+      // và chính nút này biến mất. Không cần tự set state cho task.
+      setNotionMsg('✓ Đã tạo trên Notion');
+    } catch (err) {
+      console.error('Tạo task trên Notion thất bại', err);
+      setNotionMsg(err instanceof Error ? err.message : 'Tạo trên Notion thất bại.');
+    } finally {
+      setNotionSyncing(false);
     }
   }
 
@@ -292,6 +313,16 @@ export default function TaskModal({
               <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={!canEditFields} />
               {isEdit && task?.notionUrl && (
                 <a className="notion-row" href={task.notionUrl} target="_blank" rel="noreferrer">📝 Mở task trên Notion →</a>
+              )}
+              {/* Chưa có trang Notion -> cho tạo lại bằng tay. Sync lúc tạo task là
+                  fire-and-forget nên hỏng thì im lặng; đây là đường bù duy nhất. */}
+              {isEdit && task && !task.notionPageId && canEditFields && (
+                <div className="notion-sync-row">
+                  <button className="btn-sm" onClick={handleSyncNotion} disabled={notionSyncing}>
+                    {notionSyncing ? '⏳ Đang tạo trên Notion…' : '📝 Tạo task trên Notion'}
+                  </button>
+                  {notionMsg && <span className="notion-sync-msg muted">{notionMsg}</span>}
+                </div>
               )}
             </section>
 

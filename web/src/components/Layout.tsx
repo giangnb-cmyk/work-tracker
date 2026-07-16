@@ -14,6 +14,7 @@ const Bugs = lazy(() => import('./Bugs'));
 const Timeline = lazy(() => import('./Timeline'));
 const Dashboard = lazy(() => import('./Dashboard'));
 const Performance = lazy(() => import('./Performance'));
+const Visits = lazy(() => import('./Visits'));
 const SprintManager = lazy(() => import('./SprintManager'));
 const Team = lazy(() => import('./Team'));
 const Settings = lazy(() => import('./Settings'));
@@ -50,6 +51,7 @@ export default function Layout() {
             {activeView === 'timeline' && <Timeline />}
             {activeView === 'dashboard' && <Dashboard />}
             {activeView === 'performance' && <Performance />}
+            {activeView === 'visits' && <Visits />}
             {activeView === 'sprints' && <SprintManager />}
             {activeView === 'team' && <Team />}
             {activeView === 'settings' && <Settings />}

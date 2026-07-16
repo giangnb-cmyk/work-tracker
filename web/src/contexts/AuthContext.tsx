@@ -14,6 +14,7 @@ import {
 import type { User } from '@supabase/supabase-js';
 import { ALLOWED_EMAIL_DOMAIN, supabase } from '../supabase';
 import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
+import { logVisit } from '../lib/visitWrites';
 import { rowToMember } from '../lib/mappers';
 import type { JobRole, TeamMember, UserRole } from '../types';
 
@@ -123,6 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const p = await syncProfile(u);
         setUser({ uid: u.id, email: u.email ?? '' });
         setProfile(p);
+        // Sau khi qua cửa allowlist: người bị từ chối không tính là một lượt truy cập.
+        void logVisit(u.id);
       } catch (err) {
         console.error('Tải hồ sơ người dùng thất bại', err);
         setError('Không tải được hồ sơ người dùng.');

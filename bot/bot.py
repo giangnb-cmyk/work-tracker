@@ -48,6 +48,7 @@ _SKILLS_DIR = str(Path(__file__).parent / "skills")
 if _SKILLS_DIR not in sys.path:
     sys.path.insert(0, _SKILLS_DIR)
 import bug_sync  # noqa: E402  — doc forum Discord -> upsert bang `bugs`
+import weekly_report  # noqa: E402  — task Supabase -> Google Sheet cua tung project
 from supabase_client import get_client  # noqa: E402
 
 # Hint chi Claude cach + khi nao chay tung skill: xem hints.py.
@@ -135,6 +136,9 @@ RAG_SYNC_ENABLED = bool(_settings.get("rag_sync_enabled", False))
 RAG_SYNC_TIMEOUT = int(_settings.get("rag_sync_timeout_seconds", 900))  # gioi han moi skill (giay)
 _GDRIVE_KEY_DEFAULT = Path(__file__).parent.parent / "keys" / "service-account-gsheets.json"
 
+# --- Weekly report tu dong: SANG THU 2, cung gio voi bug sync (mac dinh 9h) -------
+WEEKLY_REPORT_ENABLED = bool(_settings.get("weekly_report_enabled", False))
+
 try:
     from zoneinfo import ZoneInfo
     _SYNC_TZINFO = ZoneInfo(BUG_SYNC_TZ)
@@ -143,6 +147,9 @@ except Exception:
     # Khong co tzdata -> quy doi tho ve UTC (VN = UTC+7). Cai 'tzdata' de chuan.
     log.warning("Không load được timezone '%s' (thiếu tzdata?), dùng UTC xấp xỉ.", BUG_SYNC_TZ)
     _SYNC_TIME = datetime.time(hour=(BUG_SYNC_HOUR - 7) % 24, minute=0)
+    # Phai gan: weekly_report_sync doc bien nay de biet hom nay co phai thu 2 khong.
+    # None -> datetime.now(None) tra gio may, dung xap xi cung tinh than nhanh o tren.
+    _SYNC_TZINFO = None
 
 
 def _last_json(text: str):
@@ -353,6 +360,31 @@ async def daily_rag_sync():
             log.warning("Không gửi được tóm tắt sync RAG")
 
 
+@tasks.loop(time=_SYNC_TIME)
+async def weekly_report_sync():
+    """Sáng thứ 2: điền weekly report vào Google Sheet của từng project."""
+    if not WEEKLY_REPORT_ENABLED:
+        return
+    # tasks.loop(time=...) chạy MỖI NGÀY — discord.py không có tham số 'weekday', nên tự lọc.
+    if datetime.datetime.now(_SYNC_TZINFO).weekday() != 0:  # 0 = thứ 2
+        return
+    try:
+        # run_all chặn (gọi Sheets + Supabase đồng bộ) -> đẩy sang thread, đừng treo event loop.
+        # force=False: KHÔNG bao giờ tự ghi đè ô người viết tay trong lần chạy tự động.
+        lines = await asyncio.to_thread(weekly_report.run_all)
+    except Exception:
+        log.exception("Weekly report tự động thất bại")
+        return
+    summary = "\n".join(lines).strip()
+    log.info("Weekly report tự động:\n%s", summary)
+    if BUG_SYNC_CHANNEL_ID:
+        try:
+            ch = client.get_channel(BUG_SYNC_CHANNEL_ID) or await client.fetch_channel(BUG_SYNC_CHANNEL_ID)
+            await ch.send(f"📊 Weekly report tự động (thứ 2, {BUG_SYNC_HOUR}h):\n```\n{summary[:1800]}\n```")
+        except Exception:
+            log.warning("Không gửi được tóm tắt weekly report")
+
+
 @tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
 async def poll_bug_sync_requests():
     """Moi nhip: (1) day thay doi nhan tu app -> Discord, (2) xu ly yeu cau 'Sync' tu web."""
@@ -417,6 +449,9 @@ async def on_ready():
     if RAG_SYNC_ENABLED and not daily_rag_sync.is_running():
         daily_rag_sync.start()
         log.info("RAG sync bật: chạy lúc %sh (%s)", BUG_SYNC_HOUR, BUG_SYNC_TZ)
+    if WEEKLY_REPORT_ENABLED and not weekly_report_sync.is_running():
+        weekly_report_sync.start()
+        log.info("Weekly report bật: thứ 2 lúc %sh (%s)", BUG_SYNC_HOUR, BUG_SYNC_TZ)
 
 
 @client.event

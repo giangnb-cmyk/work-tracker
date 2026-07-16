@@ -56,6 +56,7 @@ export function rowToProject(r: Row): Project {
     color: r.color ?? '#6366f1',
     description: r.description ?? '',
     notionProjectId: r.notion_project_id ?? null,
+    weeklySheetId: r.weekly_sheet_id ?? null,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };

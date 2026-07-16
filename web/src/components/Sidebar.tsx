@@ -6,35 +6,44 @@ import ProfileModal from './ProfileModal';
 import { EyeIcon } from './icons';
 
 // 'projects' is no longer an in-app tab — it's the landing page you enter through.
-export type ViewId = 'dashboard' | 'performance' | 'board' | 'mytasks' | 'features' | 'backlog' | 'bugs' | 'timeline' | 'sprints' | 'team' | 'settings';
+export type ViewId = 'dashboard' | 'performance' | 'visits' | 'board' | 'mytasks' | 'features' | 'backlog' | 'bugs' | 'timeline' | 'sprints' | 'team' | 'settings';
 
 interface NavDef {
   id: ViewId;
   label: string;
   icon: string;
-  adminOnly?: boolean;
 }
 
+/** Việc hằng ngày — ai cũng thấy. */
 const NAV: NavDef[] = [
   // Thống kê đứng đầu: đây là trang tổng quan mở ra ngay khi vào dự án.
   { id: 'dashboard', label: 'Thống kê', icon: '📊' },
-  { id: 'performance', label: 'Hiệu suất', icon: '📈', adminOnly: true },
   { id: 'board', label: 'Bảng Sprint', icon: '📋' },
   { id: 'mytasks', label: 'Task của tôi', icon: '🎯' },
   { id: 'features', label: 'Features', icon: '🧩' },
   { id: 'backlog', label: 'Backlog', icon: '📥' },
   { id: 'bugs', label: 'Bugs', icon: '🐞' },
   { id: 'timeline', label: 'Timeline', icon: '📆' },
-  { id: 'sprints', label: 'Quản lý Sprint', icon: '🗂️', adminOnly: true },
-  { id: 'team', label: 'Thành viên', icon: '👥', adminOnly: true },
-  { id: 'settings', label: 'Cấu hình', icon: '⚙️', adminOnly: true },
 ];
 
 /**
- * Suy ra từ NAV thay vì khai lại bằng tay: Layout là thứ duy nhất chặn member mở view
- * admin, nên hai danh sách lệch nhau là lộ dữ liệu chứ không chỉ là lỗi hiển thị.
+ * Việc quản trị — gộp vào MỘT mục "Quản trị" bấm để xổ ra, thay vì 5 mục rải giữa các tab
+ * dùng hằng ngày.
  */
-export const ADMIN_ONLY_VIEWS: ViewId[] = NAV.filter((n) => n.adminOnly).map((n) => n.id);
+const ADMIN_NAV: NavDef[] = [
+  { id: 'performance', label: 'Hiệu suất', icon: '📈' },
+  { id: 'visits', label: 'Truy cập', icon: '👣' },
+  { id: 'sprints', label: 'Quản lý Sprint', icon: '🗂️' },
+  { id: 'team', label: 'Thành viên', icon: '👥' },
+  { id: 'settings', label: 'Cấu hình', icon: '⚙️' },
+];
+
+/**
+ * Suy ra từ ADMIN_NAV thay vì khai lại bằng tay: Layout là thứ duy nhất chặn member mở
+ * view admin, nên hai danh sách lệch nhau là lộ dữ liệu chứ không chỉ là lỗi hiển thị.
+ * Thêm một mục vào ADMIN_NAV là nó được chặn luôn, không phải nhớ sửa hai chỗ.
+ */
+export const ADMIN_ONLY_VIEWS: ViewId[] = ADMIN_NAV.map((n) => n.id);
 
 interface SidebarProps {
   active: ViewId;
@@ -45,6 +54,10 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
   const { profile, isAdmin, isRealAdmin, viewAsMember, setViewAsMember, signOut } = useAuth();
   const { selectedProject, selectProject } = useSprintContext();
   const [editingProfile, setEditingProfile] = useState(false);
+  // Đang đứng trong một view quản trị thì mở sẵn — không thì mục đang chọn bị giấu trong
+  // nhóm đóng, người dùng không thấy mình đang ở đâu.
+  const inAdminView = ADMIN_ONLY_VIEWS.includes(active);
+  const [adminOpen, setAdminOpen] = useState(inAdminView);
 
   return (
     <aside className="sidebar">
@@ -55,7 +68,7 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
         <span className="project-back-name">{selectedProject?.name ?? 'Dự án'}</span>
       </button>
 
-      {NAV.filter((n) => !n.adminOnly || isAdmin).map((n) => (
+      {NAV.map((n) => (
         <button
           key={n.id}
           className={`nav-item${active === n.id ? ' active' : ''}`}
@@ -65,6 +78,37 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
           {n.label}
         </button>
       ))}
+
+      {isAdmin && (
+        <div className="nav-group">
+          <button
+            className={`nav-item nav-group-head${adminOpen ? ' open' : ''}`}
+            onClick={() => setAdminOpen((v) => !v)}
+            aria-expanded={adminOpen}
+          >
+            <span className="icon">🛠️</span>
+            Quản trị
+            {/* Chấm báo khi đang ở một mục con mà nhóm đang đóng — nếu không, mục đang mở
+                trông như không được chọn ở đâu cả. */}
+            {!adminOpen && inAdminView && <span className="nav-group-dot" aria-hidden />}
+            <span className="nav-group-caret" aria-hidden>{adminOpen ? '▾' : '▸'}</span>
+          </button>
+          {adminOpen && (
+            <div className="nav-sub">
+              {ADMIN_NAV.map((n) => (
+                <button
+                  key={n.id}
+                  className={`nav-item nav-sub-item${active === n.id ? ' active' : ''}`}
+                  onClick={() => onSelect(n.id)}
+                >
+                  <span className="icon">{n.icon}</span>
+                  {n.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="sidebar-footer">
         <button

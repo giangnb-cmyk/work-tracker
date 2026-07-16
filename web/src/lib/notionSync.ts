@@ -44,7 +44,24 @@ async function callGateway(body: unknown): Promise<SyncResult> {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Notion gateway ${res.status}`);
+  if (!res.ok) {
+    // Nói ra NGUYÊN NHÂN thay vì mỗi con số: 3 mã này ứng với 3 chỗ hỏng hoàn toàn khác
+    // nhau, mà "Notion gateway 503" thì không ai đoán được phải đi sửa ở đâu.
+    if (res.status === 503) {
+      throw new Error(
+        'Server chưa cấu hình xác thực: thiếu SUPABASE_URL / SUPABASE_ANON_KEY ở /api ' +
+          '(Vercel → Settings → Environment Variables, rồi Redeploy).',
+      );
+    }
+    if (res.status === 401) throw new Error('Phiên đăng nhập hết hạn. Tải lại trang rồi thử lại.');
+    if (res.status === 502) {
+      throw new Error(
+        'Notion từ chối yêu cầu. Hay gặp nhất: NOTION_PROP_* trỏ vào cột không có trong ' +
+          'Notion DB (vd cột Priority). Xem log Vercel để biết chi tiết.',
+      );
+    }
+    throw new Error(`Notion gateway lỗi ${res.status}.`);
+  }
   return (await res.json()) as SyncResult;
 }
 

@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BUG_STATUSES, BUG_STATUS_LABEL, type Bug, type BugLabel, type TeamMember } from '../../types';
 import { BUG_STATUS_COLOR } from '../../lib/bugStatus';
+import { labelsInGroup } from '../../lib/bugLabelGroups';
 
-export type Facet = 'status' | 'label' | 'assignee' | 'reporter';
+export type Facet = 'status' | 'version' | 'label' | 'assignee' | 'reporter';
 export interface FilterToken { id: string; facet: Facet; op: 'is' | 'not'; values: string[]; }
 
 interface Opt { value: string; label: string; color?: string; icon?: string; }
 
 const FACETS: { key: Facet; label: string; icon: string }[] = [
   { key: 'status', label: 'Trạng thái', icon: '🚦' },
-  { key: 'label', label: 'Nhãn', icon: '🏷️' },
+  { key: 'version', label: 'Version', icon: '🏷️' },
+  { key: 'label', label: 'Nhãn', icon: '🔖' },
   { key: 'assignee', label: 'Người nhận', icon: '🙋' },
   { key: 'reporter', label: 'Người báo', icon: '✍️' },
 ];
-const FACET_LABEL: Record<Facet, string> = { status: 'Trạng thái', label: 'Nhãn', assignee: 'Người nhận', reporter: 'Người báo' };
+const FACET_LABEL: Record<Facet, string> = {
+  status: 'Trạng thái', version: 'Version', label: 'Nhãn',
+  assignee: 'Người nhận', reporter: 'Người báo',
+};
 
 function peopleOpts(members: TeamMember[]): Opt[] {
   return [
@@ -24,9 +29,19 @@ function peopleOpts(members: TeamMember[]): Opt[] {
   ];
 }
 
+function labelOpts(labels: BugLabel[]): Opt[] {
+  return labels.map((l) => ({ value: l.id, label: l.name, color: l.color, icon: l.icon }));
+}
+
 function facetOpts(facet: Facet, labels: BugLabel[], members: TeamMember[]): Opt[] {
   if (facet === 'status') return BUG_STATUSES.map((s) => ({ value: s, label: BUG_STATUS_LABEL[s], color: BUG_STATUS_COLOR[s] }));
-  if (facet === 'label') return labels.map((l) => ({ value: l.id, label: l.name, color: l.color, icon: l.icon }));
+  // Version LÀ nhãn — tách facet riêng chỉ để khỏi phải dò tìm '1.0.x' giữa cả rổ nhãn.
+  // Mới nhất lên đầu: lọc version gần như luôn là tìm bản vừa build.
+  if (facet === 'version') {
+    return labelOpts(labelsInGroup(labels, 'version'))
+      .sort((a, b) => b.label.localeCompare(a.label, undefined, { numeric: true }));
+  }
+  if (facet === 'label') return labelOpts(labels);
   return peopleOpts(members);
 }
 
@@ -41,6 +56,12 @@ export function matchBug(b: Bug, tokens: FilterToken[], meId: string): boolean {
       return t.op === 'is'
         ? t.values.every((v) => b.labelIds.includes(v))
         : t.values.every((v) => !b.labelIds.includes(v));
+    }
+    // Version cũng là nhãn, nhưng dùng OR chứ không AND: một bug chỉ mang ĐÚNG MỘT version,
+    // nên "là 1.0.x, 1.0.y" mà hiểu theo AND thì luôn ra rỗng — vô nghĩa với người dùng.
+    if (t.facet === 'version') {
+      const any = t.values.some((v) => b.labelIds.includes(v));
+      return t.op === 'is' ? any : !any;
     }
     const uid = t.facet === 'assignee' ? b.assigneeId : b.reporterId;
     const one = (v: string) => (v === 'none' ? !uid : v === 'any' ? !!uid : v === 'me' ? uid === meId : uid === v);
@@ -78,8 +99,10 @@ export default function BugFilterBar({ labels, members, tokens, onTokens, query,
   const opts = useMemo(() => (facet ? facetOpts(facet, labels, members) : []), [facet, labels, members]);
   const nameOf = useMemo(() => {
     const m = new Map<string, Opt>();
-    (['status', 'label', 'assignee', 'reporter'] as Facet[]).forEach((f) =>
-      facetOpts(f, labels, members).forEach((o) => m.set(`${f}:${o.value}`, o)));
+    // Lấy từ FACETS chứ không liệt kê tay: quên thêm facet mới vào đây thì token của nó
+    // hiện ra id thô thay vì tên.
+    FACETS.forEach(({ key }) =>
+      facetOpts(key, labels, members).forEach((o) => m.set(`${key}:${o.value}`, o)));
     return (f: Facet, v: string) => m.get(`${f}:${v}`)?.label ?? v;
   }, [labels, members]);
 
