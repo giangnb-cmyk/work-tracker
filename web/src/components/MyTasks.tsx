@@ -4,6 +4,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useMyTasks } from '../hooks/useMyTasks';
 import { useMyBugs } from '../hooks/useMyBugs';
 import { useBugLabels } from '../hooks/useBugLabels';
+import { useStoredView } from '../hooks/useStoredView';
 import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import TaskRow from './TaskRow';
@@ -15,6 +16,8 @@ import BugModal from './bug/BugModal';
 import type { Bug, Task, TaskStatus } from '../types';
 
 type ViewMode = 'list' | 'gallery';
+
+const VIEW_MODES: readonly ViewMode[] = ['list', 'gallery'];
 /** Nhớ kiểu xem qua các lần vào — đây là sở thích cá nhân, không phải trạng thái phiên. */
 const MODE_KEY = 'myTasksView';
 
@@ -29,14 +32,7 @@ export default function MyTasks() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [editingBug, setEditingBug] = useState<Bug | null>(null);
   const [creating, setCreating] = useState(false);
-  const [mode, setMode] = useState<ViewMode>(
-    () => (localStorage.getItem(MODE_KEY) === 'gallery' ? 'gallery' : 'list'),
-  );
-
-  function selectMode(next: ViewMode) {
-    localStorage.setItem(MODE_KEY, next);
-    setMode(next);
-  }
+  const [mode, selectMode] = useStoredView<ViewMode>(MODE_KEY, VIEW_MODES, 'list');
 
   const jobRoleOf = useMemo(() => {
     const map = new Map(members.map((m) => [m.uid, m.jobRole]));

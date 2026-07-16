@@ -1,0 +1,29 @@
+{
+  // Serverless functions (web/api/*) chạy trên Node ở Vercel, KHÔNG phải trong trình duyệt:
+  // không có DOM, và module resolution theo Node chứ không phải bundler.
+  //
+  // Trước đây `api/` không nằm trong project nào -> `tsc -b` bỏ qua hoàn toàn, mà Vercel
+  // build function bằng esbuild (không typecheck). Lỗi kiểu ở đây không ai bắt cho tới lúc
+  // nổ ngoài production.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    // Project được `references` thì KHÔNG được đặt noEmit. Bẻ emit sang .tsbuild (đã
+    // gitignore) như tsconfig.node.json làm — Vercel build function từ api/*.ts bằng
+    // esbuild, nên .js sinh ra ở đây chỉ là rác của tsc, không được lẫn vào api/.
+    "composite": true,
+    "outDir": "./.tsbuild/api"
+  },
+  "include": ["api"]
+}

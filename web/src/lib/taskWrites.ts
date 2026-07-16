@@ -3,7 +3,7 @@
 // Postgres is the source of truth if Notion fails.
 
 import { supabase } from '../supabase';
-import { createNotionPage, updateNotionPage } from './notionSync';
+import { archiveNotionPage, createNotionPage, updateNotionPage } from './notionSync';
 import { taskPatchToRow } from './mappers';
 import { endOfWorkWeek } from './format';
 import { Timestamp } from './time';
@@ -113,9 +113,20 @@ export function becameDone(prev: TaskStatus, next: TaskStatus | undefined): bool
   return next === 'done' && prev !== 'done';
 }
 
-export async function deleteTask(id: string): Promise<void> {
-  const { error } = await supabase.from('tasks').delete().eq('id', id);
+/**
+ * Xoá task, và dọn luôn trang Notion đã liên kết (nếu có).
+ *
+ * Nhận cả `task` chứ không chỉ id vì cần `notionPageId` — sau khi xoá khỏi Postgres thì
+ * không còn chỗ nào tra ra nó nữa.
+ *
+ * Thứ tự có chủ ý: Postgres trước, Notion sau. Postgres là nguồn sự thật, nên Notion hỏng
+ * cũng không được chặn việc xoá; ngược lại archive Notion trước rồi Postgres lỗi thì trang
+ * đã vào Trash trong khi task vẫn còn sống — lệch tệ hơn.
+ */
+export async function deleteTask(task: Pick<Task, 'id' | 'notionPageId'>): Promise<void> {
+  const { error } = await supabase.from('tasks').delete().eq('id', task.id);
   if (error) throw error;
+  if (task.notionPageId) void safeNotionArchive(task.notionPageId);
 }
 
 async function syncNewToNotion(
@@ -147,5 +158,15 @@ async function safeNotionUpdate(
     await updateNotionPage(notionPageId, task, assigneeNotionUserId, notionProjectId);
   } catch (err) {
     console.error('Đồng bộ cập nhật Notion thất bại', err);
+  }
+}
+
+async function safeNotionArchive(notionPageId: string) {
+  try {
+    await archiveNotionPage(notionPageId);
+  } catch (err) {
+    // Task đã xoá khỏi Postgres rồi — không có gì để rollback, và cũng không nên: đây là
+    // side-sync. Log lại để còn dọn tay trang Notion mồ côi.
+    console.error(`Xoá trang Notion ${notionPageId} thất bại (task đã xoá khỏi app)`, err);
   }
 }

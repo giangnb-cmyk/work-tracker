@@ -22,7 +22,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const caller = await authorize(req.headers as Record<string, unknown>);
-  if (!caller.ok) return res.status(401).json({ error: 'Unauthorized' });
+  if (!caller.ok) {
+    // Xem ghi chú ở api/notion.ts: thiếu env server != token sai.
+    if (caller.notConfigured) return res.status(503).json({ error: 'auth_not_configured' });
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const payload = req.body as DonePayload;
   if (!payload?.title) return res.status(400).json({ error: 'title required' });

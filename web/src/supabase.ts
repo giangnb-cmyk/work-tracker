@@ -6,10 +6,17 @@ import { createClient } from '@supabase/supabase-js';
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Fail loud in dev so we don't get cryptic runtime errors later.
+// Fail loud. Thiếu biến thì `createClient` cũng ném lỗi ngay sau đây và app trắng màn
+// hình — nói rõ THIẾU CÁI GÌ và ĐẶT Ở ĐÂU, kèm cả Vercel: biến VITE_* được nhúng lúc
+// BUILD, nên thêm biến trên Vercel xong phải redeploy mới ăn (không phải cứ set là xong).
 if (!url || !anonKey) {
-  console.error(
-    'Thiếu cấu hình Supabase. Đặt VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY trong web/.env.local.',
+  const missing = [!url && 'VITE_SUPABASE_URL', !anonKey && 'VITE_SUPABASE_ANON_KEY']
+    .filter(Boolean)
+    .join(', ');
+  throw new Error(
+    `Thiếu cấu hình Supabase: ${missing}. ` +
+      'Local: đặt trong web/.env.local. Production: Vercel → Project Settings → ' +
+      'Environment Variables, rồi REDEPLOY (biến VITE_* nhúng lúc build).',
   );
 }
 

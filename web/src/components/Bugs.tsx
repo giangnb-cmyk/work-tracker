@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useBugs } from '../hooks/useBugs';
 import { useBugLabels } from '../hooks/useBugLabels';
+import { useStoredView } from '../hooks/useStoredView';
 import { updateBug } from '../lib/bugWrites';
 import { seedDefaultBugLabels } from '../lib/bugLabelWrites';
 import { requestBugSync } from '../lib/bugSyncWrites';
@@ -15,13 +16,17 @@ import type { Bug, BugStatus } from '../types';
 
 type ViewMode = 'kanban' | 'list';
 
+const VIEW_MODES: readonly ViewMode[] = ['kanban', 'list'];
+/** Nhớ kiểu xem qua các lần vào — sở thích cá nhân, không phải trạng thái phiên. */
+const MODE_KEY = 'bugsView';
+
 /** Bugs tab: per-project bug tracker with a Kanban board and a list view. */
 export default function Bugs() {
   const { user, isAdmin } = useAuth();
   const { selectedProjectId, selectedProject, members } = useSprintContext();
   const { bugs, loading } = useBugs(selectedProjectId);
   const { labels } = useBugLabels(selectedProjectId);
-  const [mode, setMode] = useState<ViewMode>('kanban');
+  const [mode, selectMode] = useStoredView<ViewMode>(MODE_KEY, VIEW_MODES, 'kanban');
   const [editing, setEditing] = useState<Bug | null>(null);
   const [creating, setCreating] = useState(false);
   const [seeding, setSeeding] = useState(false);
@@ -102,8 +107,8 @@ export default function Bugs() {
             <button className="btn-sm" onClick={syncDiscord} title="Kéo bug mới nhất từ forum Discord">🔄 Sync Discord</button>
           )}
           <div className="seg-toggle">
-            <button className={`seg${mode === 'kanban' ? ' on' : ''}`} onClick={() => setMode('kanban')}>Kanban</button>
-            <button className={`seg${mode === 'list' ? ' on' : ''}`} onClick={() => setMode('list')}>Danh sách</button>
+            <button className={`seg${mode === 'kanban' ? ' on' : ''}`} onClick={() => selectMode('kanban')}>Kanban</button>
+            <button className={`seg${mode === 'list' ? ' on' : ''}`} onClick={() => selectMode('list')}>Danh sách</button>
           </div>
           <button className="btn-primary" onClick={() => setCreating(true)}>＋ Báo bug</button>
         </div>

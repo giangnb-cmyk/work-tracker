@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useSprintContext } from '../contexts/SprintContext';
+import ConfirmDialog from './ConfirmDialog';
 import { formatDate } from '../lib/format';
-import type { SprintStatus } from '../types';
+import type { Sprint, SprintStatus } from '../types';
 
 const SPRINT_STATUSES: SprintStatus[] = ['planning', 'active', 'completed'];
 const SPRINT_STATUS_LABEL: Record<SprintStatus, string> = {
@@ -18,6 +19,19 @@ export default function SprintManager() {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState<Sprint | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleDelete(sprint: Sprint) {
+    try {
+      await deleteSprint(sprint.id);
+      setRemoving(null);
+    } catch (err) {
+      console.error('Xoá sprint thất bại', err);
+      setRemoving(null);
+      setError('Xoá sprint thất bại (cần quyền admin).');
+    }
+  }
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -102,12 +116,7 @@ export default function SprintManager() {
                   </select>
                 </td>
                 <td>
-                  <button
-                    className="btn-sm btn-danger"
-                    onClick={() => {
-                      if (confirm(`Xoá ${s.name}? (task trong sprint sẽ không bị xoá)`)) deleteSprint(s.id);
-                    }}
-                  >
+                  <button className="btn-sm btn-danger" onClick={() => setRemoving(s)}>
                     Xoá
                   </button>
                 </td>
@@ -121,6 +130,19 @@ export default function SprintManager() {
           </tbody>
         </table>
       </div>
+
+      {error && <p className="error-text">{error}</p>}
+
+      {removing && (
+        <ConfirmDialog
+          title="Xoá sprint?"
+          message={<>Sprint <strong>“{removing.name}”</strong> sẽ bị xoá.</>}
+          detail="Task trong sprint KHÔNG bị xoá, chỉ mất liên kết sprint (task chưa giao ai sẽ rơi về Backlog). Sprint thì không khôi phục được."
+          confirmLabel="Xoá sprint"
+          onConfirm={() => handleDelete(removing)}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
     </div>
   );
 }

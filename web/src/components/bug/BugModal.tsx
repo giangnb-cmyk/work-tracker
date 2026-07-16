@@ -9,6 +9,8 @@ import { detectProvider, hostOf, providerMeta } from '../../lib/attachments';
 import { formatDate } from '../../lib/format';
 import ProviderIcon from '../task/ProviderIcon';
 import Markdown from '../Markdown';
+import CollapsibleBox from '../CollapsibleBox';
+import ConfirmDialog from '../ConfirmDialog';
 import BugLabelChip from './BugLabelChip';
 import BadgeSelect from './BadgeSelect';
 import { MoreVerticalIcon } from '../icons';
@@ -40,6 +42,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   const [error, setError] = useState<string | null>(null);
   // Bug có sẵn thì mặc định ĐỌC (Markdown đã render); bug mới thì mở thẳng ô nhập.
   const [editingDesc, setEditingDesc] = useState(!isEdit);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const grp = (g: LabelGroup) => labelsInGroup(labels, g);
   const sel = (g: LabelGroup) => selectedInGroup(labelIds, labels, g);
@@ -87,8 +90,14 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   }
 
   async function handleDelete() {
-    if (!bug || !window.confirm(`Xoá bug "${bug.title}"?`)) return;
-    try { await deleteBug(bug.id); onClose(); } catch { setError('Xoá thất bại.'); }
+    if (!bug) return;
+    try {
+      await deleteBug(bug.id);
+      onClose();
+    } catch {
+      setConfirmDelete(false);
+      setError('Xoá thất bại.');
+    }
   }
 
   const sevOpts = grp('severity').map((l) => ({ value: l.id, label: l.name, color: l.color, icon: l.icon }));
@@ -163,7 +172,9 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
                 placeholder="Các bước tái hiện, kết quả mong đợi / thực tế… (hỗ trợ Markdown)"
               />
             ) : description.trim() ? (
-              <Markdown className="bugm-desc-view">{description}</Markdown>
+              <CollapsibleBox className="bugm-desc-clp">
+                <Markdown className="bugm-desc-view">{description}</Markdown>
+              </CollapsibleBox>
             ) : (
               <p className="muted bugm-desc-empty">Chưa có mô tả.</p>
             )}
@@ -241,7 +252,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
         {/* Footer */}
         <div className="bugm-footer">
           {isEdit && (isAdmin || bug?.reporterId === user?.uid) && (
-            <button className="btn-sm btn-danger" onClick={handleDelete}>🗑 Xoá</button>
+            <button className="btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>🗑 Xoá</button>
           )}
           <span style={{ flex: 1 }} />
           <button className="btn-sm" onClick={onClose}>Huỷ</button>
@@ -252,6 +263,21 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           )}
         </div>
       </div>
+
+      {confirmDelete && bug && (
+        <ConfirmDialog
+          title="Xoá bug?"
+          message={<>Bug <strong>#{bug.number} “{bug.title}”</strong> sẽ bị xoá khỏi app.</>}
+          detail={
+            bug.discordThreadId
+              ? 'Bài post trên Discord KHÔNG bị xoá — và vì forum vẫn còn bài đó, lần sync tới bot sẽ tạo lại bug này. Muốn dứt điểm thì xoá bài trên Discord trước.'
+              : 'Không khôi phục được.'
+          }
+          confirmLabel="Xoá bug"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

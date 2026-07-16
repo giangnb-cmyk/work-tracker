@@ -12,6 +12,7 @@ import PriorityBadge from './task/PriorityBadge';
 import StatusToggle from './task/StatusToggle';
 import RefImagesSection from './task/RefImagesSection';
 import TaskActivity from './TaskActivity';
+import ConfirmDialog from './ConfirmDialog';
 import { FileIcon, PaperclipIcon } from './icons';
 import type { Attachment, Subtask, Task, TaskPriority, TaskStatus } from '../types';
 
@@ -70,6 +71,7 @@ export default function TaskModal({
   const [creating, setCreating] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const sprintName = sprints.find((s) => s.id === sprintId)?.name ?? 'Backlog';
   const projectName = projects.find((p) => p.id === projectId)?.name;
@@ -170,11 +172,12 @@ export default function TaskModal({
   }
 
   async function handleDelete() {
-    if (!task || !window.confirm(`Xoá task "${task.title}"?`)) return;
+    if (!task) return;
     try {
-      await deleteTask(task.id);
+      await deleteTask(task);
       onClose();
     } catch {
+      setConfirmDelete(false);
       setError('Xoá thất bại.');
     }
   }
@@ -314,7 +317,7 @@ export default function TaskModal({
           {/* Footer: edits autosave (no Save/Cancel); creation is explicit. */}
           <div className="tmodal-footer">
             {isEdit && isAdmin && (
-              <button className="btn-sm btn-danger" onClick={handleDelete}>🗑 Xoá task</button>
+              <button className="btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>🗑 Xoá task</button>
             )}
             <div className="tmodal-foot-spacer" />
             {isEdit ? (
@@ -333,6 +336,21 @@ export default function TaskModal({
           <TaskActivity taskId={task.id} actorId={user?.uid ?? ''} actorName={profile?.displayName ?? ''} />
         )}
       </div>
+
+      {confirmDelete && task && (
+        <ConfirmDialog
+          title="Xoá task?"
+          message={<>Task <strong>“{task.title}”</strong> sẽ bị xoá khỏi app.</>}
+          detail={
+            task.notionPageId
+              ? 'Trang Notion đã liên kết cũng được đưa vào Trash (khôi phục được trong 30 ngày). Task trong app thì không khôi phục được.'
+              : 'Không khôi phục được.'
+          }
+          confirmLabel="Xoá task"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

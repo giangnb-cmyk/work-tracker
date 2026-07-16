@@ -31,6 +31,10 @@
   --radius: 16px;
   --radius-sm: 8px;
 
+  /* Nền ô đọc-mô-tả trong modal. Là màu đặc chứ không phải lớp rgba() chồng lên
+     --surface, để gradient "Xem thêm" tắt dần về đúng nó mà không lộ vệt ở mép. */
+  --desc-bg: #161f2c;
+
   /* MỘT font duy nhất cho toàn app — không trộn họ chữ ở bất kỳ đâu.
      Inter được chọn vì nó vốn đã là font dùng nhiều nhất, đọc tốt ở cỡ 0.85rem của
      bảng dữ liệu, và có tabular-nums nên cột số vẫn thẳng hàng mà không cần font mono.
@@ -843,8 +847,11 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bug-media-file:hover { border-color: var(--primary); text-decoration: none; }
 
 /* ---- Redesigned bug detail modal (header badges · info grid · docs) ---- */
-/* Rộng ~940px: mô tả Markdown là phần dài nhất, ở 640px nó bị bó thành cột hẹp. */
-.bug-modal { width: min(940px, 100%); padding: 0; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
+/* PHẢI viết 2 class `.modal.bug-modal`. `.modal` (cùng specificity 0-1-0) nằm SAU trong
+   file này nên một mình `.bug-modal` sẽ thua ở MỌI thuộc tính chung — width, padding,
+   max-height đều bị `.modal` đè, y như `.modal.modal-wide` phía dưới đã phải né.
+   Rộng 1200px: mô tả Markdown là phần dài nhất, hẹp hơn là nó bị bó thành cột chữ. */
+.modal.bug-modal { width: min(1200px, 100%); padding: 0; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
 .bugm-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.9rem 1.15rem; border-bottom: 1px solid var(--border-soft); }
 .bugm-icon { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); font-size: 1rem; }
 .bugm-head-spacer { flex: 1; }
@@ -855,8 +862,29 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bugm-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
 .seg-sm .seg { font-size: 0.74rem; padding: 0.2rem 0.6rem; }
 .bugm-desc-edit { min-height: 220px; line-height: 1.65; }
-.bugm-desc-view { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-soft); border-radius: 12px; padding: 0.85rem 1rem; }
+/* Màu ĐẶC, không phải rgba() chồng lên nền modal: vệt mờ "Xem thêm" phải tắt dần về
+   đúng màu này, mà gradient thì không nhận màu chồng lớp. Trị số = rgba(0,0,0,0.25)
+   trên nền --surface (#1e293b) — nhìn y hệt bản cũ. */
+.bugm-desc-view { background: var(--desc-bg); border: 1px solid var(--border-soft); border-radius: 12px; padding: 0.85rem 1rem; }
+.bugm-desc-clp { --clp-fade-to: var(--desc-bg); }
+.bugm-desc-clp .clp-body { border-radius: 12px; }
 .bugm-desc-empty { padding: 0.8rem 1rem; border: 1px dashed var(--border); border-radius: 12px; font-size: 0.85rem; }
+
+/* ---- Khối thu gọn + "Xem thêm" (components/CollapsibleBox.tsx) ---- */
+.clp { --clp-fade-to: var(--surface); }
+.clp-body { position: relative; overflow: hidden; }
+.clp-clamped::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 80px;
+  background: linear-gradient(to bottom, transparent, var(--clp-fade-to));
+  pointer-events: none;
+}
+.clp-more {
+  width: 100%; margin-top: 0.4rem; padding: 0.35rem; background: none;
+  border: 1px solid var(--border-soft); border-radius: 8px; color: var(--muted);
+  font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.clp-more:hover { color: var(--text); border-color: var(--primary); }
 .bugm-quick { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .bugm-others { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.2rem; }
 .bugm-footer { display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1.15rem; border-top: 1px solid var(--border-soft); }
@@ -1306,6 +1334,18 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 }
 .modal h2 { font-size: 1.25rem; margin-bottom: 1.25rem; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem; }
+
+/* ---- Hộp xác nhận xoá (components/ConfirmDialog.tsx) ---- */
+/* Nằm TRÊN modal đang mở (task/bug modal gọi nó từ bên trong). */
+.confirm-overlay { z-index: 100; }
+/* 2 class để chắc chắn đè được `.modal` — xem ghi chú ở `.modal.bug-modal`. */
+.modal.confirm-modal { width: min(440px, 100%); }
+.confirm-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.8rem; }
+.confirm-ic { font-size: 1.15rem; }
+.confirm-head h2 { margin: 0; font-size: 1.15rem; }
+.confirm-msg { font-size: 0.9rem; line-height: 1.55; }
+.confirm-detail { margin-top: 0.5rem; padding: 0.6rem 0.75rem; background: rgba(251, 191, 36, 0.07); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 10px; font-size: 0.78rem; line-height: 1.5; }
+.confirm-modal .modal-actions { margin-top: 1.1rem; }
 
 /* ============================================================================
    Task detail modal (rich two-pane view)

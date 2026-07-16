@@ -241,7 +241,7 @@ A `BEFORE INSERT` trigger assigns `number` = next per-project running id.
 | `order`        | number            | sort order                                                  |
 | `discordThreadId` | string \| null | source Discord forum thread id (sync upsert key; unique)    |
 | `pendingDiscordPush` | boolean | app changed the labels; bot still needs to push them to Discord |
-| `createdAt` / `updatedAt` | Timestamp | timestamps (`updatedAt` via trigger)                    |
+| `createdAt` / `updatedAt` | Timestamp | `updatedAt` via trigger. Bug đến từ Discord: `createdAt` = lúc **tạo bài post**, không phải lúc bot sync — xem dưới |
 
 ### Discord forum sync (two-way)
 
@@ -251,6 +251,11 @@ The bot keeps a Discord **forum channel** and `bugs` in sync **both directions**
   `profiles.discord_id`). Forum tags → `bug_labels`, linked by `discordTagId` (not just
   name); a thread's applied tags → `bug.labelIds`. Upsert keyed by `discordThreadId`;
   re-syncs refresh content but **preserve** `status`/`assigneeId`.
+  `createdAt` được ghi từ **thời điểm tạo thread** (`Thread.created_at`, lùi về snowflake
+  của thread id) ở cả nhánh insert lẫn update — bỏ nó thì cột rơi về `default now()` và
+  bug báo tháng 3 mà sync tháng 7 sẽ hiện là tháng 7. Discord là nguồn sự thật cho mốc
+  này, nên mỗi lần sync đều ghi đè (cùng một giá trị → lặp lại vô hại). Dữ liệu cũ đã
+  được và lại một lần bằng migration `0020` (giải mã snowflake ngay trong SQL).
 - **app → Discord:** changing a bug's labels in-app sets `pendingDiscordPush`; the bot
   rewrites that thread's applied tags to match (creating a forum tag for an app-only
   label if needed). While `pendingDiscordPush` is set, the Discord→app sync won't

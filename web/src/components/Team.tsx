@@ -4,6 +4,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { deleteMember } from '../lib/memberWrites';
 import Avatar from './Avatar';
 import MemberModal from './MemberModal';
+import ConfirmDialog from './ConfirmDialog';
 import { formatDate } from '../lib/format';
 import { JOB_ROLE_LABEL, type TeamMember } from '../types';
 
@@ -13,14 +14,17 @@ export default function Team() {
   const { members, membersLoading } = useSprintContext();
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState<TeamMember | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleDelete(m: TeamMember) {
-    if (!confirm(`Xoá thành viên "${m.displayName}"?`)) return;
     try {
       await deleteMember(m.uid);
+      setRemoving(null);
     } catch (err) {
       console.error('Xoá thành viên thất bại', err);
-      alert('Xoá thất bại (cần quyền admin).');
+      setRemoving(null);
+      setError('Xoá thất bại (cần quyền admin).');
     }
   }
 
@@ -81,7 +85,7 @@ export default function Team() {
                   <td>
                     <div className="row" style={{ gap: '0.35rem' }}>
                       <button className="btn-sm" onClick={() => setEditing(m)}>Sửa</button>
-                      <button className="btn-sm btn-danger" onClick={() => handleDelete(m)}>Xoá</button>
+                      <button className="btn-sm btn-danger" onClick={() => setRemoving(m)}>Xoá</button>
                     </div>
                   </td>
                 )}
@@ -97,8 +101,21 @@ export default function Team() {
         </p>
       )}
 
+      {error && <p className="error-text">{error}</p>}
+
       {adding && <MemberModal onClose={() => setAdding(false)} />}
       {editing && <MemberModal member={editing} onClose={() => setEditing(null)} />}
+
+      {removing && (
+        <ConfirmDialog
+          title="Xoá thành viên?"
+          message={<>Xoá <strong>“{removing.displayName}”</strong> khỏi danh sách thành viên.</>}
+          detail="Task và bug của người này KHÔNG bị xoá, chỉ gỡ liên kết người nhận (tên cũ vẫn hiện trên thẻ). Nếu họ đăng nhập Google lại thì hồ sơ tự xuất hiện lại."
+          confirmLabel="Xoá thành viên"
+          onConfirm={() => handleDelete(removing)}
+          onCancel={() => setRemoving(null)}
+        />
+      )}
     </div>
   );
 }

@@ -74,6 +74,26 @@ def _att_kind(content_type: str | None, filename: str) -> str:
 def _safe_name(name: str) -> str:
     return re.sub(r"[^\w.-]", "_", name or "file")[:80]
 
+
+def _thread_created_at(t) -> str | None:
+    """Luc bai post duoc TAO tren Discord (UTC, ISO) - moc that cua cai bug do.
+
+    Khong co ham nay thi cot `created_at` roi ve `default now()` cua Postgres, tuc la
+    ngay BOT SYNC chu khong phai ngay bao bug: bug post thang 3 sync thang 7 se hien
+    la thang 7.
+
+    `Thread.created_at` chi ton tai voi thread tao sau 09/01/2022 (Discord moi them
+    truong nay), nen lui ve snowflake cua thread id - id sinh ra dung luc post, va voi
+    bai forum thi thread id == id tin nhan dau, nen hai nguon luon khop.
+    """
+    at = getattr(t, "created_at", None)
+    if at is None:
+        try:
+            at = discord.utils.snowflake_time(t.id)
+        except Exception:
+            return None
+    return at.isoformat()
+
 # Tag workflow -> cot kanban (status). Uu tien: giai doan sau thang.
 _STATUS_PRECEDENCE = ["done", "deployed", "pending", "fixing"]
 
@@ -267,6 +287,11 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list, by_thr
             patch = {"title": it["title"], "description": it["description"],
                      "reporter_id": reporter_id, "reporter_name": reporter_name,
                      "attachments": it["attachments"], "discord_guild_id": it["guild_id"]}
+            # Ghi de created_at moi lan sync: Discord la nguon su that cho "bug bao luc nao",
+            # va day cung la duong backfill cho bug da sync sai truoc do (ghi cung mot gia
+            # tri moi lan nen lap lai vo hai).
+            if it.get("created_at"):
+                patch["created_at"] = it["created_at"]
             # App vua doi nhan (chua push) -> KHONG ghi de label/status; cho push xong da.
             if not row.get("pending_discord_push"):
                 patch["label_ids"] = label_ids
@@ -274,13 +299,17 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list, by_thr
             sb.table(BUGS).update(patch).eq("id", row["id"]).execute()
             updated += 1
         else:
-            sb.table(BUGS).insert({
+            new_row = {
                 "project_id": project_id, "title": it["title"], "description": it["description"],
                 "status": status, "label_ids": label_ids,
                 "reporter_id": reporter_id, "reporter_name": reporter_name,
                 "discord_thread_id": key, "discord_guild_id": it["guild_id"],
                 "attachments": it["attachments"],
-            }).execute()
+            }
+            # Thieu moc thi de Postgres dung `default now()` con hon ghi dai mot ngay sai.
+            if it.get("created_at"):
+                new_row["created_at"] = it["created_at"]
+            sb.table(BUGS).insert(new_row).execute()
             created += 1
     return {"created": created, "updated": updated, "total": len(items)}
 
@@ -323,6 +352,7 @@ async def sync_forum(client, sb, project_id: str, forum_channel_id: int) -> dict
             "applied_tag_ids": applied,
             "attachments": atts,
             "guild_id": str(t.guild.id) if t.guild else "",
+            "created_at": _thread_created_at(t),
         })
     return await asyncio.to_thread(_upsert_bugs, sb, project_id, items, available, by_thread)
 

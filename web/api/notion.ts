@@ -1,5 +1,6 @@
 // POST /api/notion — the single Notion sync gateway used by both web and bot.
-// Body: { action: 'create' | 'update', task: NotionTaskInput, notionPageId?: string }
+// Body: { action: 'create' | 'update' | 'archive' | 'list-projects', task?: NotionTaskInput,
+//         notionPageId?: string }
 // Auth: Supabase access token (web) or x-sync-secret header (bot). See _auth.ts / _notion.ts.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -30,7 +31,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const caller = await authorize(req.headers as Record<string, unknown>);
-  if (!caller.ok) return res.status(401).json({ error: 'Unauthorized' });
+  if (!caller.ok) {
+    // Thiếu env server != token sai. Trả 503 để log/Network tab chỉ thẳng vào cấu hình
+    // Vercel thay vì để cả đội đi soi nhầm phía đăng nhập.
+    if (caller.notConfigured) {
+      return res.status(503).json({ error: 'auth_not_configured' });
+    }
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const { action, task, notionPageId } = req.body as {
     action?: string;
@@ -60,6 +68,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         page_id: notionPageId,
         properties: buildProperties(task, false) as never,
       });
+      return res.status(200).json({ synced: true, notionPageId });
+    }
+
+    // Xoá task trong app -> dọn luôn trang Notion tương ứng.
+    //
+    // Notion API không xoá vĩnh viễn được: `archived: true` đẩy trang vào Trash, còn khôi
+    // phục được 30 ngày — đúng thứ ta muốn cho một thao tác lỡ tay.
+    //
+    // CHỈ đụng ĐÚNG MỘT trang theo id do caller đưa (chính là `tasks.notion_page_id`).
+    // Database Notion này là workspace dùng chung cả công ty: không bao giờ được suy ra
+    // trang từ tên, không bao giờ quét hàng loạt.
+    if (action === 'archive') {
+      if (!notionPageId) return res.status(400).json({ error: 'notionPageId required' });
+      await notion.pages.update({ page_id: notionPageId, archived: true });
       return res.status(200).json({ synced: true, notionPageId });
     }
 

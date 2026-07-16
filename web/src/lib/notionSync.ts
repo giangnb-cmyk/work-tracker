@@ -92,6 +92,17 @@ export function updateNotionPage(
   });
 }
 
+/**
+ * Đẩy trang Notion của một task vào Trash khi task bị xoá trong app.
+ *
+ * Notion API không có "xoá vĩnh viễn" — trang nằm trong Trash 30 ngày rồi mới mất, nên
+ * lỡ tay vẫn khôi phục được. Chỉ nhận `notionPageId` (không nhận tên/tiêu đề): workspace
+ * Notion dùng chung cả công ty, đụng nhầm trang là hỏng việc người khác.
+ */
+export function archiveNotionPage(notionPageId: string) {
+  return callGateway({ action: 'archive', notionPageId });
+}
+
 /** Fetch the selectable Notion projects (for linking an in-app project). */
 export async function listNotionProjects(): Promise<NotionProjectOption[]> {
   const token = await authToken();
