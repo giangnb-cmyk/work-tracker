@@ -1,8 +1,14 @@
 import type { CSSProperties } from 'react';
-import type { BugLabel } from '../../types';
+
+/** Minimal shape a chip needs — BugLabel lẫn FeatureLabel đều thoả. */
+export interface ChipLabel {
+  name: string;
+  color: string;
+  icon: string;
+}
 
 interface Props {
-  label: BugLabel;
+  label: ChipLabel;
   onRemove?: () => void;
   onClick?: () => void;
   active?: boolean; // for the toggle picker (dim when not selected)

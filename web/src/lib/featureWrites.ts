@@ -1,7 +1,7 @@
 // Admin-only feature writes. RLS requires admin. A feature belongs to a project.
 
 import { supabase } from '../supabase';
-import type { Attachment, Feature } from '../types';
+import type { Attachment, Feature, FeatureKind } from '../types';
 
 export interface FeatureInput {
   projectId: string;
@@ -9,6 +9,8 @@ export interface FeatureInput {
   icon: string;
   color: string;
   description: string;
+  kind: FeatureKind;
+  labelIds: string[];
   /** Link tài liệu + ảnh ref; mọi task của feature sẽ đọc lại mảng này. */
   attachments: Attachment[];
 }
@@ -22,6 +24,8 @@ export async function createFeature(input: FeatureInput, createdBy: string): Pro
       icon: input.icon || '🧩',
       color: input.color || '#6366f1',
       description: input.description.trim(),
+      kind: input.kind,
+      label_ids: input.labelIds,
       attachments: input.attachments,
       created_by: createdBy || null,
     })
@@ -37,6 +41,8 @@ export async function updateFeature(id: string, patch: Partial<Feature>): Promis
   if (patch.icon !== undefined) row.icon = patch.icon;
   if (patch.color !== undefined) row.color = patch.color;
   if (patch.description !== undefined) row.description = patch.description;
+  if (patch.kind !== undefined) row.kind = patch.kind;
+  if (patch.labelIds !== undefined) row.label_ids = patch.labelIds;
   if (patch.attachments !== undefined) row.attachments = patch.attachments;
   const { error } = await supabase.from('features').update(row).eq('id', id);
   if (error) throw error;

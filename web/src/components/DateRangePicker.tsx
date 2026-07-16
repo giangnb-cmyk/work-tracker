@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   DateRange,
   PRESETS,
+  PresetId,
   endOfDay,
   fmtDay,
   monthGrid,
@@ -16,6 +17,13 @@ import {
 interface Props {
   value: DateRange;
   onChange: (r: DateRange) => void;
+  /** Cột preset bên phải — mặc định là bộ của thống kê truy cập. */
+  presets?: { id: PresetId; label: string }[];
+  /**
+   * Cho chọn ngày TƯƠNG LAI (Timeline: kế hoạch nằm phía trước). Mặc định khoá —
+   * thống kê truy cập không có dữ liệu tương lai.
+   */
+  allowFuture?: boolean;
 }
 
 const DOW_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -26,7 +34,7 @@ const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `Thg ${i + 1}`);
  * cột preset bên phải (60 phút/12 giờ/…/Năm nay). Ngày TƯƠNG LAI bị khoá — thống kê
  * truy cập không có dữ liệu tương lai.
  */
-export default function DateRangePicker({ value, onChange }: Props) {
+export default function DateRangePicker({ value, onChange, presets = PRESETS, allowFuture = false }: Props) {
   const [open, setOpen] = useState(false);
   // Tháng đang xem trên lịch — neo theo ngày cuối của khoảng đang chọn.
   const [view, setView] = useState(() => {
@@ -69,7 +77,8 @@ export default function DateRangePicker({ value, onChange }: Props) {
     onChange({
       fromMs: startOfDay(fromDayMs),
       // Khoảng chứa hôm nay thì chốt ở "bây giờ" cho khớp preset; quá khứ thì hết ngày.
-      toMs: Math.min(endOfDay(toDayMs), nowMs),
+      // allowFuture (Timeline) thì luôn lấy hết ngày — kế hoạch được phép ở tương lai.
+      toMs: allowFuture ? endOfDay(toDayMs) : Math.min(endOfDay(toDayMs), nowMs),
       presetId: null,
     });
     setAnchorMs(null);
@@ -124,7 +133,7 @@ export default function DateRangePicker({ value, onChange }: Props) {
                 type="date"
                 className="input drp-date"
                 value={toInputDate(value.fromMs)}
-                max={toInputDate(todayEndMs)}
+                max={allowFuture ? undefined : toInputDate(todayEndMs)}
                 onChange={(e) => onInputChange('from', e.target.value)}
               />
               <span className="muted">–</span>
@@ -132,7 +141,7 @@ export default function DateRangePicker({ value, onChange }: Props) {
                 type="date"
                 className="input drp-date"
                 value={toInputDate(value.toMs)}
-                max={toInputDate(todayEndMs)}
+                max={allowFuture ? undefined : toInputDate(todayEndMs)}
                 onChange={(e) => onInputChange('to', e.target.value)}
               />
             </div>
@@ -182,7 +191,7 @@ export default function DateRangePicker({ value, onChange }: Props) {
                 {monthGrid(view.y, view.m).map((d) => {
                   const ms = d.getTime();
                   const off = d.getMonth() !== view.m;
-                  const future = ms > todayEndMs;
+                  const future = !allowFuture && ms > todayEndMs;
                   const isStart = sameDay(ms, previewFrom);
                   const isEnd = sameDay(ms, previewTo);
                   const inRange = ms >= startOfDay(previewFrom) && ms <= previewTo;
@@ -214,7 +223,7 @@ export default function DateRangePicker({ value, onChange }: Props) {
           </div>
 
           <div className="drp-presets" role="listbox" aria-label="Khoảng thời gian nhanh">
-            {PRESETS.map((p) => (
+            {presets.map((p) => (
               <button
                 type="button"
                 key={p.id}

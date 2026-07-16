@@ -132,11 +132,16 @@ kết thúc). `bot/skills/weekly_report.py` ghi 2 ô:
 
 ---
 
-## `features/{featureId}`
+## `features/{featureId}` & `feature_labels/{labelId}`
 
 A feature: a unit of product work **inside a project**. A task optionally attaches to one
 feature (`tasks.featureId`). Admin-managed. In Postgres: `public.features`, `project_id`
 FK → `projects(id)` `on delete cascade`; RLS = read for all signed-in, write for admin.
+
+**Model quy ước** (migration 0026): một feature là **đơn vị nhỏ deliver được** (gói bán).
+Nhóm lớn ("Shop", "Gameplay"…) KHÔNG phải feature — nó là **nhãn**; version delivery
+("1.2.0") cũng là nhãn, nhận diện bằng tên (cùng regex `labelGroup` với bug). Việc chạy
+liên tục không bao giờ xong (Polish…) vẫn là feature nhưng mang `kind = 'ongoing'`.
 
 | Field         | Type      | Notes                                            |
 |---------------|-----------|--------------------------------------------------|
@@ -146,8 +151,14 @@ FK → `projects(id)` `on delete cascade`; RLS = read for all signed-in, write f
 | `icon`        | string    | emoji shown on the feature card                  |
 | `color`       | string    | accent hex for the card                          |
 | `description` | string    | optional short description                       |
+| `kind`        | string    | `delivery` (mặc định — hiện % done) \| `ongoing` (liên tục — KHÔNG hiện %, hiện nhịp 30 ngày) |
+| `labelIds`    | string[]  | ids into `feature_labels` — nhóm + version, dùng để lọc |
 | `createdAt`   | Timestamp | creation time                                    |
 | `createdBy`   | string    | uid of creator                                   |
+
+**feature_labels** — per-project tag palette cho feature (cùng pattern `bug_labels`;
+RLS: read all signed-in, write admin). Fields: `id`, `projectId`, `name` (1–40),
+`color`, `icon`. Không có `discordTagId` — palette này không sync Discord.
 
 ---
 

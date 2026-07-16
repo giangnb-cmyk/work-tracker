@@ -10,7 +10,12 @@ export type PresetId =
   | 'd90'
   | 'week'
   | 'month'
-  | 'year';
+  | 'year'
+  // *_full = trọn lịch (gồm cả ngày TƯƠNG LAI) — cho Timeline, nơi kế hoạch nằm phía trước.
+  | 'week_full'
+  | 'month_full'
+  | 'quarter_full'
+  | 'year_full';
 
 export interface DateRange {
   fromMs: number;
@@ -31,8 +36,22 @@ export const PRESETS: { id: PresetId; label: string }[] = [
   { id: 'year', label: 'Năm nay' },
 ];
 
+/** Preset cho Timeline: trọn tuần/tháng/quý/năm (có tương lai) + nhìn lùi 30/90 ngày. */
+export const TIMELINE_PRESETS: { id: PresetId; label: string }[] = [
+  { id: 'week_full', label: 'Tuần này' },
+  { id: 'month_full', label: 'Tháng này' },
+  { id: 'quarter_full', label: 'Quý này' },
+  { id: 'year_full', label: 'Năm nay' },
+  { id: 'd30', label: '30 ngày qua' },
+  { id: 'd90', label: '90 ngày qua' },
+];
+
 export function presetLabel(id: PresetId): string {
-  return PRESETS.find((p) => p.id === id)?.label ?? '';
+  return (
+    PRESETS.find((p) => p.id === id)?.label ??
+    TIMELINE_PRESETS.find((p) => p.id === id)?.label ??
+    ''
+  );
 }
 
 const HOUR_MS = 3_600_000;
@@ -68,6 +87,28 @@ export function startOfYear(ms: number): number {
   return d.getTime();
 }
 
+export function startOfQuarter(ms: number): number {
+  const d = new Date(startOfDay(ms));
+  d.setMonth(d.getMonth() - (d.getMonth() % 3), 1);
+  return d.getTime();
+}
+
+/** Cuối ngày cuối của tháng chứa `ms`. */
+export function endOfMonth(ms: number): number {
+  const d = new Date(startOfDay(ms));
+  return new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() - 1;
+}
+
+export function endOfQuarter(ms: number): number {
+  const d = new Date(startOfQuarter(ms));
+  return new Date(d.getFullYear(), d.getMonth() + 3, 1).getTime() - 1;
+}
+
+export function endOfYear(ms: number): number {
+  const d = new Date(startOfDay(ms));
+  return new Date(d.getFullYear() + 1, 0, 1).getTime() - 1;
+}
+
 /**
  * Khoảng thời gian của một preset tính tại thời điểm `nowMs`.
  * "N ngày qua" tính TRÒN NGÀY và bao gồm hôm nay (7 ngày qua = hôm nay + 6 hôm trước),
@@ -93,6 +134,15 @@ export function presetRange(id: PresetId, nowMs: number): DateRange {
       return { fromMs: startOfMonth(nowMs), toMs: nowMs, presetId: id };
     case 'year':
       return { fromMs: startOfYear(nowMs), toMs: nowMs, presetId: id };
+    // Trọn lịch (Timeline): kết thúc ở CUỐI kỳ, kể cả khi đó là tương lai.
+    case 'week_full':
+      return { fromMs: startOfWeek(nowMs), toMs: startOfWeek(nowMs) + 7 * DAY_MS - 1, presetId: id };
+    case 'month_full':
+      return { fromMs: startOfMonth(nowMs), toMs: endOfMonth(nowMs), presetId: id };
+    case 'quarter_full':
+      return { fromMs: startOfQuarter(nowMs), toMs: endOfQuarter(nowMs), presetId: id };
+    case 'year_full':
+      return { fromMs: startOfYear(nowMs), toMs: endOfYear(nowMs), presetId: id };
   }
 }
 

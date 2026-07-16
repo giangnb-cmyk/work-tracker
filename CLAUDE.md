@@ -26,12 +26,18 @@ Project is the entry gate (`ProjectSelect`); everything below is scoped to the s
 - **Bảng Sprint** (`SprintBoard`) — task list for the selected sprint, with a "+" create card.
 - **Task của tôi** (`MyTasks`) — the current user's tasks as cards.
 - **Features** (`Features`) — per-project feature cards; open one to see its tasks. Tasks
-  attach to a feature (`tasks.feature_id`).
+  attach to a feature (`tasks.feature_id`). A feature = đơn vị deliver được (gói bán);
+  nhóm lớn (Shop…) và version delivery (1.2.0) là **nhãn** (`feature_labels` +
+  `features.label_ids`) — lọc bằng chip. `features.kind`: `delivery` hiện % done,
+  `ongoing` (Polish, tuning — không bao giờ xong) hiện nhịp 30 ngày thay vì %.
 - **Backlog** (`Backlog`) — parked tasks: no sprint AND no assignee.
 - **Bugs** (`Bugs`) — a bug tracker with a **Kanban** view (columns by status) and a
   **GitLab-style list**. Bugs carry freeform `bug_labels`; the Kanban column is derived
   from a workflow label (Fixing/Pending/Deployed/Done). A "+" filter builds token filters.
-- **Timeline / Thống kê / Quản lý Sprint / Thành viên / Cấu hình** — Gantt, charts, admin.
+- **Timeline** (`Timeline`) — Gantt CẢ DỰ ÁN gộp theo feature (một hàng/feature, xổ ra
+  task); khoảng thời gian chọn bằng `DateRangePicker` (bộ preset `TIMELINE_PRESETS`,
+  `allowFuture` — khác tab Truy cập vốn khoá tương lai).
+- **Thống kê / Quản lý Sprint / Thành viên / Cấu hình** — charts, admin.
 
 ### Discord bug sync (`bot/skills/bug_sync.py`)
 

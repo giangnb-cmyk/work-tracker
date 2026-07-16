@@ -120,6 +120,29 @@ export interface TeamMember {
 }
 
 /** A feature: a unit of product work inside a project. Tasks may attach to one. */
+/**
+ * delivery = gói bán / thứ ship được cho user thật, có ngày xong (hiện % hoàn thành).
+ * ongoing  = việc chạy liên tục (Polish, Gameplay tuning…) — không bao giờ "done",
+ *            UI không hiện % mà hiện nhịp làm gần đây.
+ */
+export type FeatureKind = 'delivery' | 'ongoing';
+
+export const FEATURE_KIND_LABEL: Record<FeatureKind, string> = {
+  delivery: 'Gói bán',
+  ongoing: 'Liên tục',
+};
+
+/** A project-scoped label in the feature tag palette (Shop / Gameplay / …). */
+export interface FeatureLabel {
+  id: string;
+  projectId: string;
+  name: string;
+  color: string;
+  icon: string; // optional emoji
+  createdAt?: Timestamp;
+  createdBy: string;
+}
+
 export interface Feature {
   id: string;
   projectId: string;
@@ -127,6 +150,9 @@ export interface Feature {
   icon: string; // emoji shown on the card
   color: string; // accent hex
   description: string;
+  kind: FeatureKind;
+  /** ids into `feature_labels` — nhóm lớn (Shop…) + tag tự do, dùng để lọc. */
+  labelIds: string[];
   /** Link tài liệu + ảnh ref dùng chung cho mọi task của feature (migration 0019). */
   attachments: Attachment[];
   createdAt?: Timestamp;

@@ -10,6 +10,7 @@ import type {
   Bug,
   BugLabel,
   Feature,
+  FeatureLabel,
   Project,
   Sprint,
   Subtask,
@@ -70,7 +71,22 @@ export function rowToFeature(r: Row): Feature {
     icon: r.icon ?? '🧩',
     color: r.color ?? '#6366f1',
     description: r.description ?? '',
+    // ?? để chịu được lúc migration 0026 chưa áp — cột thiếu thì coi như mặc định.
+    kind: r.kind ?? 'delivery',
+    labelIds: r.label_ids ?? [],
     attachments: (r.attachments ?? []) as Attachment[],
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? '',
+  };
+}
+
+export function rowToFeatureLabel(r: Row): FeatureLabel {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name,
+    color: r.color ?? '#6366f1',
+    icon: r.icon ?? '',
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };

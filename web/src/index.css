@@ -730,6 +730,14 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tl-nodate { position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 0.72rem; }
 .filter-bar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
 
+/* Timeline gộp theo feature: hàng cha đậm, task con thụt vào khi xổ ra */
+.tl-feat .tl-name { font-weight: 600; }
+.tl-caret { flex-shrink: 0; font-size: 0.7rem; color: var(--muted); transition: transform 0.15s ease; }
+.tl-caret.open { transform: rotate(90deg); }
+.tl-sub .tl-row-label { padding-left: 1.7rem; }
+.tl-feat-bar { overflow: hidden; }
+.tl-feat-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; opacity: 0.9; }
+
 /* ============================================================================
    Bugs (tracker): segmented toggle · label chips · kanban · list
    ========================================================================== */
@@ -1730,6 +1738,29 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .feat-prog { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
 .feat-prog .progress { flex: 1; height: 7px; }
 .feat-pct { font-size: 0.72rem; color: var(--muted); flex-shrink: 0; }
+
+/* Feature: nhãn + loại (delivery/ongoing) + thanh lọc */
+.feat-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
+.feat-chip-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.featflt { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.1rem; }
+.fk-pills { display: flex; gap: 0.4rem; }
+.fk-pill {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: var(--muted);
+  font-size: 0.82rem; font-weight: 600; padding: 0.4rem 0.7rem; border-radius: 9px; cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.fk-pill small { font-size: 0.68rem; font-weight: 400; }
+.fk-pill:hover { color: var(--text); }
+.fk-pill.on { background: var(--primary); border-color: transparent; color: #fff; }
+.fk-pills.sm .fk-pill { flex-direction: row; padding: 0.3rem 0.65rem; font-size: 0.78rem; }
+.fk-badge {
+  font-size: 0.7rem; font-weight: 600; color: var(--sky); white-space: nowrap;
+  background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 0.15rem 0.5rem; border-radius: 999px;
+}
+.feat-label-new { display: flex; gap: 0.4rem; margin-top: 0.45rem; }
+.feat-label-new .input { flex: 1; }
 
 .project-card-new {
   background: transparent;
