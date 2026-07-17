@@ -4,6 +4,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useBugs } from '../hooks/useBugs';
 import { useBugLabels } from '../hooks/useBugLabels';
 import { useStoredView } from '../hooks/useStoredView';
+import { navigate, useRoute } from '../lib/router';
 import { updateBug } from '../lib/bugWrites';
 import { seedDefaultBugLabels } from '../lib/bugLabelWrites';
 import { requestBugSync } from '../lib/bugSyncWrites';
@@ -27,7 +28,7 @@ export default function Bugs() {
   const { bugs, loading } = useBugs(selectedProjectId);
   const { labels } = useBugLabels(selectedProjectId);
   const [mode, selectMode] = useStoredView<ViewMode>(MODE_KEY, VIEW_MODES, 'kanban');
-  const [editing, setEditing] = useState<Bug | null>(null);
+  const route = useRoute();
   const [creating, setCreating] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -36,6 +37,19 @@ export default function Bugs() {
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const canEditBug = (b: Bug) => isAdmin || b.reporterId === user?.uid || b.assigneeId === user?.uid;
+
+  // Bug đang mở suy ra TỪ URL (/bugs/<số>) — mở/đóng modal là đổi path, nhờ đó link
+  // trên thanh địa chỉ luôn gửi được cho người khác. Danh sách chưa tải xong thì
+  // editing tạm null; tải xong sẽ tự khớp và modal bật lên.
+  const editing = useMemo(
+    () => (route.bugNumber != null ? bugs.find((b) => b.number === route.bugNumber) ?? null : null),
+    [bugs, route.bugNumber],
+  );
+  const openBug = (b: Bug) => navigate(`/bugs/${b.number}`);
+  function closeModal() {
+    setCreating(false);
+    if (route.bugNumber != null) navigate('/bugs');
+  }
 
   const key = (ids: string[]) => [...ids].sort().join(',');
   const meId = user?.uid ?? '';
@@ -125,12 +139,18 @@ export default function Bugs() {
         onQuery={setQuery}
       />
 
+      {!loading && route.bugNumber != null && !editing && (
+        <div className="callout-inline" style={{ marginBottom: '1rem' }}>
+          Không thấy bug #{route.bugNumber} trong dự án này.
+        </div>
+      )}
+
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : mode === 'kanban' ? (
-        <BugKanban bugs={filtered} labelsById={labelsById} onOpen={setEditing} onMove={move} canEditBug={canEditBug} />
+        <BugKanban bugs={filtered} labelsById={labelsById} onOpen={openBug} onMove={move} canEditBug={canEditBug} />
       ) : (
-        <BugList bugs={filtered} labelsById={labelsById} projectName={selectedProject?.name ?? ''} onOpen={setEditing} />
+        <BugList bugs={filtered} labelsById={labelsById} projectName={selectedProject?.name ?? ''} onOpen={openBug} />
       )}
 
       {(editing || creating) && (
@@ -138,7 +158,7 @@ export default function Bugs() {
           bug={editing}
           projectId={selectedProjectId}
           labels={labels}
-          onClose={() => { setEditing(null); setCreating(false); }}
+          onClose={closeModal}
         />
       )}
     </div>

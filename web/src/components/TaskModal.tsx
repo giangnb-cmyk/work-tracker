@@ -88,6 +88,16 @@ export default function TaskModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [notionSyncing, setNotionSyncing] = useState(false);
   const [notionMsg, setNotionMsg] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  function copyTaskLink() {
+    if (!task) return;
+    // ?p= để link mở đúng dự án cả khi người nhận đang đứng ở dự án khác.
+    const suffix = projectId ? `?p=${projectId}` : '';
+    void navigator.clipboard.writeText(`${window.location.origin}/tasks/${task.id}${suffix}`);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  }
 
   const sprintName = sprints.find((s) => s.id === sprintId)?.name ?? 'Backlog';
   const projectName = projects.find((p) => p.id === projectId)?.name;
@@ -234,6 +244,11 @@ export default function TaskModal({
                 <div className="tm-idrow">
                   {isEdit && task && (
                     <span className="tm-id mono" title={task.id}>#{task.id.slice(0, 6).toUpperCase()}</span>
+                  )}
+                  {isEdit && task && (
+                    <button type="button" className="btn-sm" title={linkCopied ? 'Đã chép link' : 'Chép link task này'} onClick={copyTaskLink}>
+                      {linkCopied ? '✓' : '🔗'}
+                    </button>
                   )}
                   <PriorityBadge value={priority} onChange={setPriority} disabled={!canEditFields} />
                   <span className="tm-idrow-spacer" />

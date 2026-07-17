@@ -46,6 +46,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>(bug?.attachments ?? []);
+  const [copied, setCopied] = useState(false);
   /**
    * Danh sách bug chỉ mang VỎ (BUG_SUMMARY_COLUMNS) — ruột (mô tả + đính kèm) nạp
    * riêng ở đây. Chưa nạp xong thì KHOÁ Lưu và khoá cả nút "Sửa" mô tả: lưu lúc này
@@ -81,6 +82,14 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   function changeStatus(next: BugStatus) {
     setStatus(next);
     setLabelIds((ids) => labelsForStatus(ids, next, labels));
+  }
+
+  function copyLink() {
+    if (!bug) return;
+    // ?p= để người nhận đang đứng ở dự án khác vẫn nhảy đúng — số bug đếm theo dự án.
+    void navigator.clipboard.writeText(`${window.location.origin}/bugs/${bug.number}?p=${projectId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   }
 
   const otherLabels = grp('other');
@@ -153,6 +162,11 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           <BadgeSelect value={sel('severity')} options={sevOpts} onChange={(v) => setGroup('severity', v)} disabled={!canEdit} placeholder="Mức độ" />
           <BadgeSelect value={status} options={statusOpts} onChange={(v) => changeStatus(v as BugStatus)} disabled={!canEdit} placeholder="Trạng thái" />
           <span className="bugm-head-spacer" />
+          {isEdit && bug && (
+            <button type="button" className="bugm-iconbtn" title={copied ? 'Đã chép link' : 'Chép link bug này'} onClick={copyLink}>
+              {copied ? '✓' : '🔗'}
+            </button>
+          )}
           {bug?.discordThreadId && bug?.discordGuildId && (
             <button type="button" className="bugm-iconbtn bugm-discord" title="Mở thread trong Discord" onClick={() => openDiscordThread(bug.discordGuildId!, bug.discordThreadId!)}>
               <ProviderIcon provider="discord" size={18} />

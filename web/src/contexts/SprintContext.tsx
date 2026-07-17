@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -58,6 +59,17 @@ export function SprintProvider({ children }: { children: ReactNode }) {
     else localStorage.removeItem(PROJECT_KEY);
     setSelectedProjectId(id);
   }
+
+  // Deep link ?p=<projectId> (link bug/task chéo dự án): đổi dự án theo link MỘT lần
+  // khi danh sách project về — id lạ thì lờ đi, người dùng vẫn ở dự án đang chọn.
+  const linkProjectApplied = useRef(false);
+  useEffect(() => {
+    if (linkProjectApplied.current || projects.length === 0) return;
+    linkProjectApplied.current = true;
+    const p = new URLSearchParams(window.location.search).get('p');
+    if (p && p !== selectedProjectId && projects.some((pr) => pr.id === p)) selectProject(p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects]);
 
   // Default the selection to the active sprint once sprints load (until the user picks one).
   useEffect(() => {

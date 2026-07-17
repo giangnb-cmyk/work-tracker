@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
+import { navigate, type ViewId } from '../lib/router';
 import Avatar from './Avatar';
 import ProfileModal from './ProfileModal';
 import { EyeIcon } from './icons';
 
+// ViewId giờ sống ở lib/router (nguồn sự thật của path) — re-export để import cũ không gãy.
 // 'projects' is no longer an in-app tab — it's the landing page you enter through.
-export type ViewId = 'dashboard' | 'performance' | 'visits' | 'board' | 'mytasks' | 'features' | 'backlog' | 'bugs' | 'timeline' | 'sprints' | 'team' | 'settings';
+export type { ViewId } from '../lib/router';
 
 interface NavDef {
   id: ViewId;
@@ -61,8 +63,10 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
 
   return (
     <aside className="sidebar">
-      {/* Top-left: click to go back to the project-selection landing page. */}
-      <button className="project-back" onClick={() => selectProject(null)} title="Về trang chọn dự án">
+      {/* Top-left: click to go back to the project-selection landing page.
+          Reset path về /dashboard: giữ deep link cũ (vd /bugs/640) mà đổi dự án thì
+          số bug đó có thể trúng một bug KHÁC trong dự án mới. */}
+      <button className="project-back" onClick={() => { selectProject(null); navigate('/dashboard', { replace: true }); }} title="Về trang chọn dự án">
         <span className="back-arrow">←</span>
         <span className="project-back-icon">{selectedProject?.icon ?? '📁'}</span>
         <span className="project-back-name">{selectedProject?.name ?? 'Dự án'}</span>

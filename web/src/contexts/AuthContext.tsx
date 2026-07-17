@@ -15,6 +15,7 @@ import type { User } from '@supabase/supabase-js';
 import { ALLOWED_EMAIL_DOMAIN, supabase } from '../supabase';
 import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
 import { logVisit } from '../lib/visitWrites';
+import { navigate } from '../lib/router';
 import { rowToMember } from '../lib/mappers';
 import type { JobRole, TeamMember, UserRole } from '../types';
 
@@ -26,6 +27,13 @@ interface AppUser {
 
 /** Khoá sessionStorage — cố ý KHÔNG dùng localStorage: đóng tab là thoát chế độ xem thử. */
 const PREVIEW_KEY = 'viewAsMember';
+
+/**
+ * Deep link mở lúc CHƯA đăng nhập: OAuth redirect quay về origin '/' nên path bị mất.
+ * Stash trước khi đi Google, khôi phục sau khi phiên về. sessionStorage: chỉ sống
+ * trong tab đó, không dây sang lần đăng nhập khác.
+ */
+const POST_LOGIN_PATH_KEY = 'postLoginPath';
 
 interface AuthState {
   user: AppUser | null;
@@ -164,6 +172,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const p = await syncProfile(u);
         setUser({ uid: u.id, email: u.email ?? '' });
         setProfile(p);
+        // Khôi phục deep link đã stash trước vòng OAuth (xem POST_LOGIN_PATH_KEY).
+        const stashedPath = sessionStorage.getItem(POST_LOGIN_PATH_KEY);
+        if (stashedPath) {
+          sessionStorage.removeItem(POST_LOGIN_PATH_KEY);
+          navigate(stashedPath, { replace: true });
+        }
         // Sau khi qua cửa allowlist: người bị từ chối không tính là một lượt truy cập.
         void logVisit(u.id);
       } catch (err) {
@@ -183,6 +197,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn() {
     setError(null);
+    // Giữ deep link qua vòng OAuth. Không nhét path vào redirectTo: URL redirect phải
+    // nằm trong allowlist của Supabase, origin thì chắc chắn có còn path thì không.
+    const deepPath = window.location.pathname + window.location.search;
+    if (deepPath !== '/') sessionStorage.setItem(POST_LOGIN_PATH_KEY, deepPath);
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
