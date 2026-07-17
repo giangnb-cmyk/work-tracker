@@ -7,6 +7,7 @@ qua --allowedTools trong che do an toan).
 """
 
 import asyncio
+import contextlib
 import datetime
 import hashlib
 import json
@@ -269,6 +270,46 @@ async def ask_claude(prompt: str, channel_id: int, sender_id: int = 0) -> str:
             break
 
     raise RuntimeError(last_err[:500])
+
+
+_ACK_EMOJI = "👀"  # "da thay cau hoi" — bao ngay, ke ca khi Claude nghi lau
+
+
+def _brief(e: Exception) -> str:
+    """Loi Discord dinh ca trang HTML Cloudflare -> ep 1 dong, cat ngan cho log de doc."""
+    return " ".join(str(e).split())[:150]
+
+
+async def ack(message) -> None:
+    """Tha reaction bao 'da nhan cau hoi'. Best-effort: that bai thi thoi, van tra loi."""
+    try:
+        await message.add_reaction(_ACK_EMOJI)
+    except Exception as e:
+        log.warning("Không thả được reaction ở #%s: %s", message.channel, _brief(e))
+
+
+@contextlib.asynccontextmanager
+async def typing_best_effort(channel):
+    """Hien 'đang gõ…' NEU Discord cho — khong cho duoc thi van chay tiep.
+
+    WHY: `async with channel.typing()` goi POST /typing ngay trong __aenter__. Discord tra
+    500 / trang chan Cloudflare o endpoint nay la chuyen xay ra THAT (17/07/2026) -> loi
+    nem ra ngoai, ask_claude KHONG BAO GIO chay, nguoi dung chi thay '⚠️ Có lỗi xảy ra: 500'.
+    Chi bao 'đang gõ' chi la trang tri, tuyet doi khong duoc giet cau tra loi.
+    """
+    typing = channel.typing()
+    started = False
+    try:
+        await typing.__aenter__()
+        started = True
+    except Exception as e:  # 500 / Cloudflare / rot mang -> ke, van tra loi
+        log.warning("Không bật được chỉ báo 'đang gõ' ở #%s: %s", channel, _brief(e))
+    try:
+        yield  # loi cua THAN BAI van nem ra ngoai binh thuong
+    finally:
+        if started:
+            with contextlib.suppress(Exception):
+                await typing.__aexit__(None, None, None)
 
 
 def strip_mentions(content: str) -> str:
@@ -698,8 +739,9 @@ async def on_message(message: discord.Message):
     # Lenh nhanh: "@bot sync bug" -> dong bo bug tu forum ngay (khong qua Claude).
     if BUG_FORUMS and SYNC_BUG_RE.search(question) and "bug" in question.lower():
         log.info("[#%s] %s yêu cầu sync bug", message.channel, message.author)
+        await ack(message)
         try:
-            async with message.channel.typing():
+            async with typing_best_effort(message.channel):
                 summary = await _do_sync_all()
             await message.reply(f"🐞 Đã đồng bộ bug từ forum Discord: {summary}")
         except Exception as e:
@@ -708,8 +750,9 @@ async def on_message(message: discord.Message):
         return
 
     log.info("[#%s] %s hỏi: %s", message.channel, message.author, question[:120])
+    await ack(message)
     try:
-        async with message.channel.typing():
+        async with typing_best_effort(message.channel):
             answer = await ask_claude(
                 f"Người gửi: {message.author.display_name} (Discord id {message.author.id}). "
                 f"Yêu cầu: {question}",

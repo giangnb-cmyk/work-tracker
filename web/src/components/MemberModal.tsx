@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
+import { createMember, MemberConflictError, updateMember, type MemberInput } from '../lib/memberWrites';
 import { JOB_ROLES, type JobRole, type TeamMember, type UserRole } from '../types';
 
 interface MemberModalProps {
@@ -43,7 +43,9 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
       onClose();
     } catch (err) {
       console.error('Lưu thành viên thất bại', err);
-      setError('Lưu thất bại. Cần quyền admin.');
+      // Trùng email/Discord là lỗi NHẬP LIỆU, admin có thừa quyền — đổ hết vào câu "cần
+      // quyền admin" thì người sửa đi soi nhầm phân quyền trong khi chỉ cần đổi email.
+      setError(err instanceof MemberConflictError ? err.message : 'Lưu thất bại. Cần quyền admin.');
       setSaving(false);
     }
   }
