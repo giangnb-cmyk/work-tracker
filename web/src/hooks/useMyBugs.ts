@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { supabase } from '../supabase';
-import { rowToBug } from '../lib/mappers';
+import { BUG_SUMMARY_COLUMNS, rowToBug } from '../lib/mappers';
 import { useLiveQuery } from './useLiveQuery';
 import type { Bug } from '../types';
 
@@ -13,9 +13,10 @@ import type { Bug } from '../types';
  */
 export function useMyBugs(uid: string, projectId: string | null) {
   const fetcher = useCallback(async () => {
+    // Chỉ tải VỎ bug (không description/attachments) — xem BUG_SUMMARY_COLUMNS.
     const { data, error } = await supabase
       .from('bugs')
-      .select('*')
+      .select(BUG_SUMMARY_COLUMNS)
       .eq('assignee_id', uid)
       .eq('project_id', projectId as string)
       .order('number', { ascending: false });

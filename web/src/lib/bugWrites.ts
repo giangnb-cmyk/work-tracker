@@ -3,7 +3,26 @@
 
 import { supabase } from '../supabase';
 import { bugPatchToRow } from './mappers';
-import type { Bug, BugStatus } from '../types';
+import type { Attachment, Bug, BugStatus } from '../types';
+
+/**
+ * Ruột của một bug (mô tả + đính kèm) — danh sách chỉ tải vỏ (BUG_SUMMARY_COLUMNS
+ * trong mappers), BugModal gọi cái này lúc mở để lấy phần còn lại.
+ */
+export async function fetchBugDetail(
+  id: string,
+): Promise<{ description: string; attachments: Attachment[] }> {
+  const { data, error } = await supabase
+    .from('bugs')
+    .select('description, attachments')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return {
+    description: (data.description as string) ?? '',
+    attachments: (data.attachments ?? []) as Attachment[],
+  };
+}
 
 export interface NewBugInput {
   projectId: string;

@@ -72,24 +72,64 @@ function photoOf(u: User): string {
   return m.avatar_url || m.picture || '';
 }
 
+/**
+ * Chỉ ghi presence khi dấu vết cũ hơn ngần này. Ghi MỖI lượt mở trang thì bảng
+ * profiles (đang phát realtime) kích cả team refetch lại roster — write vô ích.
+ */
+const PRESENCE_STALE_MS = 10 * 60 * 1000;
+
 /** Ensure the profile row exists + refresh presence/display fields; returns it. */
 async function syncProfile(u: User): Promise<TeamMember | null> {
-  await supabase.from('profiles').upsert(
-    {
-      id: u.id,
-      email: u.email ?? '',
-      display_name: displayNameOf(u),
-      photo_url: photoOf(u),
-      last_seen_at: new Date().toISOString(),
-    },
-    { onConflict: 'id' },
-  );
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', u.id).single();
-  if (error || !data) {
-    console.error('Tải hồ sơ thất bại', error);
+  // Đọc trước, ghi sau: lượt mở trang thông thường chỉ tốn MỘT chuyến mạng và không
+  // ghi gì (trước đây là upsert + select lại = 2 chuyến + 1 write mỗi lượt).
+  const { data: existing, error: readErr } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', u.id)
+    .maybeSingle();
+  if (readErr) {
+    console.error('Tải hồ sơ thất bại', readErr);
     return null;
   }
-  return rowToMember(data);
+
+  const fresh = {
+    email: u.email ?? '',
+    display_name: displayNameOf(u),
+    photo_url: photoOf(u),
+  };
+
+  if (!existing) {
+    // Lần đăng nhập đầu: tạo row — .select() ngay trên upsert để ghi + đọc lại
+    // gói trong một chuyến.
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert({ ...fresh, id: u.id, last_seen_at: new Date().toISOString() }, { onConflict: 'id' })
+      .select('*')
+      .single();
+    if (error || !data) {
+      console.error('Tạo hồ sơ thất bại', error);
+      return null;
+    }
+    return rowToMember(data);
+  }
+
+  // Row đã có: chỉ ghi khi Google đổi tên/ảnh/email hoặc presence đã nguội — và ghi
+  // NỀN, không bắt màn hình khởi động chờ một cái write.
+  const changed =
+    existing.email !== fresh.email ||
+    existing.display_name !== fresh.display_name ||
+    existing.photo_url !== fresh.photo_url;
+  const lastSeen = existing.last_seen_at ? new Date(existing.last_seen_at).getTime() : 0;
+  if (changed || Date.now() - lastSeen > PRESENCE_STALE_MS) {
+    void supabase
+      .from('profiles')
+      .update({ ...(changed ? fresh : {}), last_seen_at: new Date().toISOString() })
+      .eq('id', u.id)
+      .then(({ error }) => {
+        if (error) console.error('Cập nhật presence thất bại', error);
+      });
+  }
+  return rowToMember(changed ? { ...existing, ...fresh } : existing);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

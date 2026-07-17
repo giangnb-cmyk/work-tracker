@@ -105,6 +105,16 @@ export function rowToBugLabel(r: Row): BugLabel {
   };
 }
 
+/**
+ * Cột cho DANH SÁCH bug — cố ý bỏ `description` + `attachments`: ruột chiếm ~250 kB
+ * cho 640 bug mà kanban/list không hiển thị. Ruột nạp riêng khi mở BugModal
+ * (`fetchBugDetail` trong bugWrites). rowToBug điền '' / [] cho phần thiếu.
+ */
+export const BUG_SUMMARY_COLUMNS =
+  'id, project_id, number, title, status, label_ids, reporter_id, reporter_name, ' +
+  'assignee_id, assignee_name, order, discord_thread_id, discord_guild_id, ' +
+  'pending_discord_push, created_at, updated_at, done_at';
+
 export function rowToBug(r: Row): Bug {
   return {
     id: r.id,
@@ -201,6 +211,7 @@ export function rowToActivity(r: Row): Activity {
     type: r.type,
     body: r.body ?? '',
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    editedAt: Timestamp.fromISO(r.edited_at) ?? undefined,
   };
 }
 

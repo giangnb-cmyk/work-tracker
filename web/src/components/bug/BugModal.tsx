@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSprintContext } from '../../contexts/SprintContext';
-import { createBug, deleteBug, updateBug } from '../../lib/bugWrites';
+import { createBug, deleteBug, fetchBugDetail, updateBug } from '../../lib/bugWrites';
 import { BUG_STATUS_COLOR, labelsForStatus } from '../../lib/bugStatus';
 import { labelsInGroup, selectedInGroup, setGroupLabel, type LabelGroup } from '../../lib/bugLabelGroups';
 import { openDiscordThread } from '../../lib/discordLink';
@@ -45,6 +45,33 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   const [editingDesc, setEditingDesc] = useState(!isEdit);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [preview, setPreview] = useState<Attachment | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>(bug?.attachments ?? []);
+  /**
+   * Danh sách bug chỉ mang VỎ (BUG_SUMMARY_COLUMNS) — ruột (mô tả + đính kèm) nạp
+   * riêng ở đây. Chưa nạp xong thì KHOÁ Lưu và khoá cả nút "Sửa" mô tả: lưu lúc này
+   * là ghi đè mô tả thật trên server bằng chuỗi rỗng.
+   */
+  const [detailReady, setDetailReady] = useState(!isEdit);
+
+  useEffect(() => {
+    if (!bug) return;
+    let alive = true;
+    fetchBugDetail(bug.id)
+      .then((d) => {
+        if (!alive) return;
+        setDescription(d.description);
+        setAttachments(d.attachments);
+        setDetailReady(true);
+      })
+      .catch((err) => {
+        console.error('Tải chi tiết bug thất bại', err);
+        if (alive) setError('Không tải được mô tả bug — đóng rồi mở lại nhé.');
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bug?.id]);
 
   const grp = (g: LabelGroup) => labelsInGroup(labels, g);
   const sel = (g: LabelGroup) => selectedInGroup(labelIds, labels, g);
@@ -61,10 +88,12 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
     const found = (description.match(URL_RE) ?? []).map((u) => u.replace(/[.,]+$/, ''));
     return [...new Set(found)];
   }, [description]);
-  const images = (bug?.attachments ?? []).filter((a) => a.kind === 'image');
+  const images = attachments.filter((a) => a.kind === 'image');
 
   async function handleSave() {
     if (!title.trim()) return setError('Cần nhập tiêu đề bug.');
+    if (isEdit && !detailReady) return; // nút đã disable — chốt chặn thêm cho chắc
+
     setSaving(true);
     setError(null);
     const assignee = members.find((m) => m.uid === assigneeId) ?? null;
@@ -162,7 +191,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
               {canEdit && (
                 <div className="seg-toggle seg-sm" role="group" aria-label="Kiểu xem mô tả">
                   <button type="button" className={`seg${!editingDesc ? ' on' : ''}`} onClick={() => setEditingDesc(false)}>Xem</button>
-                  <button type="button" className={`seg${editingDesc ? ' on' : ''}`} onClick={() => setEditingDesc(true)}>Sửa</button>
+                  <button type="button" className={`seg${editingDesc ? ' on' : ''}`} onClick={() => setEditingDesc(true)} disabled={!detailReady}>Sửa</button>
                 </div>
               )}
             </div>
@@ -177,6 +206,8 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
               <CollapsibleBox className="bugm-desc-clp">
                 <Markdown className="bugm-desc-view">{description}</Markdown>
               </CollapsibleBox>
+            ) : !detailReady ? (
+              <p className="muted bugm-desc-empty">Đang tải mô tả…</p>
             ) : (
               <p className="muted bugm-desc-empty">Chưa có mô tả.</p>
             )}
@@ -265,7 +296,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           <span style={{ flex: 1 }} />
           <button className="btn-sm" onClick={onClose}>Huỷ</button>
           {canEdit && (
-            <button className="btn-primary" onClick={handleSave} disabled={saving}>
+            <button className="btn-primary" onClick={handleSave} disabled={saving || (isEdit && !detailReady)}>
               {saving ? 'Đang lưu…' : isEdit ? 'Lưu thay đổi' : 'Tạo bug'}
             </button>
           )}

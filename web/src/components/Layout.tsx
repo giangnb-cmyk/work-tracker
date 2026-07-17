@@ -12,7 +12,11 @@ const Features = lazy(() => import('./Features'));
 const Backlog = lazy(() => import('./Backlog'));
 const Bugs = lazy(() => import('./Bugs'));
 const Timeline = lazy(() => import('./Timeline'));
-const Dashboard = lazy(() => import('./Dashboard'));
+// Dashboard là view MẶC ĐỊNH sau khi vào dự án — kích tải chunk (kéo theo chunk
+// Chart.js) ngay từ lúc boot, song song với các lượt gọi auth, thay vì nối đuôi
+// sau cổng chọn dự án. Các view khác vẫn lazy thuần vì không chắc được mở.
+const dashboardImport = import('./Dashboard');
+const Dashboard = lazy(() => dashboardImport);
 const Performance = lazy(() => import('./Performance'));
 const Visits = lazy(() => import('./Visits'));
 const SprintManager = lazy(() => import('./SprintManager'));

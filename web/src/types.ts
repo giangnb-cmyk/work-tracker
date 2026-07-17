@@ -48,6 +48,8 @@ export interface Activity {
   type: ActivityType;
   body: string;
   createdAt?: Timestamp;
+  /** Mốc sửa nội dung gần nhất (chỉ bình luận); undefined = chưa sửa. DB tự điền — xem 0029. */
+  editedAt?: Timestamp;
 }
 
 /** An in-app notification delivered to one user (the web half of completion notices). */
