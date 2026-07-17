@@ -70,10 +70,20 @@ export function devApi(): Plugin {
           const mod = await server.ssrLoadModule(`/api/${name}.ts`);
           await (mod.default as (rq: unknown, rs: unknown) => unknown)(vercelReq, res);
         } catch (err) {
-          server.config.logger.error(`[dev-api] ${name} failed: ${String(err)}`);
+          // Handler chết NGOÀI try/catch của chính nó (lỗi lúc load module, hoặc throw
+          // trước khối try). Các gateway đều tự trả mã có nghĩa (401/502/503) cho lỗi
+          // chúng lường trước, nên 500 ở đây LUÔN là sự cố ngoài dự tính.
+          //
+          // Trả kèm message + stack: đây là plugin `apply: 'serve'`, không bao giờ chạy
+          // trên production, mà "dev api handler error" trơ trọi thì phải mò log terminal
+          // mới biết chuyện gì — trong khi người bấm nút chỉ nhìn thấy tab Network.
+          const detail = err instanceof Error ? err.message : String(err);
+          server.config.logger.error(`[dev-api] ${name} chết: ${detail}`);
+          if (err instanceof Error && err.stack) server.config.logger.error(err.stack);
           if (!res.writableEnded) {
             res.statusCode = 500;
-            res.end(JSON.stringify({ error: 'dev api handler error' }));
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'dev api handler error', detail }));
           }
         }
       });

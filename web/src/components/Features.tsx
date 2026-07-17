@@ -12,14 +12,28 @@ import TaskModal from './TaskModal';
 import FeatureModal from './FeatureModal';
 import CreateTaskCard from './CreateTaskCard';
 import BugLabelChip from './bug/BugLabelChip';
+import FeatureAvatars, { type FeaturePerson } from './FeatureAvatars';
 import type { Feature, FeatureKind, FeatureLabel, Task, TaskStatus } from '../types';
 
 const DAY = 86_400_000;
 
+/** Số liệu một feature — gộp trong đúng một vòng lặp qua tasks. */
+interface FeatureStats {
+  done: number;
+  total: number;
+  done30: number;
+  /** uid → số task + tên đã denormalize trên task (còn dùng được cả khi member bị xoá). */
+  byUid: Map<string, { count: number; name: string }>;
+}
+
+// Dùng chung cho card chưa có task: khỏi tạo object mới mỗi lần render một card.
+const EMPTY_STATS = { done: 0, total: 0, done30: 0 };
+const EMPTY_PEOPLE: FeaturePerson[] = [];
+
 /** Features tab: a card grid of the project's features; open one to see its tasks. */
 export default function Features() {
   const { isAdmin } = useAuth();
-  const { features, featuresLoading, selectedProjectId, selectedProject } = useSprintContext();
+  const { features, featuresLoading, selectedProjectId, selectedProject, members } = useSprintContext();
   const { tasks, loading: tasksLoading } = useProjectTasks(selectedProjectId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
@@ -46,23 +60,50 @@ export default function Features() {
     [projectFeatures, kindFilter, filterLabelIds],
   );
 
-  /** done/total (+ done 30 ngày cho feature liên tục) — một vòng lặp cho tất cả. */
+  /** done/total (+ done 30 ngày cho feature liên tục) + ai đang gánh — một vòng lặp cho tất cả. */
   const statsByFeature = useMemo(() => {
     const cutoff30 = Date.now() - 30 * DAY;
-    const map = new Map<string, { done: number; total: number; done30: number }>();
+    const map = new Map<string, FeatureStats>();
     for (const t of tasks) {
       if (!t.featureId) continue;
-      const s = map.get(t.featureId) ?? { done: 0, total: 0, done30: 0 };
+      let s = map.get(t.featureId);
+      if (!s) {
+        s = { done: 0, total: 0, done30: 0, byUid: new Map() };
+        map.set(t.featureId, s);
+      }
       s.total += 1;
       if (t.status === 'done') {
         s.done += 1;
         // dueDate được reset về đúng ngày xong khi hoàn thành (xem DATA_MODEL).
         if ((t.dueDate?.toMillis() ?? 0) >= cutoff30) s.done30 += 1;
       }
-      map.set(t.featureId, s);
+      if (!t.assigneeId) continue;
+      const p = s.byUid.get(t.assigneeId);
+      if (p) p.count += 1;
+      else s.byUid.set(t.assigneeId, { count: 1, name: t.assigneeName });
     }
     return map;
   }, [tasks]);
+
+  /**
+   * Người có task trong feature, ai nhiều task đứng trước.
+   * Ảnh/tên ưu tiên lấy từ `members` (mới nhất), rơi về tên denormalize trên task khi
+   * người đó không còn trong danh sách member — card vẫn hiện chữ cái đầu thay vì trống.
+   */
+  const peopleByFeature = useMemo(() => {
+    const memberByUid = new Map(members.map((m) => [m.uid, m]));
+    const out = new Map<string, FeaturePerson[]>();
+    for (const [featureId, s] of statsByFeature) {
+      const people: FeaturePerson[] = [];
+      for (const [uid, { count, name }] of s.byUid) {
+        const m = memberByUid.get(uid);
+        people.push({ uid, count, name: m?.displayName || name, photoURL: m?.photoURL });
+      }
+      people.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'vi'));
+      out.set(featureId, people);
+    }
+    return out;
+  }, [statsByFeature, members]);
 
   function toggleFilterLabel(id: string) {
     setFilterLabelIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
@@ -148,7 +189,7 @@ export default function Features() {
           </button>
         )}
         {visibleFeatures.map((f) => {
-          const { done, total, done30 } = statsByFeature.get(f.id) ?? { done: 0, total: 0, done30: 0 };
+          const { done, total, done30 } = statsByFeature.get(f.id) ?? EMPTY_STATS;
           const percent = total === 0 ? 0 : Math.round((done / total) * 100);
           const chips = f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l));
           return (
@@ -172,6 +213,7 @@ export default function Features() {
                   </span>
                 </>
               )}
+              <FeatureAvatars people={peopleByFeature.get(f.id) ?? EMPTY_PEOPLE} />
             </button>
           );
         })}

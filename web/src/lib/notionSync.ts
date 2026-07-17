@@ -60,7 +60,11 @@ async function callGateway(body: unknown): Promise<SyncResult> {
           'Notion DB (vd cột Priority). Xem log Vercel để biết chi tiết.',
       );
     }
-    throw new Error(`Notion gateway lỗi ${res.status}.`);
+    // Gateway tự trả 401/502/503 cho mọi lỗi nó lường trước, nên tới được đây (hay gặp
+    // nhất là 500) tức là nó chết ngoài dự tính. Bám theo `detail` server gửi kèm nếu có:
+    // không có nó thì chỉ còn mỗi con số, phải đi mò log terminal/Vercel mới lần ra.
+    const detail = await res.json().then((b: { detail?: string }) => b?.detail).catch(() => undefined);
+    throw new Error(`Notion gateway lỗi ${res.status}.${detail ? ` Chi tiết: ${detail}` : ''}`);
   }
   return (await res.json()) as SyncResult;
 }

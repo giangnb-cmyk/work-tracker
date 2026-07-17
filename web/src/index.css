@@ -1741,6 +1741,22 @@ table.data-table { width: 100%; border-collapse: collapse; }
 
 /* Feature: nhãn + loại (delivery/ongoing) + thanh lọc */
 .feat-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
+
+/* Avatar người có task trong feature — chồng mép lên nhau ở đáy card.
+   Viền phải là màu ĐẶC (#1a2436 = --glass trộn lên --bg) chứ không phải rgba: viền
+   trong suốt sẽ để lộ avatar nằm dưới đúng chỗ vòng tròn cần cắt. content-box giữ
+   .avatar.sm đúng 24px, viền vẽ ra ngoài thay vì ăn vào trong. */
+.feat-people { display: flex; align-items: center; margin-top: auto; }
+.feat-people .avatar { border: 2px solid #1a2436; box-sizing: content-box; }
+.feat-person { display: flex; }
+.feat-person + .feat-person, .feat-person-more { margin-left: -8px; }
+.feat-person-more {
+  display: flex; align-items: center;
+  height: 24px; padding: 0 0.4rem;
+  border: 2px solid #1a2436; border-radius: 999px; box-sizing: content-box;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted); font-size: 0.65rem; font-weight: 700;
+}
 .feat-chip-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .featflt { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.1rem; }
 .fk-pills { display: flex; gap: 0.4rem; }
