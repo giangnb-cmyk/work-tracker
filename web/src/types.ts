@@ -196,6 +196,11 @@ export interface Feature {
   labelIds: string[];
   /** Link tài liệu + ảnh ref dùng chung cho mọi task của feature (migration 0019). */
   attachments: Attachment[];
+  /**
+   * Mốc ĐÁNH DẤU TAY là đã xong (migration 0031) — cho feature ship từ trước khi có
+   * tracker nên không có task để suy ra. null = suy từ task như thường.
+   */
+  doneAt: Timestamp | null;
   createdAt?: Timestamp;
   createdBy: string;
 }

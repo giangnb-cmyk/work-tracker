@@ -75,6 +75,7 @@ export function rowToFeature(r: Row): Feature {
     kind: r.kind ?? 'delivery',
     labelIds: r.label_ids ?? [],
     attachments: (r.attachments ?? []) as Attachment[],
+    doneAt: Timestamp.fromISO(r.done_at),
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };

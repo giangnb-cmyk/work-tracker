@@ -17,7 +17,7 @@ import FeatureCard from './FeatureCard';
 import FeatureTeamRow from './FeatureTeamRow';
 import FeatureFilterBar, { isFeatureDone, matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
 import { groupFeaturesByVersion } from '../lib/featureGroups';
-import { versionRangeChips } from '../lib/versionRange';
+import { versionRangeChips, type VersionChip } from '../lib/versionRange';
 import { labelGroup } from '../lib/bugLabelGroups';
 import type { Feature, FeatureLabel, Task, TaskStatus } from '../types';
 
@@ -165,9 +165,8 @@ export default function Features() {
     return (
       <FeatureDetail
         feature={selected}
-        labels={selected.labelIds
-          .map((id) => labelById.get(id))
-          .filter((l): l is FeatureLabel => Boolean(l))}
+        labels={groupChipsOf(selected)}
+        versions={versionChipsOf(selected)}
         people={peopleByFeature.get(selected.id) ?? EMPTY_PEOPLE}
         // Truyền task xuống thay vì để con tự gọi useProjectTasks lần nữa. Trùng topic
         // realtime giờ đã vô hại (useLiveQuery tự thêm id riêng cho mỗi instance), nhưng
@@ -274,8 +273,10 @@ export default function Features() {
 
 interface DetailProps {
   feature: Feature;
-  /** Nhãn của feature (đã resolve từ labelIds), do cha tra sẵn. */
+  /** Nhãn NHÓM của feature (đã resolve từ labelIds), do cha tra sẵn. */
   labels: FeatureLabel[];
+  /** Chip version đã gộp khoảng (1.0.x → 1.5.x) — cùng cách hiện với card ngoài lưới. */
+  versions: VersionChip[];
   /** Ai có task trong feature, nhiều task đứng trước — cha đã gộp sẵn từ cùng bộ task. */
   people: FeaturePerson[];
   /** Task của cả project, do component cha fetch — xem chú thích ở chỗ gọi. */
@@ -287,7 +288,9 @@ interface DetailProps {
   onCloseEdit: () => void;
 }
 
-function FeatureDetail({ feature, labels, people, tasks, loading, onBack, onEdit, editingFeature, onCloseEdit }: DetailProps) {
+function FeatureDetail({
+  feature, labels, versions, people, tasks, loading, onBack, onEdit, editingFeature, onCloseEdit,
+}: DetailProps) {
   const { user, isAdmin } = useAuth();
   const { members, selectedSprintId } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
@@ -323,9 +326,10 @@ function FeatureDetail({ feature, labels, people, tasks, loading, onBack, onEdit
         </div>
         {onEdit && <button className="btn-sm" onClick={onEdit}>Sửa</button>}
       </div>
-      {labels.length > 0 && (
+      {(labels.length > 0 || versions.length > 0) && (
         <div className="feat-chip-row feat-chips-lg" style={{ marginBottom: '0.6rem' }}>
           {labels.map((l) => <BugLabelChip key={l.id} label={l} />)}
+          {versions.map((v) => <BugLabelChip key={v.key} label={v} />)}
         </div>
       )}
       <FeatureTeamRow people={people} />

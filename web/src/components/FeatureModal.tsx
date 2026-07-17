@@ -4,6 +4,7 @@ import { createFeatureLabel } from '../lib/featureLabelWrites';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { sortFeatureLabels } from '../lib/featureLabelSort';
+import { formatDate } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import AttachmentsField from './task/AttachmentsField';
 import RefImagesSection from './task/RefImagesSection';
@@ -38,6 +39,9 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
   const [kind, setKind] = useState<FeatureKind>(feature?.kind ?? 'delivery');
   const [labelIds, setLabelIds] = useState<string[]>(feature?.labelIds ?? []);
   const [newLabel, setNewLabel] = useState('');
+  /** Đánh dấu tay đã xong (0031). `wasDone` để chỉ gửi khi ĐỔI — xem FeaturePatch. */
+  const wasDone = Boolean(feature?.doneAt);
+  const [done, setDone] = useState(wasDone);
   // Cùng mảng `attachments` với task (phân biệt bằng `kind`), nên dùng lại nguyên
   // AttachmentsField (link) + RefImagesSection (ảnh) của TaskModal.
   const [attachments, setAttachments] = useState<Attachment[]>(feature?.attachments ?? []);
@@ -108,11 +112,13 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
       if (isEdit && feature) {
         await updateFeature(feature.id, {
           name: name.trim(), icon, description: description.trim(), kind, labelIds: orderedLabelIds, attachments,
+          // Chỉ gửi khi ĐỔI: gửi done:true mỗi lần lưu là dập mốc cũ thành hiện tại.
+          ...(done !== wasDone ? { done } : {}),
         });
       } else {
         const input: FeatureInput = {
           projectId, name, icon, color: feature?.color ?? '#6366f1', description, kind,
-          labelIds: orderedLabelIds, attachments,
+          labelIds: orderedLabelIds, attachments, done,
         };
         await createFeature(input, user?.uid ?? '');
       }
@@ -164,6 +170,23 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
           </div>
           <p className="fk-hint">{FEATURE_KIND_HINT[kind]}</p>
         </div>
+
+        {/* Ghi đè tay: feature ship từ trước khi có tracker thì không có task để suy ra.
+            'ongoing' theo định nghĩa không bao giờ xong nên không cho tick — hiện ra mà
+            bấm không ăn còn khó hiểu hơn là ẩn đi. */}
+        {kind !== 'ongoing' && (
+          <label className="field feat-donebox">
+            <input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} disabled={saving} />
+            <span>
+              Đã hoàn thành
+              <small>
+                {wasDone && feature?.doneAt
+                  ? `Đánh dấu xong ${formatDate(feature.doneAt)}.`
+                  : 'Tick nếu feature đã xong nhưng không có task nào để tính (import từ dự án chạy trước đó).'}
+              </small>
+            </span>
+          </label>
+        )}
 
         <div className="grid-2">
           <div className="field">
