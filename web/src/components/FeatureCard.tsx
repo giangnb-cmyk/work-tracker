@@ -25,7 +25,9 @@ interface Props {
 export default function FeatureCard({
   feature, labels, versions, people, done, total, done30, finished, onOpen,
 }: Props) {
-  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+  // Đánh dấu tay là xong -> thanh phải đầy. Không thì feature import (0/0 task) tick
+  // "đã hoàn thành" mà vẫn nằm đó 0% — đúng cái nó vừa được bảo là không phải.
+  const percent = finished ? 100 : total === 0 ? 0 : Math.round((done / total) * 100);
 
   return (
     <button className={`project-card feat-card glass${finished ? ' done' : ''}`} onClick={onOpen}>

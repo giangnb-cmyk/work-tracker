@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createFeature, updateFeature, type FeatureInput } from '../lib/featureWrites';
 import { createFeatureLabel } from '../lib/featureLabelWrites';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
@@ -30,6 +30,8 @@ interface FeatureModalProps {
   onClose: () => void;
 }
 
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
 /** Admin dialog to create/edit a feature within a project. */
 export default function FeatureModal({ feature, projectId, onClose }: FeatureModalProps) {
   const { user } = useAuth();
@@ -46,7 +48,9 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
   // Cùng mảng `attachments` với task (phân biệt bằng `kind`), nên dùng lại nguyên
   // AttachmentsField (link) + RefImagesSection (ảnh) của TaskModal.
   const [attachments, setAttachments] = useState<Attachment[]>(feature?.attachments ?? []);
+  /** Chỉ dùng cho lúc TẠO — chế độ sửa tự lưu, trạng thái nằm ở saveState. */
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
   const [pasting, setPasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,7 +106,66 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
     }
   }
 
-  async function handleSave() {
+  /**
+   * Ảnh chụp các giá trị sửa được, để biết có gì ĐỔI THẬT không.
+   *
+   * Dùng `labelIds` thô chứ KHÔNG dùng orderedLabelIds: palette về sau (async) làm thứ
+   * tự sắp lại, snapshot đổi theo và tự-lưu bắn một lần ghi vô nghĩa dù người dùng chưa
+   * chạm vào gì.
+   */
+  const snapshot = () => JSON.stringify({ name, icon, description, kind, labelIds, attachments, done });
+  const lastSavedRef = useRef<string | null>(null);
+  if (lastSavedRef.current === null) lastSavedRef.current = snapshot();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** `done` đã lưu — chỉ gửi khi ĐỔI, gửi mỗi lần lưu là dập mốc done_at thành hiện tại. */
+  const savedDoneRef = useRef(wasDone);
+
+  async function persist(): Promise<void> {
+    if (!feature) return;
+    if (!name.trim()) {
+      setError('Cần nhập tên feature.');
+      return;
+    }
+    setError(null);
+    setSaveState('saving');
+    const pending = snapshot();
+    try {
+      await updateFeature(feature.id, {
+        name: name.trim(), icon, description: description.trim(), kind,
+        labelIds: orderedLabelIds, attachments,
+        ...(done !== savedDoneRef.current ? { done } : {}),
+      });
+      savedDoneRef.current = done;
+      lastSavedRef.current = pending;
+      setSaveState('saved');
+    } catch (err) {
+      console.error('Tự động lưu feature thất bại', err);
+      setSaveState('error');
+      setError('Lưu thất bại. Cần quyền admin.');
+    }
+  }
+
+  // Tự lưu (có trễ) mỗi khi giá trị đổi — chỉ ở chế độ SỬA. Tạo mới vẫn là một hành động
+  // dứt khoát: chưa có row nào để mà lưu dần.
+  useEffect(() => {
+    if (!isEdit) return;
+    if (snapshot() === lastSavedRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => void persist(), 700);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, icon, description, kind, labelIds, attachments, done]);
+
+  /** Đóng: đẩy nốt lần sửa đang chờ, kẻo bấm đóng nhanh là mất. */
+  async function handleClose() {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (isEdit && snapshot() !== lastSavedRef.current) await persist();
+    onClose();
+  }
+
+  async function handleCreate() {
     if (!name.trim()) {
       setError('Cần nhập tên feature.');
       return;
@@ -110,29 +173,27 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
     setSaving(true);
     setError(null);
     try {
-      if (isEdit && feature) {
-        await updateFeature(feature.id, {
-          name: name.trim(), icon, description: description.trim(), kind, labelIds: orderedLabelIds, attachments,
-          // Chỉ gửi khi ĐỔI: gửi done:true mỗi lần lưu là dập mốc cũ thành hiện tại.
-          ...(done !== wasDone ? { done } : {}),
-        });
-      } else {
-        const input: FeatureInput = {
-          projectId, name, icon, color: feature?.color ?? '#6366f1', description, kind,
-          labelIds: orderedLabelIds, attachments, done,
-        };
-        await createFeature(input, user?.uid ?? '');
-      }
+      const input: FeatureInput = {
+        projectId, name, icon, color: feature?.color ?? '#6366f1', description, kind,
+        labelIds: orderedLabelIds, attachments, done,
+      };
+      await createFeature(input, user?.uid ?? '');
       onClose();
     } catch (err) {
-      console.error('Lưu feature thất bại', err);
-      setError('Lưu thất bại. Cần quyền admin.');
+      console.error('Tạo feature thất bại', err);
+      setError('Tạo thất bại. Cần quyền admin.');
       setSaving(false);
     }
   }
 
+  const saveHint =
+    saveState === 'saving' ? 'Đang lưu…' :
+    saveState === 'error' ? '⚠ Lưu lỗi' :
+    saveState === 'saved' ? '✓ Đã lưu' : 'Tự động lưu';
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    // Bấm ra nền cũng phải đẩy nốt lần sửa đang chờ, không được lặng lẽ vứt đi.
+    <div className="modal-overlay" onClick={() => void handleClose()}>
       <div className="modal modal-wide feat-modal" onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? 'Sửa feature' : 'Feature mới'}</h2>
 
@@ -249,11 +310,22 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
 
         {error && <p className="error-text">{error}</p>}
 
+        {/* Sửa thì tự lưu (không có nút Lưu/Huỷ — huỷ cái gì khi đã ghi rồi?); tạo mới
+            vẫn là một hành động dứt khoát. Cùng khuôn với TaskModal. */}
         <div className="modal-actions">
-          <button className="btn-sm" onClick={onClose} disabled={saving}>Huỷ</button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Đang lưu…' : isEdit ? 'Lưu' : 'Tạo'}
-          </button>
+          {isEdit ? (
+            <>
+              <span className={`tm-savehint tm-save-${saveState}`}>{saveHint}</span>
+              <button className="btn-sm" onClick={() => void handleClose()}>Đóng</button>
+            </>
+          ) : (
+            <>
+              <button className="btn-sm" onClick={onClose} disabled={saving}>Huỷ</button>
+              <button className="btn-primary" onClick={() => void handleCreate()} disabled={saving}>
+                {saving ? 'Đang tạo…' : 'Tạo'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
