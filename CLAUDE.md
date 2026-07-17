@@ -156,6 +156,7 @@ bot-work-tracker/
 │   │                       #   task_title (làm sạch tiêu đề — chặn ở code, không chỉ hint),
 │   │                       #   attachments (URL → attachment; song song web/src/lib/attachments.ts),
 │   │                       #   bug_sync (Discord forum ↔ bugs), doc_* (RAG),
+│   │                       #   release_sync (sheet Timeline → feature_labels.release_date),
 │   │                       #   member_dm (DM điểm tuần cho member — thứ 5 + test từ web)
 │   ├── settings.json       #   model, allowed users, channels, bug_forums
 │   └── .env.example        #   DISCORD_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY

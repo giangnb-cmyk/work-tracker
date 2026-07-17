@@ -221,6 +221,12 @@ export interface Project {
   notionProjectId: string | null;
   /** Google Spreadsheet **id** (không phải URL) bot điền weekly report vào. Rỗng = chưa bật. */
   weeklySheetId: string | null;
+  /**
+   * Sheet chứa LỊCH PHÁT HÀNH (tab `Timeline`, cột Version | Date) — bot đọc khi bấm
+   * "Sync lịch" ở Timeline để điền feature_labels.release_date. KHÁC `weeklySheetId`:
+   * đó là sheet báo cáo tuần. Rỗng = dự án không đồng bộ lịch. Migration 0033.
+   */
+  releaseSheetId: string | null;
   createdAt?: Timestamp;
   createdBy: string;
 }

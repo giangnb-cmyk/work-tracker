@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
@@ -6,6 +7,7 @@ import DateRangePicker from './DateRangePicker';
 import TaskModal from './TaskModal';
 import { TIMELINE_PRESETS, startOfDay, type DateRange } from '../lib/dateRange';
 import { buildVersionRows, type FeatureRow, type TaskBar, type VersionRow } from '../lib/timelineRows';
+import { requestReleaseSync } from '../lib/releaseSyncWrites';
 import TimelineFeatureRow, { type TimelineScale } from './timeline/TimelineFeatureRow';
 import FeatureTasksModal from './timeline/FeatureTasksModal';
 import type { Feature, Task } from '../types';
@@ -25,6 +27,7 @@ function label(ms: number): string {
  * tương lai).
  */
 export default function Timeline() {
+  const { user, isAdmin } = useAuth();
   const { selectedProjectId, selectedProject, features } = useSprintContext();
   const { tasks, loading } = useProjectTasks(selectedProjectId);
   const { labels } = useFeatureLabels(selectedProjectId);
@@ -34,6 +37,29 @@ export default function Timeline() {
   /** Feature đang mở popup danh sách task; null = không mở. */
   const [taskListRow, setTaskListRow] = useState<FeatureRow | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  /**
+   * Xếp yêu cầu cho bot đọc lại lịch từ sheet. Web không đọc được Google Sheets (service
+   * account chỉ có ở bot) nên không thể làm tại chỗ — bot rút hàng đợi rồi ghi lại, ngày
+   * mới tự hiện qua realtime.
+   */
+  async function syncRelease() {
+    if (!selectedProjectId) return;
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      await requestReleaseSync(selectedProjectId, user?.uid ?? '');
+      setSyncMsg('Đã gửi yêu cầu — bot đọc sheet trong giây lát, lịch tự cập nhật.');
+    } catch (err) {
+      console.error('Yêu cầu sync lịch phát hành thất bại', err);
+      setSyncMsg('Gửi yêu cầu thất bại (cần quyền admin, và migration 0033 đã áp).');
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMsg(null), 8000);
+    }
+  }
 
   const toggle = (set: Set<string>, key: string) => {
     const next = new Set(set);
@@ -169,6 +195,16 @@ export default function Timeline() {
           <p>Theo version — xổ một bản ra để xem feature, xổ feature để xem task.</p>
         </div>
         <div className="row" style={{ gap: '0.5rem' }}>
+          {isAdmin && (
+            <button
+              className="btn-sm"
+              onClick={syncRelease}
+              disabled={syncing}
+              title="Đọc lại lịch phát hành từ sheet release (tab Timeline)"
+            >
+              {syncing ? 'Đang gửi…' : '🔄 Sync lịch'}
+            </button>
+          )}
           {range && (
             <button className="btn-sm" onClick={() => setRange(null)}>Cả dự án</button>
           )}
@@ -176,10 +212,12 @@ export default function Timeline() {
         </div>
       </div>
 
-      {tasks.length === 0 ? (
-        <div className="glass empty">Chưa có task.</div>
-      ) : versionRows.length === 0 ? (
-        <div className="glass empty">Không có task nào trong khoảng này.</div>
+      {syncMsg && <div className="callout-inline" style={{ marginBottom: '1rem' }}>{syncMsg}</div>}
+
+      {versionRows.length === 0 ? (
+        <div className="glass empty">
+          Chưa có version nào chốt ngày phát hành, và cũng chưa có task nào trong khoảng này.
+        </div>
       ) : (
         <div className="glass tl-wrap">
           <div className="tl-scroll">

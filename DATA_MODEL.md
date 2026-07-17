@@ -101,6 +101,7 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `description`     | string         | optional short description                                |
 | `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
 | `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
+| `releaseSheetId`  | string \| null | Google Spreadsheet **id** chứa lịch phát hành, tab `Timeline` (migration `0033`). KHÁC `weeklySheetId` — hai sheet khác nhau, xem `release_sync_requests` |
 | `createdAt`       | Timestamp      | creation time                                             |
 | `createdBy`       | string         | uid of creator                                            |
 
@@ -385,6 +386,28 @@ Nút **🧪 Gửi test** ở tab **Cấu hình** (admin, `components/MemberDmTes
 > số task **đã xong trong tuần** (từ thứ 2 00:00 giờ VN, đếm qua bảng `activity` — chỉ có
 > dữ liệu từ khi áp `0007`), số task **tồn đọng** (có assignee, chưa done, kèm số trễ hạn,
 > liệt kê tối đa 5 task) + 1 câu động viên. Chỉ DM người có `profiles.discord_id`.
+
+---
+
+## `release_sync_requests` (hàng đợi đồng bộ lịch phát hành)
+
+`{ id, project_id, requested_by, status, result, created_at, processed_at }` — migration `0033`.
+
+Nút **🔄 Sync lịch** ở tab **Timeline** (admin): web insert 1 dòng, bot (service-role)
+quét mỗi `bug_sync_poll_seconds`, đọc tab **`Timeline`** của `projects.release_sheet_id`
+(cột `Version | Date`) rồi ghi `feature_labels.release_date` cho nhãn version TRÙNG TÊN,
+sau đó ghi lại `status` (`pending → done | error`) + `result`. Cùng khuôn hàng-đợi với
+`bug_sync_requests` / `member_dm_requests`; RLS admin-only cả insert lẫn select.
+
+> **Vì sao phải đi vòng qua bot**: web KHÔNG đọc được Google Sheets — service account chỉ
+> có ở bot (`bot/skills/drive_gateway.py`). Skill: `bot/skills/release_sync.py`, chạy tay
+> được: `python skills/release_sync.py --project <uuid>`.
+>
+> Bot đọc **serial thô** (`UNFORMATTED_VALUE`) chứ không đọc chuỗi đã format: `6/1/2026`
+> không phân biệt được 1/6 với 6/1 — đoán sai là lệch cả lịch phát hành.
+>
+> Sheet có version mà app chưa có nhãn → **báo trong `result`, KHÔNG tự tạo nhãn**: nhãn
+> là thứ người dùng gắn tay vào feature, để bot đẻ ra thì lạc nhãn lúc nào không biết.
 
 ---
 

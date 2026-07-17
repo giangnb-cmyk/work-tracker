@@ -52,6 +52,7 @@ import bug_sync  # noqa: E402  — doc forum Discord -> upsert bang `bugs`
 import weekly_report  # noqa: E402  — task Supabase -> Google Sheet cua tung project
 import weekly_mail  # noqa: E402  — soan + gui mail weekly report tu template Gmail
 import member_dm  # noqa: E402  — DM diem tuan (task xong/ton dong) cho tung member
+import release_sync  # noqa: E402  — sheet release -> feature_labels.release_date
 from supabase_client import get_client  # noqa: E402
 
 # Hint chi Claude cach + khi nao chay tung skill: xem hints.py.
@@ -690,9 +691,52 @@ async def _process_sync_request(sb, req):
         log.warning("Cập nhật trạng thái sync request lỗi: %s", e)
 
 
+@tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
+async def poll_release_sync_requests():
+    """Quet yeu cau 'Sync lich' tu web (bang release_sync_requests, nut o tab Timeline).
+
+    Web khong doc duoc Google Sheets (service account chi co o bot) nen phai di duong nay
+    — xem migration 0033.
+    """
+    try:
+        sb = get_client()
+        pending = await asyncio.to_thread(
+            lambda: sb.table("release_sync_requests").select("*").eq("status", "pending")
+            .order("created_at").execute().data
+        )
+    except Exception as e:
+        log.warning("Đọc release_sync_requests lỗi (chưa áp migration 0033?): %s", e)
+        return
+    for req in pending or []:
+        await _process_release_sync_request(sb, req)
+
+
+async def _process_release_sync_request(sb, req):
+    status, result = "done", ""
+    try:
+        # sync_project chan (goi Sheets + Supabase dong bo) -> day sang thread, dung treo
+        # event loop cua discord.py.
+        result = await asyncio.to_thread(release_sync.sync_project, sb, req["project_id"])
+    except Exception as e:
+        status, result = "error", str(e)[:300]
+        log.exception("Xử lý yêu cầu sync lịch phát hành lỗi")
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        await asyncio.to_thread(
+            lambda: sb.table("release_sync_requests").update(
+                {"status": status, "result": result, "processed_at": now_iso}
+            ).eq("id", req["id"]).execute()
+        )
+    except Exception as e:
+        log.warning("Cập nhật trạng thái sync lịch lỗi: %s", e)
+
+
 @client.event
 async def on_ready():
     log.info("Bot online: %s (id=%s)", client.user, client.user.id)
+    if not poll_release_sync_requests.is_running():
+        poll_release_sync_requests.start()
+        log.info("Quét yêu cầu sync lịch phát hành từ web mỗi %ds", BUG_SYNC_POLL_SECONDS)
     if BUG_FORUMS:
         if not daily_bug_sync.is_running():
             daily_bug_sync.start()
