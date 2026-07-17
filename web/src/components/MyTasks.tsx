@@ -13,6 +13,7 @@ import TaskModal from './TaskModal';
 import CreateTaskCard from './CreateTaskCard';
 import BugList from './bug/BugList';
 import BugModal from './bug/BugModal';
+import Switch from './Switch';
 import type { Bug, Task, TaskStatus } from '../types';
 
 type ViewMode = 'list' | 'gallery';
@@ -33,6 +34,7 @@ export default function MyTasks() {
   const [editingBug, setEditingBug] = useState<Bug | null>(null);
   const [creating, setCreating] = useState(false);
   const [mode, selectMode] = useStoredView<ViewMode>(MODE_KEY, VIEW_MODES, 'list');
+  const [showDoneBugs, setShowDoneBugs] = useState(false);
 
   const jobRoleOf = useMemo(() => {
     const map = new Map(members.map((m) => [m.uid, m.jobRole]));
@@ -53,6 +55,10 @@ export default function MyTasks() {
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const openBugs = bugs.filter((b) => b.status !== 'done').length;
+  const visibleBugs = useMemo(
+    () => (showDoneBugs ? bugs : bugs.filter((b) => b.status !== 'done')),
+    [bugs, showDoneBugs],
+  );
 
   function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
@@ -122,18 +128,31 @@ export default function MyTasks() {
       {/* Bug được giao — tách hẳn khỏi task, tiêu đề riêng cho dễ nhìn. */}
       {bugs.length > 0 && (
         <section className="mt-bugs">
-          <div className="mt-subhead">
-            <h2>🐞 Bug được giao</h2>
-            <p className="muted">
-              {openBugs} bug đang mở · {bugs.length - openBugs} đã xong · {selectedProject?.name ?? 'dự án'}
-            </p>
+          <div className="mt-subhead row between">
+            <div>
+              <h2>🐞 Bug được giao</h2>
+              <p className="muted">
+                {openBugs} bug đang mở · {bugs.length - openBugs} đã xong · {selectedProject?.name ?? 'dự án'}
+              </p>
+            </div>
+            {/* Mặc định giấu bug đã xong: đây là danh sách VIỆC CÒN PHẢI LÀM, bug xong
+                nằm lại chỉ tổ đẩy việc đang mở xuống dưới. */}
+            <Switch
+              checked={showDoneBugs}
+              onChange={setShowDoneBugs}
+              label="Hiện bug đã xong"
+            />
           </div>
-          <BugList
-            bugs={bugs}
-            labelsById={labelsById}
-            projectName={selectedProject?.name ?? ''}
-            onOpen={setEditingBug}
-          />
+          {visibleBugs.length > 0 ? (
+            <BugList
+              bugs={visibleBugs}
+              labelsById={labelsById}
+              projectName={selectedProject?.name ?? ''}
+              onOpen={setEditingBug}
+            />
+          ) : (
+            <div className="glass empty">Không còn bug nào đang mở. 🎉</div>
+          )}
         </section>
       )}
 

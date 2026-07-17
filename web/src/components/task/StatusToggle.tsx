@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import Switch from '../Switch';
 import type { TaskStatus } from '../../types';
 
 interface Props {
@@ -12,6 +13,9 @@ interface Props {
  * (so a task parked in "Đang làm"/"Review" isn't flattened to "todo" by an
  * accidental toggle). The data model keeps all 4 statuses — only this control
  * is binary, per the requested "Hoàn thành / Chưa làm" label.
+ *
+ * Phần nhìn nằm ở components/Switch (dùng chung với chỗ khác); ở đây chỉ còn luật
+ * ánh xạ bool <-> TaskStatus.
  */
 export default function StatusToggle({ value, onChange, disabled }: Props) {
   const isDone = value === 'done';
@@ -21,25 +25,13 @@ export default function StatusToggle({ value, onChange, disabled }: Props) {
     if (value !== 'done') prevRef.current = value;
   }, [value]);
 
-  function toggle() {
-    if (disabled) return;
-    onChange(isDone ? prevRef.current : 'done');
-  }
-
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={isDone}
-      aria-label="Trạng thái hoàn thành"
-      className={`status-toggle${isDone ? ' on' : ''}${disabled ? ' disabled' : ''}`}
+    <Switch
+      checked={isDone}
+      onChange={(next) => onChange(next ? 'done' : prevRef.current)}
+      label={isDone ? 'Hoàn thành' : 'Chưa làm'}
       disabled={disabled}
-      onClick={toggle}
-    >
-      <span className="stg-track" aria-hidden>
-        <span className="stg-thumb" />
-      </span>
-      <span className="stg-label">{isDone ? 'Hoàn thành' : 'Chưa làm'}</span>
-    </button>
+      ariaLabel="Trạng thái hoàn thành"
+    />
   );
 }
