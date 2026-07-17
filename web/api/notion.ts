@@ -20,7 +20,28 @@ function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-sync-secret');
 }
 
+/**
+ * Bọc TOÀN BỘ handler, không chừa dòng nào ra ngoài try.
+ *
+ * Trên Vercel, một throw lọt ra khỏi handler thành 500 của hạ tầng: body do Vercel sinh,
+ * ta không chèn được gì vào, nên phía người dùng chỉ còn đúng con số 500 và phải đi mò log
+ * Vercel mới biết chuyện gì. `authorize()` từng nằm ngoài try đúng kiểu đó.
+ *
+ * Ở đây thì khác: mọi lỗi đều thành một mã CÓ NGHĨA kèm `detail` để UI đọc thẳng ra —
+ * và điều đó đúng ở cả local lẫn production, chứ không chỉ dưới `npm run dev`.
+ */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  try {
+    return await route(req, res);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('Gateway Notion chết ngoài dự tính', err);
+    if (res.writableEnded) return;
+    return res.status(502).json({ synced: false, error: 'gateway_crash', detail });
+  }
+}
+
+async function route(req: VercelRequest, res: VercelResponse) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -40,7 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { action, task, notionPageId } = req.body as {
+  // req.body có thể vắng (body rỗng / Content-Type lạ) — destructure thẳng là ném TypeError
+  // ra ngoài, và trên Vercel nó thành 500 trắng.
+  const { action, task, notionPageId } = (req.body ?? {}) as {
     action?: string;
     task?: NotionTaskInput;
     notionPageId?: string;
@@ -88,6 +111,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Unknown action' });
   } catch (err) {
     console.error('Đồng bộ Notion thất bại', err);
-    return res.status(502).json({ synced: false, error: 'notion_api_error' });
+    // Kèm message của Notion: "Priority is not a property that exists" nói thẳng phải đi
+    // sửa cột nào, còn 'notion_api_error' trơ trọi thì buộc phải mở log Vercel mới biết —
+    // mà chỉ admin mới vào được đó. Đây là API nội bộ sau cổng đăng nhập, không phải
+    // endpoint công khai, nên lộ message của Notion là chấp nhận được.
+    return res.status(502).json({
+      synced: false,
+      error: 'notion_api_error',
+      detail: err instanceof Error ? err.message : String(err),
+    });
   }
 }

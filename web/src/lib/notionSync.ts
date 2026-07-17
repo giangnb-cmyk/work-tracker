@@ -45,26 +45,30 @@ async function callGateway(body: unknown): Promise<SyncResult> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    // Nói ra NGUYÊN NHÂN thay vì mỗi con số: 3 mã này ứng với 3 chỗ hỏng hoàn toàn khác
-    // nhau, mà "Notion gateway 503" thì không ai đoán được phải đi sửa ở đâu.
+    // `detail` do gateway gửi kèm (api/notion.ts) — đọc TRƯỚC mọi nhánh và dùng cho mọi mã.
+    // Trên Vercel không có shim dev nào để mò, và log Vercel thì chỉ admin mới vào được:
+    // không đính lý do thật vào ngay đây là người bấm nút chỉ còn mỗi con số.
+    const detail = await res
+      .json()
+      .then((b: { detail?: string }) => b?.detail?.trim() || undefined)
+      .catch(() => undefined);
+    const withDetail = (msg: string) => new Error(detail ? `${msg} Chi tiết: ${detail}` : msg);
+
+    // Nói ra NGUYÊN NHÂN thay vì mỗi con số: mỗi mã ứng với một chỗ hỏng khác hẳn nhau,
+    // mà "Notion gateway 503" thì không ai đoán được phải đi sửa ở đâu.
     if (res.status === 503) {
-      throw new Error(
+      throw withDetail(
         'Server chưa cấu hình xác thực: thiếu SUPABASE_URL / SUPABASE_ANON_KEY ở /api ' +
           '(Vercel → Settings → Environment Variables, rồi Redeploy).',
       );
     }
-    if (res.status === 401) throw new Error('Phiên đăng nhập hết hạn. Tải lại trang rồi thử lại.');
+    if (res.status === 401) throw withDetail('Phiên đăng nhập hết hạn. Tải lại trang rồi thử lại.');
     if (res.status === 502) {
-      throw new Error(
-        'Notion từ chối yêu cầu. Hay gặp nhất: NOTION_PROP_* trỏ vào cột không có trong ' +
-          'Notion DB (vd cột Priority). Xem log Vercel để biết chi tiết.',
+      throw withDetail(
+        'Notion từ chối yêu cầu. Hay gặp nhất: NOTION_PROP_* trỏ vào cột không có trong Notion DB.',
       );
     }
-    // Gateway tự trả 401/502/503 cho mọi lỗi nó lường trước, nên tới được đây (hay gặp
-    // nhất là 500) tức là nó chết ngoài dự tính. Bám theo `detail` server gửi kèm nếu có:
-    // không có nó thì chỉ còn mỗi con số, phải đi mò log terminal/Vercel mới lần ra.
-    const detail = await res.json().then((b: { detail?: string }) => b?.detail).catch(() => undefined);
-    throw new Error(`Notion gateway lỗi ${res.status}.${detail ? ` Chi tiết: ${detail}` : ''}`);
+    throw withDetail(`Notion gateway lỗi ${res.status}.`);
   }
   return (await res.json()) as SyncResult;
 }
