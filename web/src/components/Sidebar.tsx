@@ -138,7 +138,7 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
             Xem như thành viên
           </button>
         )}
-        <button className="btn-sm" style={{ width: '100%', marginTop: '0.4rem' }} onClick={signOut}>
+        <button className="btn-sm btn-signout" style={{ width: '100%', marginTop: '0.4rem' }} onClick={signOut}>
           Đăng xuất
         </button>
       </div>

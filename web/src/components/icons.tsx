@@ -73,6 +73,16 @@ export function FileIcon({ size = 20, className }: IconProps) {
   );
 }
 
+/** Cây bút — sửa nội dung tại chỗ (bình luận…). */
+export function PencilIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
 export function MoreVerticalIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className}>

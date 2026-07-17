@@ -73,16 +73,22 @@ export function makeLinkAttachment(url: string, name?: string): Attachment {
   };
 }
 
-/** Upload an image file to Storage and return an image attachment. Throws on failure. */
-export async function uploadImageAttachment(file: File): Promise<Attachment> {
+/**
+ * Upload an image file to Storage and return an image attachment. Throws on failure.
+ *
+ * @param name ghi đè tên hiển thị. Dành cho ảnh dán từ clipboard — trình duyệt đặt tên
+ *   mọi ảnh dán là 'image.png', để nguyên thì cả lưới Ref toàn thumbnail trùng tên.
+ */
+export async function uploadImageAttachment(file: File, name?: string): Promise<Attachment> {
   const id = uid();
-  const path = `task-attachments/${id}-${file.name.replace(/[^\w.-]/g, '_')}`;
+  const label = (name || file.name || 'image.png').trim();
+  const path = `task-attachments/${id}-${label.replace(/[^\w.-]/g, '_')}`;
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false });
   if (error) throw error;
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return { id, kind: 'image', url: data.publicUrl, name: file.name, provider: 'image', storagePath: path };
+  return { id, kind: 'image', url: data.publicUrl, name: label, provider: 'image', storagePath: path };
 }
 
 /** Best-effort delete of an uploaded image's underlying Storage object. */

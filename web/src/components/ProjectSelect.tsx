@@ -24,7 +24,7 @@ export default function ProjectSelect() {
         <div className="row" style={{ gap: '0.6rem' }}>
           <Avatar name={profile?.displayName ?? ''} photoURL={profile?.photoURL} size="sm" />
           <span className="muted" style={{ fontSize: '0.85rem' }}>{profile?.displayName}</span>
-          <button className="btn-sm" onClick={signOut}>Đăng xuất</button>
+          <button className="btn-sm btn-signout" onClick={signOut}>Đăng xuất</button>
         </div>
       </header>
 

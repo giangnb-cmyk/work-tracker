@@ -1,28 +1,12 @@
 import { useState } from 'react';
-import Avatar from './Avatar';
+import ActivityItem from './task/ActivityItem';
 import { useActivity } from '../hooks/useActivity';
-import { addComment } from '../lib/activityWrites';
-import { timeAgo } from '../lib/format';
-import { STATUS_LABEL, type Activity, type TaskStatus } from '../types';
+import { addComment, canEditComment } from '../lib/activityWrites';
 
 interface Props {
   taskId: string;
   actorId: string;
   actorName: string;
-}
-
-/** Renders the human sentence for an activity entry (comment body is shown separately). */
-function actionText(a: Activity): string {
-  switch (a.type) {
-    case 'created':
-      return 'đã tạo task này';
-    case 'status_change':
-      return `đã cập nhật trạng thái thành ${STATUS_LABEL[a.body as TaskStatus] ?? a.body}`;
-    case 'comment':
-      return 'đã bình luận';
-    default:
-      return 'đã cập nhật task';
-  }
 }
 
 /** Right-hand Activity panel: live feed of events + a comment composer. */
@@ -69,16 +53,7 @@ export default function TaskActivity({ taskId, actorId, actorName }: Props) {
       ) : (
         <ul className="tm-feed">
           {items.map((a) => (
-            <li key={a.id} className="tm-feed-item">
-              <Avatar name={a.actorName || 'Hệ thống'} size="sm" />
-              <div className="tm-feed-body">
-                <div className="tm-feed-line">
-                  <strong>{a.actorName || 'Hệ thống'}</strong> {actionText(a)}
-                </div>
-                {a.type === 'comment' && <div className="tm-feed-comment">“{a.body}”</div>}
-                <div className="tm-feed-time">{timeAgo(a.createdAt)}</div>
-              </div>
-            </li>
+            <ActivityItem key={a.id} activity={a} canEdit={canEditComment(a, actorId)} />
           ))}
         </ul>
       )}

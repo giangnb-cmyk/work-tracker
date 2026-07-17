@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createFeature, updateFeature, type FeatureInput } from '../lib/featureWrites';
 import { createFeatureLabel } from '../lib/featureLabelWrites';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
+import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { sortFeatureLabels } from '../lib/featureLabelSort';
 import { useAuth } from '../contexts/AuthContext';
 import AttachmentsField from './task/AttachmentsField';
 import RefImagesSection from './task/RefImagesSection';
-import BugLabelChip from './bug/BugLabelChip';
+import LabelSelect from './LabelSelect';
 import { labelGroup } from '../lib/bugLabelGroups';
 import type { Attachment, Feature, FeatureKind } from '../types';
 
@@ -33,14 +34,38 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
   // AttachmentsField (link) + RefImagesSection (ảnh) của TaskModal.
   const [attachments, setAttachments] = useState<Attachment[]>(feature?.attachments ?? []);
   const [saving, setSaving] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { labels } = useFeatureLabels(projectId);
   const sortedLabels = useMemo(() => sortFeatureLabels(labels), [labels]);
+  // Hai dropdown: nhãn nhóm (Shop, IAP…) và version. Version LÀ nhãn, chỉ tách ra cho
+  // khỏi phải dò '1.2.x' giữa cả rổ — cùng cách tab Bugs/Features tách facet version.
+  const groupLabels = useMemo(() => sortedLabels.filter((l) => labelGroup(l.name) !== 'version'), [sortedLabels]);
+  const versionLabels = useMemo(() => sortedLabels.filter((l) => labelGroup(l.name) === 'version'), [sortedLabels]);
+
+  /**
+   * Lưu theo đúng thứ tự hiển thị (nhãn nhóm trước, version sau) để chip trên card đọc
+   * nhất quán — thứ tự bấm chọn không nên quyết định thứ tự chip.
+   *
+   * Nhãn chưa tra được xếp bét bằng một số HỮU HẠN, không phải Infinity: lúc `labels`
+   * chưa tải xong thì mọi id đều chưa tra được, mà Infinity - Infinity = NaN và sort với
+   * comparator NaN là hành vi không xác định. Sort ổn định nên chúng giữ nguyên thứ tự cũ.
+   */
+  const orderedLabelIds = useMemo(() => {
+    const rank = new Map(sortedLabels.map((l, i) => [l.id, i]));
+    const rankOf = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
+    return [...labelIds].sort((a, b) => rankOf(a) - rankOf(b));
+  }, [labelIds, sortedLabels]);
 
   function toggleLabel(id: string) {
     setLabelIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
+
+  // Dạng hàm -> callback ổn định -> usePasteAttachment không gắn lại listener mỗi render.
+  const addAttachment = useCallback((att: Attachment) => setAttachments((prev) => [...prev, att]), []);
+  const showError = useCallback((msg: string) => setError(msg), []);
+  usePasteAttachment({ disabled: saving, onAdd: addAttachment, onError: showError, onBusy: setPasting });
 
   /** Tạo nhãn mới ngay trong modal và gắn luôn vào feature đang sửa. */
   async function addLabel() {
@@ -74,11 +99,12 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
     try {
       if (isEdit && feature) {
         await updateFeature(feature.id, {
-          name: name.trim(), icon, description: description.trim(), kind, labelIds, attachments,
+          name: name.trim(), icon, description: description.trim(), kind, labelIds: orderedLabelIds, attachments,
         });
       } else {
         const input: FeatureInput = {
-          projectId, name, icon, color: feature?.color ?? '#6366f1', description, kind, labelIds, attachments,
+          projectId, name, icon, color: feature?.color ?? '#6366f1', description, kind,
+          labelIds: orderedLabelIds, attachments,
         };
         await createFeature(input, user?.uid ?? '');
       }
@@ -92,7 +118,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-wide feat-modal" onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? 'Sửa feature' : 'Feature mới'}</h2>
 
         <div className="grid-2">
@@ -131,19 +157,36 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
           </div>
         </div>
 
+        <div className="grid-2">
+          <div className="field">
+            <span>Nhãn — nhóm (Shop, Gameplay…)</span>
+            <LabelSelect
+              options={groupLabels}
+              selectedIds={labelIds}
+              onToggle={toggleLabel}
+              placeholder="Chọn nhãn…"
+              emptyHint="Chưa có nhãn nhóm nào — thêm ở ô bên dưới."
+              disabled={saving}
+            />
+          </div>
+          <div className="field">
+            <span>Version delivery</span>
+            <LabelSelect
+              options={versionLabels}
+              selectedIds={labelIds}
+              onToggle={toggleLabel}
+              placeholder="Chọn version…"
+              emptyHint="Chưa có version nào — thêm ở ô bên dưới (vd: 1.2.x)."
+              disabled={saving}
+            />
+          </div>
+        </div>
+
         <div className="field">
-          <span>Nhãn — nhóm (Shop, Gameplay…) + version delivery (1.2.0)</span>
-          {sortedLabels.length > 0 && (
-            <div className="feat-chip-row">
-              {sortedLabels.map((l) => (
-                <BugLabelChip key={l.id} label={l} active={labelIds.includes(l.id)} onClick={() => toggleLabel(l.id)} />
-              ))}
-            </div>
-          )}
           <div className="feat-label-new">
             <input
               className="input"
-              placeholder="Thêm nhãn mới… (vd: Shop, 1.2.0)"
+              placeholder="Thêm nhãn mới… (vd: Shop, 1.2.x)"
               value={newLabel}
               maxLength={40}
               onChange={(e) => setNewLabel(e.target.value)}
@@ -155,10 +198,14 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
           </div>
         </div>
 
-        <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={saving} />
+        <div className="field">
+          <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={saving} />
+        </div>
         <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={saving} />
         <p className="perf-hint" style={{ marginTop: '0.75rem' }}>
-          Mọi task thuộc feature này sẽ tự thấy các link và ảnh ở trên.
+          {pasting
+            ? 'Đang tải ảnh vừa dán lên…'
+            : 'Ctrl+V để dán thẳng ảnh hoặc link vào đây. Mọi task thuộc feature này sẽ tự thấy các link và ảnh ở trên.'}
         </p>
 
         {error && <p className="error-text">{error}</p>}

@@ -13,7 +13,9 @@ import FeatureModal from './FeatureModal';
 import CreateTaskCard from './CreateTaskCard';
 import BugLabelChip from './bug/BugLabelChip';
 import FeatureAvatars, { type FeaturePerson } from './FeatureAvatars';
-import type { Feature, FeatureKind, FeatureLabel, Task, TaskStatus } from '../types';
+import FeatureTeamRow from './FeatureTeamRow';
+import FeatureFilterBar, { matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
+import type { Feature, FeatureLabel, Task, TaskStatus } from '../types';
 
 const DAY = 86_400_000;
 
@@ -26,13 +28,14 @@ interface FeatureStats {
   byUid: Map<string, { count: number; name: string }>;
 }
 
-// Dùng chung cho card chưa có task: khỏi tạo object mới mỗi lần render một card.
-const EMPTY_STATS = { done: 0, total: 0, done30: 0 };
+// Feature chưa có task nào. Dùng chung cho cả card lẫn bộ lọc: khỏi tạo object mới mỗi
+// lần render một card / xét một feature.
+const EMPTY_STATS: FeatureStats = { done: 0, total: 0, done30: 0, byUid: new Map() };
 const EMPTY_PEOPLE: FeaturePerson[] = [];
 
 /** Features tab: a card grid of the project's features; open one to see its tasks. */
 export default function Features() {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { features, featuresLoading, selectedProjectId, selectedProject, members } = useSprintContext();
   const { tasks, loading: tasksLoading } = useProjectTasks(selectedProjectId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -42,22 +45,14 @@ export default function Features() {
   const { labels } = useFeatureLabels(selectedProjectId);
   const sortedLabels = useMemo(() => sortFeatureLabels(labels), [labels]);
   const labelById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
-  // Lọc: loại (Tất cả/Gói bán/Liên tục) + nhãn — feature phải mang ĐỦ các nhãn đã chọn.
-  const [kindFilter, setKindFilter] = useState<'all' | FeatureKind>('all');
-  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([]);
+  // Lọc token như tab Bugs: loại / nhãn / version / người làm + tìm theo tên.
+  const [tokens, setTokens] = useState<FeatureFilterToken[]>([]);
+  const [query, setQuery] = useState('');
+  const meId = user?.uid ?? '';
 
   const projectFeatures = useMemo(
     () => features.filter((f) => f.projectId === selectedProjectId),
     [features, selectedProjectId],
-  );
-  const visibleFeatures = useMemo(
-    () =>
-      projectFeatures.filter(
-        (f) =>
-          (kindFilter === 'all' || f.kind === kindFilter) &&
-          filterLabelIds.every((id) => f.labelIds.includes(id)),
-      ),
-    [projectFeatures, kindFilter, filterLabelIds],
   );
 
   /** done/total (+ done 30 ngày cho feature liên tục) + ai đang gánh — một vòng lặp cho tất cả. */
@@ -105,9 +100,14 @@ export default function Features() {
     return out;
   }, [statsByFeature, members]);
 
-  function toggleFilterLabel(id: string) {
-    setFilterLabelIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
+  // Sau statsByFeature: facet "tiến độ" và "người làm" lọc trên chính số liệu gộp từ task.
+  const visibleFeatures = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return projectFeatures.filter((f) => {
+      if (!matchFeature(f, tokens, statsByFeature.get(f.id) ?? EMPTY_STATS, meId)) return false;
+      return !q || f.name.toLowerCase().includes(q);
+    });
+  }, [projectFeatures, tokens, query, statsByFeature, meId]);
 
   const selected = projectFeatures.find((f) => f.id === selectedId) ?? null;
 
@@ -122,6 +122,7 @@ export default function Features() {
         labels={selected.labelIds
           .map((id) => labelById.get(id))
           .filter((l): l is FeatureLabel => Boolean(l))}
+        people={peopleByFeature.get(selected.id) ?? EMPTY_PEOPLE}
         // Truyền task xuống thay vì để con tự gọi useProjectTasks lần nữa. Trùng topic
         // realtime giờ đã vô hại (useLiveQuery tự thêm id riêng cho mỗi instance), nhưng
         // fetch lại y hệt bộ task đó vẫn là thừa — một query, một channel là đủ.
@@ -146,39 +147,15 @@ export default function Features() {
         <p>Các hạng mục tính năng của {selectedProject?.name ?? 'dự án'}. Mỗi task gắn với một feature.</p>
       </div>
 
-      {(sortedLabels.length > 0 || projectFeatures.length > 0) && (
-        <div className="featflt">
-          <div className="fk-pills sm">
-            {([['all', 'Tất cả'], ['delivery', '🎯 Gói bán'], ['ongoing', '🔁 Liên tục']] as const).map(([k, lb]) => (
-              <button
-                key={k}
-                type="button"
-                className={`fk-pill${kindFilter === k ? ' on' : ''}`}
-                onClick={() => setKindFilter(k)}
-              >
-                {lb}
-              </button>
-            ))}
-          </div>
-          {sortedLabels.length > 0 && (
-            <div className="feat-chip-row">
-              {sortedLabels.map((l) => (
-                <BugLabelChip
-                  key={l.id}
-                  label={l}
-                  small
-                  active={filterLabelIds.includes(l.id)}
-                  onClick={() => toggleFilterLabel(l.id)}
-                />
-              ))}
-            </div>
-          )}
-          {(kindFilter !== 'all' || filterLabelIds.length > 0) && (
-            <button className="btn-sm" onClick={() => { setKindFilter('all'); setFilterLabelIds([]); }}>
-              Xoá lọc
-            </button>
-          )}
-        </div>
+      {projectFeatures.length > 0 && (
+        <FeatureFilterBar
+          labels={sortedLabels}
+          members={members}
+          tokens={tokens}
+          onTokens={setTokens}
+          query={query}
+          onQuery={setQuery}
+        />
       )}
 
       <div className="project-grid">
@@ -193,12 +170,12 @@ export default function Features() {
           const percent = total === 0 ? 0 : Math.round((done / total) * 100);
           const chips = f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l));
           return (
-            <button key={f.id} className="project-card glass" onClick={() => setSelectedId(f.id)}>
+            <button key={f.id} className="project-card feat-card glass" onClick={() => setSelectedId(f.id)}>
               <span className="project-icon" style={{ background: `${f.color}22` }}>{f.icon}</span>
               <span className="project-name">{f.name}</span>
               {chips.length > 0 && (
-                <span className="feat-chips">
-                  {chips.map((l) => <BugLabelChip key={l.id} label={l} small />)}
+                <span className="feat-chips feat-chips-lg">
+                  {chips.map((l) => <BugLabelChip key={l.id} label={l} />)}
                 </span>
               )}
               {f.kind === 'ongoing' ? (
@@ -237,6 +214,8 @@ interface DetailProps {
   feature: Feature;
   /** Nhãn của feature (đã resolve từ labelIds), do cha tra sẵn. */
   labels: FeatureLabel[];
+  /** Ai có task trong feature, nhiều task đứng trước — cha đã gộp sẵn từ cùng bộ task. */
+  people: FeaturePerson[];
   /** Task của cả project, do component cha fetch — xem chú thích ở chỗ gọi. */
   tasks: Task[];
   loading: boolean;
@@ -246,7 +225,7 @@ interface DetailProps {
   onCloseEdit: () => void;
 }
 
-function FeatureDetail({ feature, labels, tasks, loading, onBack, onEdit, editingFeature, onCloseEdit }: DetailProps) {
+function FeatureDetail({ feature, labels, people, tasks, loading, onBack, onEdit, editingFeature, onCloseEdit }: DetailProps) {
   const { user, isAdmin } = useAuth();
   const { members, selectedSprintId } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
@@ -283,11 +262,17 @@ function FeatureDetail({ feature, labels, tasks, loading, onBack, onEdit, editin
         {onEdit && <button className="btn-sm" onClick={onEdit}>Sửa</button>}
       </div>
       {labels.length > 0 && (
-        <div className="feat-chip-row" style={{ marginBottom: '0.6rem' }}>
-          {labels.map((l) => <BugLabelChip key={l.id} label={l} small />)}
+        <div className="feat-chip-row feat-chips-lg" style={{ marginBottom: '0.6rem' }}>
+          {labels.map((l) => <BugLabelChip key={l.id} label={l} />)}
         </div>
       )}
-      {feature.description && <p className="muted" style={{ marginBottom: '1rem' }}>{feature.description}</p>}
+      <FeatureTeamRow people={people} />
+      {feature.description && (
+        <div className="feat-block">
+          <span className="feat-cap">Description</span>
+          <p className="muted feat-desc">{feature.description}</p>
+        </div>
+      )}
 
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>

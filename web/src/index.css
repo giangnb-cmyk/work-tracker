@@ -35,6 +35,12 @@
      --surface, để gradient "Xem thêm" tắt dần về đúng nó mà không lộ vệt ở mép. */
   --desc-bg: #161f2c;
 
+  /* Chính --glass sau khi đã trộn lên --bg, dạng ĐẶC. Dùng cho thứ nổi lên trên nội
+     dung trang mà .glass không kham nổi: backdrop-filter chỉ làm mờ trong phạm vi
+     "backdrop root" gần nhất, nên hễ có tổ tiên cũng đặt backdrop-filter (.topbar) thì
+     lớp blur của con thành vô nghĩa và alpha 0.7 để lộ nguyên nội dung phía sau. */
+  --glass-solid: #1a2436;
+
   /* MỘT font duy nhất cho toàn app — không trộn họ chữ ở bất kỳ đâu.
      Inter được chọn vì nó vốn đã là font dùng nhiều nhất, đọc tốt ở cỡ 0.85rem của
      bảng dữ liệu, và có tabular-nums nên cột số vẫn thẳng hàng mà không cần font mono.
@@ -283,6 +289,11 @@ a:hover { text-decoration: underline; }
 }
 .btn-sm:hover { background: rgba(255, 255, 255, 0.1); }
 .btn-danger { color: var(--red); border-color: rgba(239, 68, 68, 0.3); }
+/* Đăng xuất: nền đỏ ĐẶC, chữ trắng đậm. Tách riêng khỏi .btn-danger — class đó đang là
+   đỏ nhạt viền mờ cho các nút Xoá nằm lẫn trong thanh công cụ, tô đặc hết thì mọi nút
+   Xoá đều hét lên. Đặt sau .btn-sm:hover để đè được nền hover xám. */
+.btn-signout { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
+.btn-signout:hover { background: #dc2626; border-color: #dc2626; }
 .btn-ghost { background: transparent; border: 1px solid transparent; }
 
 .input,
@@ -846,7 +857,17 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bug-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 .bug-row-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .bug-row-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.bug-row-status { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.1rem 0.4rem; border-radius: 6px; color: var(--st, #94a3b8); background: color-mix(in srgb, var(--st, #94a3b8) 18%, transparent); }
+/* Cùng khuôn hộp với .bug-chip.sm (font-size, line-height, padding, viền) để badge trạng
+   thái và chip nhãn đứng cạnh nhau không so le. Giữ RIÊNG border-radius vuông hơn: cùng
+   cỡ nhưng khác dáng thì vẫn phân biệt được "trạng thái" với "nhãn". */
+.bug-row-status {
+  display: inline-flex; align-items: center; line-height: 1;
+  font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 0.14rem 0.42rem; border-radius: 6px;
+  color: var(--st, #94a3b8);
+  background: color-mix(in srgb, var(--st, #94a3b8) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--st, #94a3b8) 45%, transparent);
+}
 .bug-row-ref { font-size: 0.76rem; }
 .bug-row-num { font-family: var(--font-mono); margin-left: 0.1rem; }
 .bug-row-side { display: flex; align-items: center; gap: 0.85rem; flex-shrink: 0; }
@@ -1533,10 +1554,37 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .tm-comment .btn-sm { align-self: flex-end; }
 .tm-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.25rem; }
 .tm-feed-item { display: flex; gap: 0.7rem; }
-.tm-feed-body { min-width: 0; font-size: 0.82rem; }
-.tm-feed-line { color: var(--muted); line-height: 1.45; }
+/* flex:1 chứ không chỉ min-width:0 — min-width:0 mới cho phép CO lại, còn base size vẫn
+   là auto (ôm theo nội dung) nên khối này không tự NỞ ra hết hàng: ô sửa và bình luận bị
+   bó thành một cột hẹp giữa panel thay vì chạm mép. */
+.tm-feed-body { flex: 1; min-width: 0; font-size: 0.82rem; }
+/* Hàng tên: câu mô tả bên trái, nút bút chì bám mép phải. */
+.tm-feed-line { display: flex; align-items: flex-start; gap: 0.4rem; }
+.tm-feed-said { flex: 1; min-width: 0; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
 .tm-feed-line strong { color: var(--text); font-weight: 600; }
-.tm-feed-comment { margin-top: 0.25rem; color: var(--text); background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 0.4rem 0.6rem; }
+/* overflow-wrap: anywhere — BẮT BUỘC, không phải cho đẹp: một URL dài không có dấu cách
+   nào nên không có chỗ ngắt dòng hợp lệ, để mặc định nó đẩy rộng cả ô và tràn ra ngoài
+   viền panel (min-width:0 ở .tm-feed-body chỉ cho phép co, không tự ngắt được chữ). */
+.tm-feed-comment {
+  margin-top: 0.25rem; color: var(--text); background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px; padding: 0.4rem 0.6rem; overflow-wrap: anywhere;
+}
+/* Bút chì cùng hàng với tên: không ăn chiều ngang của nội dung (link dài cần cả bề
+   rộng), mà vẫn luôn hiện — nút ẩn theo hover thì đúng lúc cần sửa lại không tìm ra. */
+.tm-feed-edit {
+  flex-shrink: 0; display: inline-flex; padding: 0.15rem; margin-top: -0.1rem;
+  background: none; border: none; border-radius: 5px; cursor: pointer;
+  color: var(--muted); transition: color 0.15s ease, background 0.15s ease;
+}
+.tm-feed-edit:hover { color: var(--sky); background: rgba(255, 255, 255, 0.07); }
+.tm-feed-editbox { margin-top: 0.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.tm-feed-editarea { min-height: 80px; font-size: 0.82rem; }
+.tm-feed-editrow { display: flex; justify-content: flex-end; gap: 0.4rem; }
+.tm-feed-edited { font-style: italic; }
+
+/* Link nằm trong chữ người dùng nhập (bình luận…) — components/Linkify.tsx. */
+.linkified { color: var(--sky); text-decoration: underline; }
+.linkified:hover { color: var(--primary); }
 .tm-feed-time { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; }
 
 @media (max-width: 900px) {
@@ -1738,33 +1786,65 @@ table.data-table { width: 100%; border-collapse: collapse; }
 }
 .profile-btn:hover { background: rgba(255, 255, 255, 0.05); }
 
-/* Tiến độ trên card feature: dùng lại .progress của task cho đồng bộ, chỉ mảnh hơn. */
+/* Tiến độ trên card feature: dùng lại .progress của task cho đồng bộ, vẫn mảnh hơn
+   (12px của task) nhưng đủ dày để thấy rõ ở cỡ card. */
 .feat-prog { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
-.feat-prog .progress { flex: 1; height: 7px; }
-.feat-pct { font-size: 0.72rem; color: var(--muted); flex-shrink: 0; }
+.feat-prog .progress { flex: 1; height: 10px; }
+.feat-pct { font-size: 0.8rem; color: var(--muted); flex-shrink: 0; }
+/* Số task xong / nhịp 30 ngày trên card feature. .project-meta gốc (0.75rem) là cỡ chú
+   thích cho card DỰ ÁN; ở card feature nó là số liệu chính nên to hơn. Bó trong
+   .feat-card để tab Dự án (ProjectSelect, Projects) dùng chung class mà không đổi theo. */
+.feat-card .project-meta { font-size: 0.85rem; }
 
 /* Feature: nhãn + loại (delivery/ongoing) + thanh lọc */
-.feat-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; }
+.feat-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; }
+/* Nhãn của feature (card + trang chi tiết) là thông tin CHÍNH — gói bán nào, version
+   nào — chứ không phải chú thích bên lề như chip trong danh sách bug, nên to hơn chip
+   mặc định. Bó trong .feat-chips-lg để tab Bugs không đổi theo. */
+.feat-chips-lg .bug-chip { font-size: 0.8rem; padding: 0.3rem 0.62rem; gap: 0.35rem; }
 
 /* Avatar người có task trong feature — chồng mép lên nhau ở đáy card.
-   Viền phải là màu ĐẶC (#1a2436 = --glass trộn lên --bg) chứ không phải rgba: viền
-   trong suốt sẽ để lộ avatar nằm dưới đúng chỗ vòng tròn cần cắt. content-box giữ
-   .avatar.sm đúng 24px, viền vẽ ra ngoài thay vì ăn vào trong. */
+   Viền phải là màu ĐẶC (--glass-solid) chứ không phải rgba: viền trong suốt sẽ để lộ
+   avatar nằm dưới đúng chỗ vòng tròn cần cắt. content-box giữ .avatar.sm đúng 24px,
+   viền vẽ ra ngoài thay vì ăn vào trong. */
 /* align-self đẩy sang mép phải: .project-card là flex column có align-items:flex-start
    nên mặc định mọi thứ bám trái. margin-top:auto ghim xuống đáy thẻ. */
 .feat-people { display: flex; align-items: center; margin-top: auto; align-self: flex-end; }
-.feat-people .avatar { border: 2px solid #1a2436; box-sizing: content-box; }
+.feat-people .avatar { border: 2px solid var(--glass-solid); box-sizing: content-box; }
 .feat-person { display: flex; }
 .feat-person + .feat-person, .feat-person-more { margin-left: -8px; }
 .feat-person-more {
   display: flex; align-items: center;
   height: 24px; padding: 0 0.4rem;
-  border: 2px solid #1a2436; border-radius: 999px; box-sizing: content-box;
+  border: 2px solid var(--glass-solid); border-radius: 999px; box-sizing: content-box;
   background: rgba(255, 255, 255, 0.08);
   color: var(--muted); font-size: 0.65rem; font-weight: 700;
 }
 .feat-chip-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.featflt { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.1rem; }
+
+/* Các khối đầu trang chi tiết feature (member, mô tả): nhãn ở trên, nội dung XUỐNG
+   DÒNG — nhãn nằm cùng hàng thì nội dung bị đẩy thụt vào, đọc rối. */
+.feat-block { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; margin-bottom: 0.9rem; }
+.feat-cap {
+  font-size: 0.72rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.feat-desc { margin: 0; }
+
+/* Ai đang làm feature. Khác chồng avatar ngoài card: ở đây có chỗ nên hiện luôn TÊN,
+   khỏi phải rê chuột đoán ai là ai. */
+.feat-team-list { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
+.feat-mate {
+  display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap;
+  padding: 0.2rem 0.55rem 0.2rem 0.2rem; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border);
+}
+.feat-mate-name { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.feat-mate-n {
+  font-size: 0.68rem; font-weight: 700; color: var(--muted);
+  padding: 0.05rem 0.35rem; border-radius: 999px; background: rgba(255, 255, 255, 0.07);
+}
+
 .fk-pills { display: flex; gap: 0.4rem; }
 .fk-pill {
   display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem;
@@ -1775,14 +1855,53 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .fk-pill small { font-size: 0.68rem; font-weight: 400; }
 .fk-pill:hover { color: var(--text); }
 .fk-pill.on { background: var(--primary); border-color: transparent; color: #fff; }
-.fk-pills.sm .fk-pill { flex-direction: row; padding: 0.3rem 0.65rem; font-size: 0.78rem; }
 .fk-badge {
   font-size: 0.7rem; font-weight: 600; color: var(--sky); white-space: nowrap;
   background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35);
   padding: 0.15rem 0.5rem; border-radius: 999px;
 }
-.feat-label-new { display: flex; gap: 0.4rem; margin-top: 0.45rem; }
+.feat-label-new { display: flex; gap: 0.4rem; }
 .feat-label-new .input { flex: 1; }
+
+/* Modal feature: form dài (icon/tên, mô tả, loại, 2 dropdown nhãn, tài liệu, ảnh ref) nên
+   .field 0.85rem mặc định đọc bị chật. Hai class để chắc chắn đè được .modal. */
+.modal.feat-modal .field { margin-bottom: 1.3rem; }
+.modal.feat-modal .grid-2 { gap: 1.1rem; align-items: start; }
+/* .field trong .grid-2 tự có khoảng cách của grid rồi — cộng thêm margin là hở toác. */
+.modal.feat-modal .grid-2 > .field { margin-bottom: 0; }
+.modal.feat-modal h2 { margin-bottom: 1.5rem; }
+
+/* Dropdown chọn nhãn (components/LabelSelect.tsx) */
+.lsel { position: relative; }
+.lsel-btn {
+  width: 100%; display: flex; align-items: center; gap: 0.5rem; min-height: 42px;
+  padding: 0.35rem 0.6rem; text-align: left; cursor: pointer;
+  background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  transition: border-color 0.15s ease;
+}
+.lsel-btn:hover:not(:disabled) { border-color: rgba(99, 102, 241, 0.5); }
+.lsel-btn.open { border-color: var(--primary); }
+.lsel-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.lsel-vals { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.lsel-ph { color: var(--muted); font-size: 0.85rem; }
+.lsel-caret { flex-shrink: 0; color: var(--muted); font-size: 0.7rem; }
+/* In-flow (không absolute) như .ss-panel: modal có overflow-y nên panel nổi sẽ bị CẮT ở
+   mép — để nó nong modal ra rồi cuộn thì không mất lựa chọn nào. Nền ĐẶC vì tổ tiên
+   .modal/.glass có backdrop-filter, blur của con không với tới nội dung dưới nó. */
+.lsel-pop {
+  position: relative; z-index: 50; margin-top: 4px; padding: 0.3rem;
+  max-height: 240px; overflow-y: auto;
+  background: var(--glass-solid); border: 1px solid var(--border); border-radius: 10px;
+}
+.lsel-opt {
+  width: 100%; display: flex; align-items: center; gap: 0.45rem; text-align: left;
+  padding: 0.35rem 0.4rem; border: none; border-radius: 7px; background: none; cursor: pointer;
+}
+.lsel-opt:hover { background: rgba(255, 255, 255, 0.06); }
+.lsel-opt.on { background: rgba(99, 102, 241, 0.14); }
+.lsel-check { flex-shrink: 0; width: 14px; color: var(--primary); font-size: 0.8rem; font-weight: 700; }
+.lsel-empty { margin: 0; padding: 0.5rem; color: var(--muted); font-size: 0.82rem; }
 
 .project-card-new {
   background: transparent;
@@ -1824,6 +1943,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
   display: grid;
   place-items: center;
 }
+/* Nền ĐẶC, không phải .glass: panel nổi trên nội dung trang, mà tổ tiên .topbar đã có
+   backdrop-filter nên lớp blur của .glass ở đây không với tới nội dung phía sau —
+   chỉ còn alpha 0.7 để nhìn xuyên xuống dưới. Đè cả background lẫn backdrop-filter
+   (thắng .glass nhờ đứng sau, cùng độ cụ thể); shadow thay blur để tách khỏi nền. */
 .notif-panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -1834,6 +1957,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
   overflow-y: auto;
   border-radius: 14px;
   padding: 0.5rem;
+  background: var(--glass-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.6);
 }
 .notif-head { font-weight: 600; padding: 0.5rem 0.75rem; font-size: 0.9rem; }
 .notif-list { list-style: none; margin: 0; padding: 0; }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Avatar from '../Avatar';
 import BugLabelChip from './BugLabelChip';
+import { isRedundantStatusLabel } from '../../lib/bugStatus';
 import { BUG_STATUSES, BUG_STATUS_LABEL, type Bug, type BugLabel, type BugStatus } from '../../types';
 
 interface Props {
@@ -57,13 +58,17 @@ export default function BugKanban({ bugs, labelsById, onOpen, onMove, canEditBug
                       {b.assigneeName && <Avatar name={b.assigneeName} size="sm" />}
                     </div>
                     <div className="bug-card-title">{b.title}</div>
-                    {b.labelIds.length > 0 && (
-                      <div className="bug-card-labels">
-                        {b.labelIds.map((id) => labelsById.get(id)).filter(Boolean).map((l) => (
-                          <BugLabelChip key={l!.id} label={l!} small />
-                        ))}
-                      </div>
-                    )}
+                    {/* Bỏ chip trùng: cột đang đứng ĐÃ LÀ trạng thái, thẻ khỏi nhắc lại. */}
+                    {(() => {
+                      const chips = b.labelIds
+                        .map((id) => labelsById.get(id))
+                        .filter((l): l is BugLabel => l !== undefined && !isRedundantStatusLabel(l.name, b.status));
+                      return chips.length > 0 && (
+                        <div className="bug-card-labels">
+                          {chips.map((l) => <BugLabelChip key={l.id} label={l} small />)}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

@@ -1,6 +1,7 @@
 import Avatar from '../Avatar';
 import BugLabelChip from './BugLabelChip';
 import { formatDate, timeAgo } from '../../lib/format';
+import { isRedundantStatusLabel } from '../../lib/bugStatus';
 import { BUG_STATUS_LABEL, type Bug, type BugLabel } from '../../types';
 
 interface Props {
@@ -24,9 +25,11 @@ export default function BugList({ bugs, labelsById, projectName, onOpen }: Props
               <span className="bug-row-ic" aria-hidden>🐞</span>
               <span className="bug-row-name">{b.title}</span>
               <span className={`bug-row-status s-${b.status}`}>{BUG_STATUS_LABEL[b.status]}</span>
-              {b.labelIds.map((id) => labelsById.get(id)).filter(Boolean).map((l) => (
-                <BugLabelChip key={l!.id} label={l!} small />
-              ))}
+              {/* Bỏ chip trùng với badge trạng thái ngay bên cạnh — xem isRedundantStatusLabel. */}
+              {b.labelIds
+                .map((id) => labelsById.get(id))
+                .filter((l): l is BugLabel => l !== undefined && !isRedundantStatusLabel(l.name, b.status))
+                .map((l) => <BugLabelChip key={l.id} label={l} small />)}
             </div>
             <div className="bug-row-ref muted">
               {projectName}<span className="bug-row-num">#{b.number}</span> · tạo {formatDate(b.createdAt)} bởi {b.reporterName || '—'}
