@@ -88,6 +88,7 @@ export function rowToFeatureLabel(r: Row): FeatureLabel {
     name: r.name,
     color: r.color ?? '#6366f1',
     icon: r.icon ?? '',
+    releaseDate: Timestamp.fromISO(r.release_date),
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };

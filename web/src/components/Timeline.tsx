@@ -7,6 +7,7 @@ import TaskModal from './TaskModal';
 import { TIMELINE_PRESETS, startOfDay, type DateRange } from '../lib/dateRange';
 import { buildVersionRows, type FeatureRow, type TaskBar, type VersionRow } from '../lib/timelineRows';
 import TimelineFeatureRow, { type TimelineScale } from './timeline/TimelineFeatureRow';
+import FeatureTasksModal from './timeline/FeatureTasksModal';
 import type { Feature, Task } from '../types';
 
 const DAY = 86_400_000;
@@ -30,7 +31,8 @@ export default function Timeline() {
   // null = "cả dự án": khung tự co giãn theo min→max hạn của toàn bộ task.
   const [range, setRange] = useState<DateRange | null>(null);
   const [openVersions, setOpenVersions] = useState<Set<string>>(new Set());
-  const [openFeatures, setOpenFeatures] = useState<Set<string>>(new Set());
+  /** Feature đang mở popup danh sách task; null = không mở. */
+  const [taskListRow, setTaskListRow] = useState<FeatureRow | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
 
   const toggle = (set: Set<string>, key: string) => {
@@ -50,17 +52,24 @@ export default function Timeline() {
     [tasks],
   );
 
-  // Khung "cả dự án": min→max các task có hạn, luôn chứa hôm nay.
+  /**
+   * Khung "cả dự án": min→max các task có hạn, luôn chứa hôm nay VÀ mọi ngày phát hành.
+   *
+   * Phải tính cả ngày phát hành: lịch release chốt trước, thường nằm xa hơn hạn task
+   * cuối cùng — bỏ ra ngoài thì bar version bị kẹp lại ở mép, nhìn như đã tới nơi.
+   */
   const projectDomain = useMemo(() => {
-    const dated = taskBars.filter((b) => b.hasDates);
     const now = startOfDay(Date.now());
-    if (dated.length === 0) return { start: now - DAY, end: now + 30 * DAY };
-    let min = Math.min(...dated.map((b) => b.start));
-    let max = Math.max(...dated.map((b) => b.end));
-    min = Math.min(min, now);
-    max = Math.max(max, now);
-    return { start: min - DAY, end: max + DAY };
-  }, [taskBars]);
+    const marks = [
+      ...taskBars.filter((b) => b.hasDates).flatMap((b) => [b.start, b.end]),
+      ...labels.map((l) => l.releaseDate?.toMillis()).filter((ms): ms is number => Boolean(ms)),
+    ];
+    if (marks.length === 0) return { start: now - DAY, end: now + 30 * DAY };
+    return {
+      start: Math.min(...marks, now) - DAY,
+      end: Math.max(...marks, now) + DAY,
+    };
+  }, [taskBars, labels]);
 
   const domain = useMemo(
     () => (range ? { start: startOfDay(range.fromMs), end: startOfDay(range.toMs) } : projectDomain),
@@ -192,6 +201,9 @@ export default function Timeline() {
                         {v.label ? `🏷️ ${v.label.name}` : '📦 Chưa gắn version'}
                       </span>
                       <span className="muted tl-who mono">
+                        {/* Ngày phát hành chốt ở sheet — hiện thẳng ra, đây là con số
+                            người ta mở Timeline lên để tìm. */}
+                        {v.releaseMs !== null && `🚩 ${label(v.releaseMs)} · `}
                         {v.rows.length} feature · {v.done}/{v.total}
                       </span>
                     </div>
@@ -224,9 +236,7 @@ export default function Timeline() {
                     <TimelineFeatureRow
                       key={`${v.key}:${row.feature?.id ?? 'other'}`}
                       row={row}
-                      open={openFeatures.has(`${v.key}:${row.feature?.id ?? 'other'}`)}
-                      onToggle={() => setOpenFeatures((s) => toggle(s, `${v.key}:${row.feature?.id ?? 'other'}`))}
-                      onOpenTask={setEditing}
+                      onOpen={() => setTaskListRow(row)}
                       scale={scale}
                     />
                   ))}
@@ -235,6 +245,15 @@ export default function Timeline() {
             })}
           </div>
         </div>
+      )}
+
+      {taskListRow && (
+        <FeatureTasksModal
+          row={taskListRow}
+          onClose={() => setTaskListRow(null)}
+          // Đóng popup trước rồi mới mở chi tiết: hai lớp popup chồng nhau đọc không ra.
+          onJump={(t) => { setTaskListRow(null); setEditing(t); }}
+        />
       )}
 
       {editing && (

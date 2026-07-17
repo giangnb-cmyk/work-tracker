@@ -32,6 +32,8 @@ export interface VersionRow {
   hasDates: boolean;
   done: number;
   total: number;
+  /** Ngày phát hành đã chốt (0032); null = chưa chốt -> mốc suy từ hạn task. */
+  releaseMs: number | null;
 }
 
 /**
@@ -68,7 +70,13 @@ export function buildVersionRows(rows: FeatureRow[], labels: FeatureLabel[]): Ve
     labels,
   ).map((g) => {
     const rs = g.features.map((f) => byId.get(f.id)).filter((r): r is FeatureRow => Boolean(r));
-    return { key: g.key, label: g.label, rows: rs, ...aggregate(rs) };
+    return {
+      key: g.key,
+      label: g.label,
+      rows: rs,
+      ...aggregate(rs),
+      releaseMs: g.label?.releaseDate?.toMillis() ?? null,
+    };
   });
 
   if (otherRow) {
@@ -77,8 +85,36 @@ export function buildVersionRows(rows: FeatureRow[], labels: FeatureLabel[]): Ve
       const merged = [...out[i].rows, otherRow];
       out[i] = { ...out[i], rows: merged, ...aggregate(merged) };
     } else {
-      out.push({ key: NO_VERSION, label: null, rows: [otherRow], ...aggregate([otherRow]) });
+      out.push({
+        key: NO_VERSION, label: null, rows: [otherRow], ...aggregate([otherRow]), releaseMs: null,
+      });
     }
   }
-  return out;
+  return applyReleaseWindows(out);
+}
+
+/**
+ * Version nào đã CHỐT ngày phát hành thì bar chạy theo lịch, không suy từ hạn task nữa:
+ * [ngày phát hành bản TRƯỚC → ngày phát hành của nó] — đúng cửa sổ làm ra bản đó.
+ *
+ * Vì sao không lấy mốc từ task: lịch phát hành chốt trước và không nhúc nhích khi một
+ * task bị dời hạn. Suy ngược từ task ra là để cái đuôi vẫy con chó — nhìn vào tưởng lịch
+ * đổi, trong khi sheet vẫn ghi y nguyên.
+ *
+ * Bản ĐẦU TIÊN không có "bản trước" -> lùi về ngày task sớm nhất của nó; không có task
+ * nào có hạn thì bar co lại thành một mốc đúng ngày phát hành.
+ * Version CHƯA chốt ngày -> giữ nguyên mốc suy từ task (hành vi cũ, không gãy).
+ *
+ * `out` đã sắp version giảm dần (groupFeaturesByVersion) nên "bản trước" nằm ở chỉ số
+ * lớn hơn; nhóm "chưa gắn version" không có ngày nên tự rơi vào nhánh giữ nguyên.
+ */
+function applyReleaseWindows(out: VersionRow[]): VersionRow[] {
+  const dated = out.filter((v) => v.releaseMs !== null);
+  return out.map((v) => {
+    if (v.releaseMs === null) return v;
+    const older = dated.filter((o) => (o.releaseMs as number) < v.releaseMs!);
+    const prev = older.length ? Math.max(...older.map((o) => o.releaseMs as number)) : null;
+    const start = prev ?? (v.hasDates ? Math.min(v.start, v.releaseMs) : v.releaseMs);
+    return { ...v, start, end: v.releaseMs, hasDates: true };
+  });
 }

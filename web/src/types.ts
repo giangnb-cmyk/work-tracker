@@ -180,6 +180,11 @@ export interface FeatureLabel {
   name: string;
   color: string;
   icon: string; // optional emoji
+  /**
+   * Ngày phát hành đã chốt của nhãn VERSION (migration 0032, nguồn: sheet release).
+   * null = nhãn không phải version, hoặc chưa chốt ngày → Timeline suy mốc từ hạn task.
+   */
+  releaseDate: Timestamp | null;
   createdAt?: Timestamp;
   createdBy: string;
 }

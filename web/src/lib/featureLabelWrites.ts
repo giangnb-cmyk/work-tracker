@@ -32,6 +32,11 @@ export async function updateFeatureLabel(id: string, patch: Partial<FeatureLabel
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.color !== undefined) row.color = patch.color;
   if (patch.icon !== undefined) row.icon = patch.icon;
+  // Ngày release của nhãn version (0032). Gửi dạng 'YYYY-MM-DD' — cột là `date`, nhét
+  // cả giờ vào là Postgres tự cắt, lệch múi giờ thì lệch luôn một ngày.
+  if (patch.releaseDate !== undefined) {
+    row.release_date = patch.releaseDate ? patch.releaseDate.toDate().toISOString().slice(0, 10) : null;
+  }
   const { error } = await supabase.from('feature_labels').update(row).eq('id', id);
   if (error) throw error;
 }

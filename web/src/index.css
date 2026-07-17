@@ -752,16 +752,23 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tl-caret { flex-shrink: 0; font-size: 0.95rem; color: var(--muted); transition: transform 0.15s ease; }
 .tl-caret.open { transform: rotate(90deg); }
 .tl-ver-bar { box-shadow: none; }
-/* Nút mở chi tiết task. Hiện mờ, rõ lên khi rê vào hàng — hàng gantt không tự nói được
-   là bấm vào thì có gì. */
-.tl-jump {
-  flex-shrink: 0; margin-left: 0.4rem; padding: 0.1rem 0.4rem; border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border);
-  color: var(--muted); font-size: 0.68rem; font-weight: 600; cursor: pointer;
-  opacity: 0.5; transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+/* Popup danh sách task của một feature (bấm hàng feature ở Timeline). */
+.modal.ftm-modal { width: min(620px, 100%); }
+.ftm-head { display: flex; align-items: baseline; gap: 0.7rem; margin-bottom: 1rem; }
+.ftm-head h2 { margin: 0; font-size: 1.15rem; }
+.ftm-count { font-size: 0.8rem; }
+.ftm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; max-height: 55vh; overflow-y: auto; }
+.ftm-item {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.7rem;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-soft); border-radius: 10px;
 }
-.tl-row:hover .tl-jump { opacity: 1; }
-.tl-jump:hover { color: var(--primary); border-color: var(--primary); }
+.ftm-item:hover { border-color: rgba(99, 102, 241, 0.45); }
+.ftm-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.ftm-title { font-size: 0.86rem; font-weight: 600; color: var(--text); }
+.ftm-sub { font-size: 0.74rem; }
+.ftm-jump { flex-shrink: 0; }
+.ftm-jump:hover { color: var(--primary); border-color: var(--primary); }
 .tl-feat-bar { overflow: hidden; }
 .tl-feat-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; opacity: 0.9; }
 
