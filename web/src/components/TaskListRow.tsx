@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import Avatar from './Avatar';
 import { daysUntil } from '../lib/format';
 import { taskProgress } from '../lib/sprint';
+import { PRIO_COLOR } from '../lib/taskColors';
 import { MoreVerticalIcon } from './icons';
 import { useClickOutside } from '../hooks/useClickOutside';
 import {
@@ -11,7 +12,6 @@ import {
   STATUS_LABEL,
   type JobRole,
   type Task,
-  type TaskPriority,
   type TaskStatus,
 } from '../types';
 
@@ -27,14 +27,6 @@ interface TaskListRowProps {
 }
 
 const UNDONE_STATUS: TaskStatus = 'in_progress';
-
-// Cùng thang màu với card (TaskRow) để hai dạng hiển thị đọc như một.
-const PRIO_COLOR: Record<TaskPriority, string> = {
-  low: '#94a3b8',
-  medium: '#fbbf24',
-  high: '#fb923c',
-  urgent: '#ef4444',
-};
 
 function fmtDay(task: Task): string {
   const d = task.dueDate?.toDate();

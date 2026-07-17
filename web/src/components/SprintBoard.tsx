@@ -11,18 +11,21 @@ import TaskModal from './TaskModal';
 import MeetingNoteModal from './MeetingNoteModal';
 import MoveSprintModal from './task/MoveSprintModal';
 import CreateTaskCard from './CreateTaskCard';
+import TaskFilterBar, { matchTask, type TaskFilterToken } from './TaskFilterBar';
 import type { Task, TaskStatus } from '../types';
 
 /**
  * Sprint task LIST (not Kanban — the team is lazy about moving cards).
  *
- * Chia SẴN theo bộ phận thay vì cho lọc: người dùng vào là thấy ngay phần việc của từng
- * bộ phận, không phải bấm lọc rồi bấm lại để so. Thứ tự mục cố định theo JOB_ROLES nên
- * không nhảy chỗ giữa các sprint.
+ * Vẫn chia SẴN theo bộ phận: vào là thấy ngay phần việc của từng bộ phận, không phải bấm
+ * lọc rồi bấm lại để so. Thứ tự mục cố định theo JOB_ROLES nên không nhảy chỗ giữa các
+ * sprint. Bộ lọc chỉ THU HẸP tập task rồi mới chia nhóm — hai thứ bù nhau chứ không thay
+ * nhau, nên sprint đông task vẫn soi được mà cái nhìn tổng vẫn còn.
  */
 export default function SprintBoard() {
   const { user, isAdmin } = useAuth();
-  const { selectedSprintId, selectedSprint, selectedProjectId, members, sprints } = useSprintContext();
+  const { selectedSprintId, selectedSprint, selectedProjectId, members, sprints, features } =
+    useSprintContext();
   const { confirmDoneNotify } = useNotify();
   const { tasks, loading } = useTasks(selectedSprintId);
   const { everTasks } = useSprintHistory(selectedSprintId);
@@ -30,6 +33,8 @@ export default function SprintBoard() {
   const [creating, setCreating] = useState(false);
   const [moving, setMoving] = useState<Task | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [tokens, setTokens] = useState<TaskFilterToken[]>([]);
+  const [query, setQuery] = useState('');
 
   // Task từng thuộc sprint này nhưng đã được chuyển đi làm tiếp ở sprint khác.
   const carriedAway = useMemo(
@@ -51,7 +56,21 @@ export default function SprintBoard() {
     () => tasks.filter((t) => t.projectId === selectedProjectId),
     [tasks, selectedProjectId],
   );
-  const groups = useMemo(() => groupTasksByDept(projectTasks, members), [projectTasks, members]);
+  // Feature của đúng dự án đang chọn — đưa vào bộ lọc thì đừng liệt kê feature dự án khác.
+  const projectFeatures = useMemo(
+    () => features.filter((f) => f.projectId === selectedProjectId),
+    [features, selectedProjectId],
+  );
+  const meId = user?.uid ?? '';
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return projectTasks.filter(
+      (t) => (!q || t.title.toLowerCase().includes(q)) && matchTask(t, tokens, meId),
+    );
+  }, [projectTasks, query, tokens, meId]);
+  // Chia nhóm SAU khi lọc: nhóm nào lọc hết task thì tự biến mất, khỏi để lại mục rỗng.
+  const groups = useMemo(() => groupTasksByDept(shown, members), [shown, members]);
+  const filtering = tokens.length > 0 || query.trim() !== '';
 
   const canChangeStatus = (t: Task) =>
     isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid;
@@ -81,6 +100,16 @@ export default function SprintBoard() {
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : (
         <>
+          {projectTasks.length > 0 && (
+            <TaskFilterBar
+              features={projectFeatures}
+              members={members}
+              tokens={tokens}
+              onTokens={setTokens}
+              query={query}
+              onQuery={setQuery}
+            />
+          )}
           {isAdmin && <CreateTaskCard variant="row" onClick={() => setCreating(true)} />}
 
           {groups.map((g) => (
@@ -106,8 +135,13 @@ export default function SprintBoard() {
             </section>
           ))}
 
+          {/* Phân biệt "chưa có task" với "lọc không ra": cùng một màn trống mà hai
+              nguyên nhân khác hẳn — nói nhầm là người dùng đi tạo task trong khi chỉ cần
+              xoá bộ lọc. */}
           {groups.length === 0 && (
-            <div className="glass empty">Sprint này chưa có task nào.</div>
+            <div className="glass empty">
+              {filtering ? 'Không có task nào khớp bộ lọc.' : 'Sprint này chưa có task nào.'}
+            </div>
           )}
         </>
       )}

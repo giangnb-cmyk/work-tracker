@@ -11,7 +11,7 @@ import { labelsForStatus } from '../lib/bugStatus';
 import BugKanban from './bug/BugKanban';
 import BugList from './bug/BugList';
 import BugModal from './bug/BugModal';
-import BugFilterBar, { matchBug, type FilterToken } from './bug/BugFilterBar';
+import BugFilterBar, { matchBug, type BugFilterToken } from './bug/BugFilterBar';
 import type { Bug, BugStatus } from '../types';
 
 type ViewMode = 'kanban' | 'list';
@@ -32,7 +32,7 @@ export default function Bugs() {
   const [seeding, setSeeding] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [tokens, setTokens] = useState<FilterToken[]>([]);
+  const [tokens, setTokens] = useState<BugFilterToken[]>([]);
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const canEditBug = (b: Bug) => isAdmin || b.reporterId === user?.uid || b.assigneeId === user?.uid;

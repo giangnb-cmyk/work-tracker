@@ -540,10 +540,10 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   border-color: rgba(99, 102, 241, 0.5); color: var(--text); background: rgba(99, 102, 241, 0.06);
 }
 
-.trow-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.trow-list { display: flex; flex-direction: column; gap: 0.55rem; }
 .trow {
-  display: flex; align-items: center; gap: 0.7rem;
-  padding: 0.5rem 0.75rem; border-radius: 10px; cursor: pointer;
+  display: flex; align-items: center; gap: 0.85rem;
+  padding: 0.85rem 1rem; border-radius: 12px; cursor: pointer;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-soft);
   transition: border-color 0.15s ease, background 0.15s ease;
@@ -563,20 +563,21 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .trow-check:disabled { cursor: default; opacity: 0.45; }
 .trow.done .trow-check { background: var(--green); border-color: var(--green); color: #fff; }
 
-.trow-icon { flex-shrink: 0; width: 20px; text-align: center; font-size: 0.95rem; }
+.trow-icon { flex-shrink: 0; width: 22px; text-align: center; font-size: 1.05rem; }
+/* Tiêu đề là thứ mắt đọc nhiều nhất trên dòng task nên nhích cỡ nhiều nhất. */
 .trow-title {
-  flex: 1; min-width: 0; font-weight: 600; font-size: 0.88rem;
+  flex: 1; min-width: 0; font-weight: 600; font-size: 0.97rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .trow-prio { flex-shrink: 0; }
-.trow-who { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; width: 150px; }
-.trow-who-name { font-size: 0.78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trow-due { flex-shrink: 0; width: 58px; font-size: 0.74rem; color: var(--muted); text-align: right; }
+.trow-who { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; width: 160px; }
+.trow-who-name { font-size: 0.85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow-due { flex-shrink: 0; width: 64px; font-size: 0.8rem; color: var(--muted); text-align: right; }
 .trow-due.overdue { color: var(--red); }
 .trow-prog { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; width: 110px; }
-.trow-prog .progress { flex: 1; height: 6px; }
-.trow-pct { font-size: 0.7rem; color: var(--muted); width: 30px; text-align: right; }
-.trow-status { flex-shrink: 0; width: 92px; font-size: 0.75rem; color: var(--muted); }
+.trow-prog .progress { flex: 1; height: 7px; }
+.trow-pct { font-size: 0.76rem; color: var(--muted); width: 34px; text-align: right; }
+.trow-status { flex-shrink: 0; width: 96px; font-size: 0.82rem; color: var(--muted); }
 
 /* Hẹp dần thì bỏ cột phụ trước, giữ tiêu đề + tick + menu tới cùng. */
 @media (max-width: 1180px) {
@@ -769,43 +770,46 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .bug-num { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); font-weight: 700; }
 
 /* GitLab-style token filter */
-.bugflt { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 1.1rem; }
-.bugflt-bar {
+/* Khung lọc token dùng chung cho Bugs lẫn task (components/TokenFilterBar.tsx).
+   Tên cũ là .bugflt-* từ hồi chỉ tab Bugs xài; đổi sang tok- vì giờ nó không còn
+   dính gì tới bug. */
+.tokflt { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 1.1rem; }
+.tokflt-bar {
   position: relative; flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
   background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: 10px; padding: 0.35rem 0.5rem;
 }
-.bugflt-search-ic { color: var(--muted); font-size: 0.85rem; }
-.bugflt-search { flex: 1; min-width: 140px; background: none; border: none; color: var(--text); font-size: 0.85rem; padding: 0.2rem; }
-.bugflt-search:focus { outline: none; }
-.bugflt-token { display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(99, 102, 241, 0.14); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 7px; padding: 0.15rem 0.2rem 0.15rem 0.45rem; font-size: 0.78rem; }
-.bugflt-token-facet { color: var(--muted); }
-.bugflt-token-op { color: var(--sky); }
-.bugflt-token-val { color: var(--text); font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bugflt-token-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 0.2rem; }
-.bugflt-token-x:hover { color: var(--red); }
-.bugflt-add { background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 6px; white-space: nowrap; }
-.bugflt-add:hover { color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+.tokflt-search-ic { color: var(--muted); font-size: 0.85rem; }
+.tokflt-search { flex: 1; min-width: 140px; background: none; border: none; color: var(--text); font-size: 0.85rem; padding: 0.2rem; }
+.tokflt-search:focus { outline: none; }
+.tokflt-token { display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(99, 102, 241, 0.14); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 7px; padding: 0.15rem 0.2rem 0.15rem 0.45rem; font-size: 0.78rem; }
+.tokflt-token-facet { color: var(--muted); }
+.tokflt-token-op { color: var(--sky); }
+.tokflt-token-val { color: var(--text); font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tokflt-token-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 0.2rem; }
+.tokflt-token-x:hover { color: var(--red); }
+.tokflt-add { background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 6px; white-space: nowrap; }
+.tokflt-add:hover { color: var(--primary); background: rgba(99, 102, 241, 0.1); }
 
-.bugflt-pop {
+.tokflt-pop {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 264px; max-height: 340px; overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.4rem;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); animation: popIn 0.16s ease;
 }
-.bugflt-pop-head { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; font-weight: 700; color: var(--muted); padding: 0.3rem 0.45rem; text-transform: uppercase; letter-spacing: 0.03em; }
-.bugflt-back { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; padding: 0; }
-.bugflt-back:hover { color: var(--text); }
-.bugflt-pop-opt { display: flex; align-items: center; gap: 0.5rem; width: 100%; background: none; border: none; color: var(--text); font-size: 0.85rem; padding: 0.5rem; border-radius: 8px; cursor: pointer; text-align: left; }
-.bugflt-pop-opt:hover { background: rgba(99, 102, 241, 0.15); }
-.bugflt-ops { display: flex; gap: 0.3rem; padding: 0.25rem 0.4rem 0.4rem; }
-.bugflt-op { flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: var(--muted); font-size: 0.78rem; padding: 0.3rem; border-radius: 7px; cursor: pointer; }
-.bugflt-op.on { background: var(--primary); color: #fff; border-color: transparent; }
-.bugflt-vals { display: flex; flex-direction: column; gap: 1px; max-height: 210px; overflow-y: auto; }
-.bugflt-val { display: flex; align-items: center; gap: 0.4rem; width: 100%; background: none; border: none; color: var(--text); font-size: 0.83rem; padding: 0.42rem 0.45rem; border-radius: 7px; cursor: pointer; text-align: left; }
-.bugflt-val:hover { background: rgba(255, 255, 255, 0.05); }
-.bugflt-val.on { background: rgba(99, 102, 241, 0.12); }
-.bugflt-check { width: 14px; flex-shrink: 0; color: var(--primary); font-size: 0.8rem; }
-.bugflt-apply { width: 100%; margin-top: 0.4rem; background: var(--primary); border: none; color: #fff; font-size: 0.82rem; font-weight: 600; padding: 0.5rem; border-radius: 8px; cursor: pointer; }
-.bugflt-apply:disabled { opacity: 0.5; cursor: default; }
+.tokflt-pop-head { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; font-weight: 700; color: var(--muted); padding: 0.3rem 0.45rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.tokflt-back { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.9rem; padding: 0; }
+.tokflt-back:hover { color: var(--text); }
+.tokflt-pop-opt { display: flex; align-items: center; gap: 0.5rem; width: 100%; background: none; border: none; color: var(--text); font-size: 0.85rem; padding: 0.5rem; border-radius: 8px; cursor: pointer; text-align: left; }
+.tokflt-pop-opt:hover { background: rgba(99, 102, 241, 0.15); }
+.tokflt-ops { display: flex; gap: 0.3rem; padding: 0.25rem 0.4rem 0.4rem; }
+.tokflt-op { flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: var(--muted); font-size: 0.78rem; padding: 0.3rem; border-radius: 7px; cursor: pointer; }
+.tokflt-op.on { background: var(--primary); color: #fff; border-color: transparent; }
+.tokflt-vals { display: flex; flex-direction: column; gap: 1px; max-height: 210px; overflow-y: auto; }
+.tokflt-val { display: flex; align-items: center; gap: 0.4rem; width: 100%; background: none; border: none; color: var(--text); font-size: 0.83rem; padding: 0.42rem 0.45rem; border-radius: 7px; cursor: pointer; text-align: left; }
+.tokflt-val:hover { background: rgba(255, 255, 255, 0.05); }
+.tokflt-val.on { background: rgba(99, 102, 241, 0.12); }
+.tokflt-check { width: 14px; flex-shrink: 0; color: var(--primary); font-size: 0.8rem; }
+.tokflt-apply { width: 100%; margin-top: 0.4rem; background: var(--primary); border: none; color: #fff; font-size: 0.82rem; font-weight: 600; padding: 0.5rem; border-radius: 8px; cursor: pointer; }
+.tokflt-apply:disabled { opacity: 0.5; cursor: default; }
 
 /* Native <select> popup readability on the dark theme */
 select.bugf-sel option, .select option { background: var(--surface); color: var(--text); }
