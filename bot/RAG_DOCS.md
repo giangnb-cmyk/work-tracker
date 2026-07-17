@@ -16,7 +16,12 @@ ngay trong **Supabase Postgres (pgvector)** — không cần database riêng.
 | `bot/skills/doc_search.py` | **CLI tìm kiếm** — Claude gọi khi người dùng hỏi về tài liệu |
 | `bot/skills/web_reader.py` | Tải nội dung từ URL (HTML/PDF) cho link |
 | `bot/skills/sync_docs.py` | **CLI đồng bộ** — mirror thư mục `docs/` vào RAG |
+| `bot/skills/drive_gateway.py` | Cổng gọi Google Drive API (chỉ đọc) — dùng chung cho 2 skill Drive |
+| `bot/skills/drive_catalog.py` | **CLI danh mục Drive** — tên + link ("file nằm ở đâu") |
+| `bot/skills/drive_ingest.py` | **CLI ruột Drive** — nội dung thật bên trong file ("trong file viết gì") |
+| `bot/skills/sheets_reader.py` | Đọc Google Sheet >10MB qua Sheets API (Drive từ chối export) |
 | `bot/sync-rag.bat` | Nhấp đúp để chạy đồng bộ |
+| `bot/sync-drive.bat` / `bot/sync-drive-content.bat` | Nhấp đúp: nạp danh mục / nạp ruột Drive |
 | `docs/` | Thư mục nguồn: bỏ file vào + dán link vào `links.txt` |
 
 `bot.py` đã được nối: thêm `DOC_HINT` vào system prompt và cho phép Claude chạy
@@ -53,6 +58,60 @@ Coi thư mục `docs/` (ở gốc repo) là **nguồn sự thật**:
 
 Lệnh đồng bộ sẽ nạp/embed lại mọi file + link, và **xoá khỏi RAG** những nguồn bạn đã gỡ
 khỏi `docs/` (mirror). Thêm `--no-prune` nếu không muốn xoá. Xem `docs/README.md`.
+
+## Tài liệu trên Google Drive: **danh mục** và **ruột**
+
+Hai skill bổ sung nhau, lịch daily chạy **cả hai**:
+
+| Skill | Nạp gì | Trả lời được câu hỏi |
+|-------|--------|----------------------|
+| `drive_catalog.py` | Danh mục: tên, loại, thư mục, link (1 chunk/file) | "Tài liệu M1_Balance nằm ở đâu?" → trả link |
+| `drive_ingest.py` | **Ruột**: nội dung thật trong Docs/Sheets/Slides/PDF/Word/Excel | "Trong M1_Balance quy định gì?" → trả lời + trích nguồn |
+
+```bash
+python skills\drive_catalog.py                  # danh mục (nhanh, ~1 phút)
+python skills\drive_ingest.py                   # ruột (xem lưu ý bên dưới)
+python skills\drive_ingest.py --dry-run         # chỉ đếm chunk, không nạp
+python skills\drive_ingest.py --no-skip         # nạp tất cả, bỏ mọi bộ lọc
+python skills\drive_ingest.py --force           # nạp lại cả file không đổi
+```
+
+### Bỏ qua file không đáng đọc ruột — `settings.json` > `rag_drive_skip`
+
+Dự án nào cũng có loại file **chỉ toàn bảng số / cặp chuỗi** — nạp ruột vào chỉ làm nhiễu
+kho mà không trả lời được câu hỏi nào, lại tốn hàng giờ embedding. Quy tắc để ở
+`settings.json`, **không hardcode** → dự án sau chỉ sửa config, không phải sửa code:
+
+```json
+"rag_drive_skip": {
+  "folders": ["csv_config"],
+  "name_contains": ["localization", "localize"]
+}
+```
+
+- `folders` — khớp **chính xác** tên thư mục Drive (không phân biệt hoa thường).
+- `name_contains` — khớp **một phần** tên file (`localization` bắt `M1 - Localization.csv`).
+- Thêm tạm cho 1 lần chạy: `--skip-folder <tên>` / `--skip-name <chuỗi>`; nạp hết: `--no-skip`.
+
+Skill in rõ **từng file bị bỏ và lý do** ở đầu mỗi lần chạy — không lọc âm thầm.
+
+> Các file này **vẫn nằm trong danh mục** (`drive_catalog.py`), nên bot vẫn chỉ được "file
+> nằm ở đâu" + link, chỉ là không đọc ruột chúng.
+
+**Nạp tăng dần** — embedding bge-m3 chạy local ~**3s/chunk**, nạp toàn bộ ruột Drive
+(~2.4k chunk) mất **~2 giờ**. Nên mỗi nguồn lưu `documents.source_version` = `modifiedTime`
+của Drive (migration `0027`); lần sau **chỉ file có sửa mới embedding lại** → ngày thường
+chạy vài giây. Lần đầu cứ để chạy hết, đừng tắt giữa chừng.
+
+**Nguồn trong kho** đặt tên `Drive: <tên file>` — nhờ tiền tố này `sync_docs.py` biết
+không prune nhầm (xoá nhầm thì nạp lại mất 2 tiếng).
+
+**Sheet > 10MB**: Drive từ chối export `.xlsx` (`exportSizeLimitExceeded`) — 10/40 file
+của kho hiện tại rơi vào đây. `sheets_reader.py` đọc thẳng qua Sheets API (đọc theo vùng,
+không dính giới hạn đó) nên vẫn nạp được.
+
+**File quá dài**: trần **300 chunk/file** cho file lọt qua bộ lọc. Skill in rõ đã cắt bao
+nhiêu, không cắt âm thầm.
 
 ## Cách thủ công (nạp lẻ từng file)
 

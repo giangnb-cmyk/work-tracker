@@ -136,6 +136,10 @@ BUG_SYNC_POLL_SECONDS = int(_settings.get("bug_sync_poll_seconds", 20))  # nhip 
 # --- Dong bo RAG (tai lieu) tu dong: chay CUNG gio voi bug sync (mac dinh 9h) -----
 RAG_SYNC_ENABLED = bool(_settings.get("rag_sync_enabled", False))
 RAG_SYNC_TIMEOUT = int(_settings.get("rag_sync_timeout_seconds", 900))  # gioi han moi skill (giay)
+# Nap RUOT tai lieu Drive can han rong hon HAN: embedding local ~3s/chunk -> lan dau (kho
+# rong, ~2000 chunk) mat ~2 tieng. Ngay thuong nap tang dan nen chi vai giay. Bi timeout
+# cung khong mat gi: file da xong co source_version, hom sau chay tiep tu do.
+RAG_DRIVE_TIMEOUT = int(_settings.get("rag_drive_timeout_seconds", 10800))
 _GDRIVE_KEY_DEFAULT = Path(__file__).parent.parent / "keys" / "service-account-gsheets.json"
 
 # --- Weekly report tu dong: SANG THU 2, cung gio voi bug sync (mac dinh 9h) -------
@@ -325,7 +329,7 @@ async def daily_bug_sync():
 
 
 def _gdrive_key_ready() -> bool:
-    """Co service account key cho drive_catalog khong (env GDRIVE_SERVICE_ACCOUNT > mac dinh)."""
+    """Co service account key cho cac skill Drive khong (env GDRIVE_SERVICE_ACCOUNT > mac dinh)."""
     raw = os.getenv("GDRIVE_SERVICE_ACCOUNT")
     if not raw:
         return _GDRIVE_KEY_DEFAULT.exists()
@@ -333,7 +337,7 @@ def _gdrive_key_ready() -> bool:
     return (p if p.is_absolute() else (Path(__file__).parent.parent / p)).exists()
 
 
-async def _run_rag_skill(script: str) -> str:
+async def _run_rag_skill(script: str, timeout: int = RAG_SYNC_TIMEOUT) -> str:
     """Chay 1 skill RAG (python skills/<script>) bang subprocess. Tra ve dong ket qua cuoi."""
     proc = await asyncio.create_subprocess_exec(
         sys.executable, os.path.join(_SKILLS_DIR, script),
@@ -343,31 +347,37 @@ async def _run_rag_skill(script: str) -> str:
         stderr=asyncio.subprocess.STDOUT,
     )
     try:
-        out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=RAG_SYNC_TIMEOUT)
+        out_b, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except asyncio.TimeoutError:
         proc.kill()
-        return f"timeout > {RAG_SYNC_TIMEOUT}s"
+        return f"timeout > {timeout}s"
     out = out_b.decode("utf-8", errors="replace").strip()
     return out.splitlines()[-1] if out else f"rc={proc.returncode}"
 
 
+async def _sync_rag_part(label: str, script: str, timeout: int = RAG_SYNC_TIMEOUT) -> str:
+    """Chay 1 phan cua lich RAG; loi cua phan nay khong duoc lam hong cac phan con lai."""
+    try:
+        return f"{label}: " + await _run_rag_skill(script, timeout)
+    except Exception:
+        log.exception("Đồng bộ RAG (%s) thất bại", label)
+        return f"{label}: lỗi"
+
+
 @tasks.loop(time=_SYNC_TIME)
 async def daily_rag_sync():
-    """9h moi ngay: nap lai tai lieu docs/ + danh muc Google Drive vao kho RAG."""
+    """9h moi ngay: nap lai kho RAG — tai lieu docs/, danh muc Drive, VA ruot tai lieu Drive.
+
+    'danh muc' (drive_catalog) tra loi "file nam o dau"; 'ruot' (drive_ingest) tra loi
+    "trong file viet gi" -> chay ca hai. drive_ingest nap tang dan (chi file co sua) nen
+    ngay thuong rat nhanh, du no phai doc noi dung that.
+    """
     if not RAG_SYNC_ENABLED:
         return
-    parts = []
-    try:
-        parts.append("docs: " + await _run_rag_skill("sync_docs.py"))
-    except Exception:
-        log.exception("Đồng bộ RAG (docs) thất bại")
-        parts.append("docs: lỗi")
-    if _gdrive_key_ready():  # chi nap Drive khi da co service account key
-        try:
-            parts.append("drive: " + await _run_rag_skill("drive_catalog.py"))
-        except Exception:
-            log.exception("Đồng bộ RAG (drive) thất bại")
-            parts.append("drive: lỗi")
+    parts = [await _sync_rag_part("docs", "sync_docs.py")]
+    if _gdrive_key_ready():  # chi cham Drive khi da co service account key
+        parts.append(await _sync_rag_part("drive", "drive_catalog.py"))
+        parts.append(await _sync_rag_part("ruột Drive", "drive_ingest.py", RAG_DRIVE_TIMEOUT))
     summary = " | ".join(parts)
     log.info("Đồng bộ RAG tự động: %s", summary)
     if BUG_SYNC_CHANNEL_ID:

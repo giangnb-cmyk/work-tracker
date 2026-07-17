@@ -251,7 +251,77 @@
       </details>
 
       <details class="card">
-        <summary><span class="icon">✨</span><h2>Claude CLI &amp; RAG</h2><span class="badge">bot/.env</span><span class="chev">▸</span></summary>
+        <summary><span class="icon">📈</span><h2>Báo cáo tuần · GA4 · Mail · DM thành viên</h2><span class="badge">settings.json</span><span class="chev">▸</span></summary>
+        <div class="card-body">
+          <div class="field">
+            <div class="row-check"><input type="checkbox" id="weeklyReportEnabled" /><label for="weeklyReportEnabled">Tự động điền weekly report vào Google Sheet <span class="tgt">weekly_report_enabled</span></label></div>
+            <span class="hint">Sáng thứ 2 lúc "Giờ đồng bộ". Link sheet đặt RIÊNG từng project ở web → Dự án (không đặt ở đây). Sheet phải share quyền Editor cho service account. Lần chạy tự động không bao giờ ghi đè ô người viết tay.</span>
+          </div>
+
+          <div class="field wide forums" style="margin-bottom:6px">
+            <label>Chỉ số GA4 theo project <span class="tgt">ga4_properties[]</span></label>
+            <span class="hint">Mỗi dòng: <b>project_id</b> (UUID từ web) ↔ <b>property_id</b> (số trong URL GA4: .../p<b>507574544</b>/...). Service account phải có quyền Viewer trên GA4 property. Project không có trong list = bỏ qua chỉ số, không phải lỗi.</span>
+            <div id="ga4Rows" style="margin-top:8px"></div>
+            <button type="button" class="btn ghost small" id="btnAddGa4" style="align-self:flex-start">+ Thêm property</button>
+          </div>
+
+          <div class="field">
+            <div class="row-check"><input type="checkbox" id="weeklyMailEnabled" /><label for="weeklyMailEnabled">Soạn mail weekly report từ template Gmail <span class="tgt">weekly_mail.enabled</span></label></div>
+            <span class="hint">KHÔNG gửi thẳng: bot DM người duyệt xem trước, bấm ✅ mới gửi. Cần bật Gmail API + keys/gmail-oauth-client.json.</span>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Thứ gửi mail (0 = thứ 2)<span class="tgt">weekly_mail.weekday</span></label>
+              <input type="number" id="weeklyMailWeekday" value="1" min="0" max="6" />
+            </div>
+            <div class="field">
+              <label>Giờ gửi mail<span class="tgt">weekly_mail.hour</span></label>
+              <input type="number" id="weeklyMailHour" value="9" min="0" max="23" />
+            </div>
+            <div class="field">
+              <label>Tiêu đề template<span class="tgt">weekly_mail.template_subject</span></label>
+              <input type="text" id="weeklyMailTemplateSubject" value="[TEMPLATE]" />
+              <span class="hint">Draft trong Gmail giữ nguyên chuỗi này ở subject.</span>
+            </div>
+            <div class="field">
+              <label>Hạn duyệt (giờ)<span class="tgt">weekly_mail.approve_timeout_hours</span></label>
+              <input type="number" id="weeklyMailApproveTimeout" value="24" min="1" />
+            </div>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Gửi tới — To (mỗi dòng 1 email)<span class="tgt">weekly_mail.to</span></label>
+              <textarea id="weeklyMailTo" rows="2" placeholder="ten@congty.vn"></textarea>
+            </div>
+            <div class="field">
+              <label>CC (mỗi dòng 1 email)<span class="tgt">weekly_mail.cc</span></label>
+              <textarea id="weeklyMailCc" rows="2" placeholder="ten2@congty.vn"></textarea>
+            </div>
+            <div class="field">
+              <label>Người duyệt — Discord ID (mỗi dòng 1)<span class="tgt">weekly_mail.approver_ids</span></label>
+              <textarea id="weeklyMailApproverIds" rows="2" placeholder="Để trống = mọi admin đã link discord_id"></textarea>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="row-check"><input type="checkbox" id="memberDmEnabled" /><label for="memberDmEnabled">DM riêng từng member điểm tuần <span class="tgt">member_dm.enabled</span></label></div>
+            <span class="hint">Số task đã xong trong tuần + số task còn tồn đọng + 1 câu động viên. Cũng bật/tắt nút "Gửi test" trên web (tab Cấu hình).</span>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Thứ gửi DM (0 = thứ 2, 3 = thứ 5)<span class="tgt">member_dm.weekday</span></label>
+              <input type="number" id="memberDmWeekday" value="3" min="0" max="6" />
+            </div>
+            <div class="field">
+              <label>Giờ gửi DM<span class="tgt">member_dm.hour</span></label>
+              <input type="number" id="memberDmHour" value="9" min="0" max="23" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card">
+        <summary><span class="icon">✨</span><h2>Claude CLI &amp; RAG</h2><span class="badge">bot/.env · settings</span><span class="chev">▸</span></summary>
         <div class="card-body">
           <div class="grid">
             <div class="field">
@@ -265,6 +335,34 @@
             <div class="field">
               <label>RAG embed model<span class="tgt">RAG_EMBED_MODEL</span></label>
               <input type="text" id="ragEmbedModel" value="bge-m3" />
+            </div>
+          </div>
+          <div class="field">
+            <div class="row-check"><input type="checkbox" id="ragSyncEnabled" checked /><label for="ragSyncEnabled">Tự động nạp lại kho RAG mỗi ngày <span class="tgt">rag_sync_enabled</span></label></div>
+            <span class="hint">Chạy lúc "Giờ sync bug" (mặc định 9h): tài liệu docs/ → danh mục Drive → ruột tài liệu Drive. Cần Ollama chạy.</span>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Hạn giờ mỗi skill RAG (giây)<span class="tgt">rag_sync_timeout_seconds</span></label>
+              <input type="number" id="ragSyncTimeoutSeconds" value="900" />
+            </div>
+            <div class="field">
+              <label>Hạn giờ nạp ruột Drive (giây)<span class="tgt">rag_drive_timeout_seconds</span></label>
+              <input type="number" id="ragDriveTimeoutSeconds" value="10800" />
+              <span class="hint">Riêng cho drive_ingest.py vì nó embedding nội dung thật (~3s/chunk). Lần đầu nạp cả kho ~2 tiếng.</span>
+            </div>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Bỏ qua thư mục Drive (mỗi dòng 1 tên)<span class="tgt">rag_drive_skip.folders</span></label>
+              <textarea id="ragDriveSkipFolders" rows="3" placeholder="csv_config">csv_config</textarea>
+              <span class="hint">Khớp CHÍNH XÁC tên thư mục. Không nạp ruột, nhưng vẫn nằm trong danh mục.</span>
+            </div>
+            <div class="field">
+              <label>Bỏ qua file có tên chứa (mỗi dòng 1 chuỗi)<span class="tgt">rag_drive_skip.name_contains</span></label>
+              <textarea id="ragDriveSkipNames" rows="3" placeholder="localization">localization
+localize</textarea>
+              <span class="hint">Khớp MỘT PHẦN. Bảng số/bảng dịch nạp vào chỉ làm nhiễu kho.</span>
             </div>
           </div>
         </div>
@@ -439,7 +537,14 @@ const NOTES = {
   moods: `Bo tam trang cua bot. Moi ngay bot tu chon 1 tam trang (co dinh trong ngay, doi qua ngay). Them/bot/sua thoai mai.`,
   moodOverride: `Ep tam trang co dinh. De TRONG '' = random doi theo ngay. Dien SO thu tu (1..so luong moods) de chon 1 tam trang. Hoac go THANG mot cau mo ta tam trang tuy y.`,
   bugForums: `Dong bo HAI CHIEU bug voi forum Discord. Moi muc: project_id (uuid tu web) + forum_channel_id (ID kenh Forum). Discord->app: moi bai post -> 1 bug, forum tags -> nhan. app->Discord: doi nhan tren app se set lai tag cua thread. Bot can quyen 'Manage Threads' (sua tag thread) + 'Manage Channels' (tao tag moi). Chay tu dong luc bug_sync_hour, khi bam 'Sync' tren web, hoac '@bot sync bug'.`,
-  bugMirror: `false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.`
+  bugMirror: `false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.`,
+  ragSync: `true = moi ngay luc bug_sync_hour (9h) tu dong nap lai kho RAG, 3 phan: (1) sync_docs.py = tai lieu trong docs/ + links.txt; (2) drive_catalog.py = DANH MUC Google Drive (ten + link, tra loi 'file nam o dau'); (3) drive_ingest.py = RUOT tai lieu Drive (noi dung that ben trong Google Docs/Sheets/Slides/PDF/Word/Excel, tra loi 'trong file viet gi'). Phan (2)(3) chi chay khi co keys/service-account-gsheets.json. drive_ingest BO QUA cac file khai trong 'rag_drive_skip' (mac dinh: thu muc csv_config + file localization) va nap TANG DAN - chi file co sua tren Drive moi embedding lai (can migration 0027) nen ngay thuong chi vai giay. Yeu cau Ollama chay + da ap migration 0014. Ket qua ghi log; gui Discord neu bug_sync_channel_id != 0.`,
+  ragTimeout: `Gioi han thoi gian (giay) moi skill RAG trong lan chay tu dong. rag_drive_timeout_seconds danh RIENG cho drive_ingest.py vi no phai embedding noi dung that (~3s/chunk tren may nay): ngay thuong nap tang dan nen chi vai giay, NHUNG lan dau (kho rong) phai nap ~2000 chunk = ~2 tieng -> de 10800 (3h) cho lan dau chay tron, khong thi bot giet giua chung. Bi giet cung KHONG mat du lieu: file da xong da co source_version nen hom sau chay tiep tu do.`,
+  ragDriveSkip: `File KHONG nap RUOT vao RAG (drive_ingest.py). 'folders' = ten thu muc Drive, khop CHINH XAC (khong phan biet hoa thuong). 'name_contains' = ten file chua chuoi nay thi bo qua, khop MOT PHAN (vd 'localization' bat 'M1 - Localization.csv'). Mac dinh bo bang so cau hinh game (csv_config) va bang dich thuat (localization): toan cap chuoi/so, nap vao chi lam nhieu kho ma khong tra loi duoc cau hoi nao, lai ton hang gio embedding. DU AN MOI chi can sua o day, KHONG phai sua code. Cac file nay VAN nam trong DANH MUC (drive_catalog.py) -> bot van chi duoc 'file nam o dau', chi khong doc ruot. Them tam thoi 1 lan chay: --skip-folder <ten> / --skip-name <chuoi>; nap tat ca: --no-skip.`,
+  weeklyReport: `true = SANG THU 2 luc bug_sync_hour (9h) tu dong dien weekly report vao Google Sheet cua tung project (cot 'Tien do / Hien tai' = task da xong sprint truoc, 'Tien do / Tiep theo lam gi' = task con lai sprint hien tai). Link sheet cau hinh RIENG tung project o web > Du an > 'Google Sheet weekly report' (cot projects.weekly_sheet_id), KHONG dat o day. Yeu cau: keys/service-account-gsheets.json, va sheet phai duoc Share quyen EDITOR cho email service account. Lan chay tu dong KHONG BAO GIO ghi de o da co chu (nguoi viet tay) - muon ghi de phai go tay '@bot weekly report' voi --force. Ket qua ghi log; gui Discord neu bug_sync_channel_id != 0.`,
+  ga4: `Chi so GA4 trong weekly report (o 'Chi so san pham / Hien tai'). Moi muc: project_id (uuid tu web) + property_id (so trong URL GA4: .../p<property_id>/...). Dung CHUNG service account voi sheets (keys/service-account-gsheets.json) — SA phai duoc them vao GA4 property quyen Viewer (Admin > Property access management) va project GCP cua SA phai bat Analytics Data API. Project khong co trong list = bo qua chi so, khong phai loi.`,
+  weeklyMail: `Tu dong soan MAIL weekly report tu template DRAFT trong Gmail (muc Templates cua Gmail thi API khong doc duoc — soan thu tu template roi LUU NHAP, subject giu '[TEMPLATE]'). KHONG gui thang: bot DM ban xem truoc cho nguoi duyet (approver_ids; de trong = moi admin da link discord_id), bam '✅ Gui mail' moi gui — het han approve_timeout_hours hoac bam Huy la KHONG gui. Setup 1 lan: bat Gmail API + tao OAuth client Desktop -> keys/gmail-oauth-client.json, roi chay 'python skills/gmail_gateway.py --auth'. Placeholder trong draft: {{START}} {{END}} (dd/mm), {{START_FULL}} {{END_FULL}} (dd/mm/yyyy), {{DONE}} {{PLAN}} (danh sach task), {{SHEET_URL}}. weekday: 0=thu 2. Thu tay (gui truc tiep, khong qua duyet): '@bot gui mail weekly report'; xem truoc: python skills/weekly_mail.py --dry-run.`,
+  memberDm: `DM RIENG tung member: so task DA XONG trong tuan (tinh tu thu 2 00:00 gio VN, dem qua bang activity) + so task CON TON DONG (co assignee, chua done, kem so tre han) + 1 cau dong vien. Chay tu dong vao 'hour' gio ngay 'weekday' (0=thu 2 ... 3=thu 5). Chi DM nguoi co profiles.discord_id VA co it nhat 1 task lien quan; member chan DM thi bot bao trong log. enabled cung bat/tat nut 'Gui test' tren web (tab Cau hinh, admin chon nguoi -> bot DM thu, can migration 0025). Thu tay: 'python skills/member_dm.py --dry-run' hoac tag bot nho gui.`,
 };
 
 /* ---- Bug forums: dynamic rows ---- */
@@ -466,6 +571,30 @@ function getForums(){
   })).filter(f => f.pid || f.fid);
 }
 
+/* ga4_properties: cung dang 'cap project_id + id' nhu bug_forums -> lam giong het. */
+function ga4RowTemplate(pid, propId){
+  const row = document.createElement('div');
+  row.className = 'forum-row';
+  row.innerHTML =
+    '<div class="field"><label>project_id (UUID)</label>'+
+      '<input type="text" class="g4-pid" placeholder="620a1a7d-...-796c97e16be5" /></div>'+
+    '<div class="field"><label>property_id (GA4)</label>'+
+      '<input type="text" class="g4-prop" inputmode="numeric" placeholder="507574544" /></div>'+
+    '<button type="button" class="icon-btn" title="Xoá">✕</button>';
+  row.querySelector('.g4-pid').value = pid || '';
+  row.querySelector('.g4-prop').value = propId || '';
+  row.querySelector('.icon-btn').addEventListener('click', () => { row.remove(); render(); });
+  row.addEventListener('input', render);
+  return row;
+}
+function addGa4Row(pid, propId){ $('ga4Rows').appendChild(ga4RowTemplate(pid, propId)); }
+function getGa4(){
+  return [...document.querySelectorAll('#ga4Rows .forum-row')].map(r => ({
+    pid: r.querySelector('.g4-pid').value.trim(),
+    propId: r.querySelector('.g4-prop').value.trim()
+  })).filter(g => g.pid || g.propId);
+}
+
 /* ---- Đọc form ---- */
 const val = (id) => ($(id) ? $(id).value.trim() : '');
 const num = (id, d) => { const n = parseInt(val(id), 10); return Number.isFinite(n) ? n : d; };
@@ -482,7 +611,23 @@ function collect(){
     taskDoneChannelId: idOrZero('taskDoneChannelId'), bugSyncChannelId: idOrZero('bugSyncChannelId'),
     forums: getForums(), bugSyncHour: num('bugSyncHour',9), bugSyncTz: val('bugSyncTz')||'Asia/Ho_Chi_Minh',
     bugSyncPollSeconds: num('bugSyncPollSeconds',20), bugMirrorVideos: $('bugMirrorVideos').checked,
+    weeklyReportEnabled: $('weeklyReportEnabled').checked, ga4: getGa4(),
+    weeklyMail: {
+      enabled: $('weeklyMailEnabled').checked,
+      weekday: num('weeklyMailWeekday',1), hour: num('weeklyMailHour',9),
+      templateSubject: val('weeklyMailTemplateSubject') || '[TEMPLATE]',
+      to: lines('weeklyMailTo'), cc: lines('weeklyMailCc'),
+      approverIds: listIds('weeklyMailApproverIds'),   // ID Discord -> giu chuoi so tho
+      approveTimeoutHours: num('weeklyMailApproveTimeout',24)
+    },
+    memberDm: {
+      enabled: $('memberDmEnabled').checked,
+      weekday: num('memberDmWeekday',3), hour: num('memberDmHour',9)
+    },
     claudeCmd: val('claudeCmd')||'claude', ollamaHost: val('ollamaHost'), ragEmbedModel: val('ragEmbedModel'),
+    ragSyncEnabled: $('ragSyncEnabled').checked, ragSyncTimeoutSeconds: num('ragSyncTimeoutSeconds',900),
+    ragDriveTimeoutSeconds: num('ragDriveTimeoutSeconds',10800),
+    ragDriveSkipFolders: lines('ragDriveSkipFolders'), ragDriveSkipNames: lines('ragDriveSkipNames'),
     sheetsMcpEnabled: $('sheetsMcpEnabled').checked, driveFolderId: val('driveFolderId'),
     mcpServiceAccountPath: val('mcpServiceAccountPath'), gdriveServiceAccount: val('gdriveServiceAccount'),
     notionSyncSecret: val('notionSyncSecret'), notionGatewayUrl: val('notionGatewayUrl'),
@@ -574,6 +719,10 @@ function buildSettings(v){
   const forumsBlock = v.forums.length
     ? '[\n' + v.forums.map(f => '    { "project_id": ' + jstr(f.pid) + ', "forum_channel_id": ' + (f.fid || '0') + ' }').join(',\n') + '\n  ]'
     : '[]';
+  // property_id la CHUOI trong settings.json (khac forum_channel_id la so) -> jstr.
+  const ga4Block = v.ga4.length
+    ? '[\n' + v.ga4.map(g => '    { "project_id": ' + jstr(g.pid) + ', "property_id": ' + jstr(g.propId) + ' }').join(',\n') + '\n  ]'
+    : '[]';
   return [
     '{',
     '  "_note_model": ' + jstr(NOTES.model) + ',',
@@ -602,10 +751,63 @@ function buildSettings(v){
     '  "bug_sync_tz": ' + jstr(v.bugSyncTz) + ',',
     '  "bug_sync_channel_id": ' + v.bugSyncChannelId + ',',
     '  "bug_sync_poll_seconds": ' + v.bugSyncPollSeconds + ',',
+    '  "_note_rag_sync": ' + jstr(NOTES.ragSync) + ',',
+    '  "rag_sync_enabled": ' + v.ragSyncEnabled + ',',
+    '  "_note_rag_timeout": ' + jstr(NOTES.ragTimeout) + ',',
+    '  "rag_sync_timeout_seconds": ' + v.ragSyncTimeoutSeconds + ',',
+    '  "rag_drive_timeout_seconds": ' + v.ragDriveTimeoutSeconds + ',',
+    '  "_note_rag_drive_skip": ' + jstr(NOTES.ragDriveSkip) + ',',
+    '  "rag_drive_skip": ' + strListBlock(v.ragDriveSkipFolders, v.ragDriveSkipNames) + ',',
+    '  "_note_weekly_report": ' + jstr(NOTES.weeklyReport) + ',',
+    '  "weekly_report_enabled": ' + v.weeklyReportEnabled + ',',
+    '  "_note_ga4": ' + jstr(NOTES.ga4) + ',',
+    '  "ga4_properties": ' + ga4Block + ',',
+    '  "_note_weekly_mail": ' + jstr(NOTES.weeklyMail) + ',',
+    '  "weekly_mail": ' + weeklyMailBlock(v.weeklyMail) + ',',
     '  "_note_bug_mirror_videos": ' + jstr(NOTES.bugMirror) + ',',
-    '  "bug_mirror_videos": ' + v.bugMirrorVideos,
+    '  "bug_mirror_videos": ' + v.bugMirrorVideos + ',',
+    '  "_note_member_dm": ' + jstr(NOTES.memberDm) + ',',
+    '  "member_dm": ' + memberDmBlock(v.memberDm),
     '}',
     ''
+  ].join('\n');
+}
+
+/* rag_drive_skip: 2 mang chuoi long nhau -> giu dung dang settings.json hien co. */
+function strListBlock(folders, names){
+  const arr = (xs) => '[' + xs.map(jstr).join(', ') + ']';
+  return [
+    '{',
+    '    "folders": ' + arr(folders) + ',',
+    '    "name_contains": ' + arr(names),
+    '  }'
+  ].join('\n');
+}
+
+function weeklyMailBlock(w){
+  const strArr = (xs) => '[' + xs.map(jstr).join(', ') + ']';
+  return [
+    '{',
+    '    "enabled": ' + w.enabled + ',',
+    '    "weekday": ' + w.weekday + ',',
+    '    "hour": ' + w.hour + ',',
+    '    "template_subject": ' + jstr(w.templateSubject) + ',',
+    '    "to": ' + strArr(w.to) + ',',
+    '    "cc": ' + strArr(w.cc) + ',',
+    // ID Discord > 2^53 -> noi chuoi so tho, TUYET DOI khong qua Number.
+    '    "approver_ids": [' + w.approverIds.join(', ') + '],',
+    '    "approve_timeout_hours": ' + w.approveTimeoutHours,
+    '  }'
+  ].join('\n');
+}
+
+function memberDmBlock(m){
+  return [
+    '{',
+    '    "enabled": ' + m.enabled + ',',
+    '    "weekday": ' + m.weekday + ',',
+    '    "hour": ' + m.hour,
+    '  }'
   ].join('\n');
 }
 
@@ -714,6 +916,31 @@ function parseEnv(text){
 function grabNum(text, key){ const m = text.match(new RegExp('"'+key+'"\\s*:\\s*(\\d+)')); return m ? m[1] : ''; }
 function grabStr(text, key){ const m = text.match(new RegExp('"'+key+'"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"')); return m ? JSON.parse('"'+m[1]+'"') : ''; }
 function grabBool(text, key){ const m = text.match(new RegExp('"'+key+'"\\s*:\\s*(true|false)')); return m ? m[1] === 'true' : false; }
+/* Nguyen khoi { ... } cua mot khoa object, de grab* chi tim TRONG pham vi do.
+   WHY: weekly_mail va member_dm deu co "enabled"/"hour" -> grab tren ca file se lay nham
+   cua khoi den truoc. Dem ngoac de cat dung khoi. */
+function grabBlock(text, key){
+  const m = text.match(new RegExp('"'+key+'"\\s*:\\s*\\{'));
+  if (!m) return '';
+  const i = text.indexOf('{', m.index);
+  let depth = 0;
+  for (let j = i; j < text.length; j++){
+    if (text[j] === '{') depth++;
+    else if (text[j] === '}' && --depth === 0) return text.slice(i, j + 1);
+  }
+  return '';
+}
+/* "key": [1, 2] -> ['1','2'] dang CHUOI so tho (ID Discord > 2^53). null neu khong co khoa. */
+function grabNumList(text, key){
+  const m = text.match(new RegExp('"'+key+'"\\s*:\\s*\\[([^\\]]*)\\]'));
+  return m ? (m[1].match(/\d+/g) || []) : null;
+}
+/* "key": ["a", "b"] -> ['a','b']; null neu khong co khoa (de giu nguyen mac dinh tren form). */
+function grabStrList(text, key){
+  const m = text.match(new RegExp('"'+key+'"\\s*:\\s*\\[([^\\]]*)\\]'));
+  if (!m) return null;
+  return (m[1].match(/"(?:[^"\\]|\\.)*"/g) || []).map(s => JSON.parse(s));
+}
 
 function setVal(id, value){ if ($(id) != null && value != null) $(id).value = value; }
 function setChk(id, b){ if ($(id) != null) $(id).checked = !!b; }
@@ -747,6 +974,42 @@ function applySettings(text){
   setChk('bypassPermissions', grabBool(text, 'bypass_permissions'));
   setChk('sheetsMcpEnabled', grabBool(text, 'sheets_mcp_enabled'));
   setChk('bugMirrorVideos', grabBool(text, 'bug_mirror_videos'));
+  if (/"rag_sync_enabled"/.test(text)) setChk('ragSyncEnabled', grabBool(text, 'rag_sync_enabled'));
+  const rst = grabNum(text, 'rag_sync_timeout_seconds'); if (rst) setVal('ragSyncTimeoutSeconds', rst);
+  const rdt = grabNum(text, 'rag_drive_timeout_seconds'); if (rdt) setVal('ragDriveTimeoutSeconds', rdt);
+  // Khong tim thay khoa -> giu mac dinh dang co tren form, dung xoa trang.
+  const sf = grabStrList(text, 'folders'); if (sf) setVal('ragDriveSkipFolders', sf.join('\n'));
+  const sn = grabStrList(text, 'name_contains'); if (sn) setVal('ragDriveSkipNames', sn.join('\n'));
+
+  if (/"weekly_report_enabled"/.test(text)) setChk('weeklyReportEnabled', grabBool(text, 'weekly_report_enabled'));
+  // weekly_mail / member_dm: doc trong PHAM VI khoi cua tung khoa (deu co 'enabled','hour').
+  const wm = grabBlock(text, 'weekly_mail');
+  if (wm){
+    setChk('weeklyMailEnabled', grabBool(wm, 'enabled'));
+    const w = grabNum(wm, 'weekday'); if (w !== '') setVal('weeklyMailWeekday', w);
+    const h = grabNum(wm, 'hour'); if (h !== '') setVal('weeklyMailHour', h);
+    const ts = grabStr(wm, 'template_subject'); if (ts) setVal('weeklyMailTemplateSubject', ts);
+    const to = grabStrList(wm, 'to'); if (to) setVal('weeklyMailTo', to.join('\n'));
+    const cc = grabStrList(wm, 'cc'); if (cc) setVal('weeklyMailCc', cc.join('\n'));
+    const ap = grabNumList(wm, 'approver_ids'); if (ap) setVal('weeklyMailApproverIds', ap.join('\n'));
+    const at = grabNum(wm, 'approve_timeout_hours'); if (at) setVal('weeklyMailApproveTimeout', at);
+  }
+  const md = grabBlock(text, 'member_dm');
+  if (md){
+    setChk('memberDmEnabled', grabBool(md, 'enabled'));
+    const w2 = grabNum(md, 'weekday'); if (w2 !== '') setVal('memberDmWeekday', w2);
+    const h2 = grabNum(md, 'hour'); if (h2 !== '') setVal('memberDmHour', h2);
+  }
+  // ga4_properties: doc raw giong bug_forums (property_id la chuoi).
+  $('ga4Rows').innerHTML = '';
+  const g4 = text.match(/"ga4_properties"\s*:\s*\[([\s\S]*?)\]/);
+  let anyG4 = false;
+  if (g4){
+    const re = /\{[^}]*"project_id"\s*:\s*"([^"]*)"[^}]*"property_id"\s*:\s*"([^"]*)"[^}]*\}/g;
+    let m;
+    while ((m = re.exec(g4[1])) !== null){ addGa4Row(m[1], m[2]); anyG4 = true; }
+  }
+  if (!anyG4) addGa4Row('', '');
   setVal('reminderChannelId', grabNum(text, 'reminder_channel_id'));
   setVal('standupChannelId', grabNum(text, 'standup_channel_id'));
   setVal('taskDoneChannelId', grabNum(text, 'task_done_channel_id'));
@@ -855,6 +1118,21 @@ function restore(v){
   setVal('bugSyncHour', v.bugSyncHour); setVal('bugSyncTz', v.bugSyncTz);
   setVal('bugSyncPollSeconds', v.bugSyncPollSeconds); setChk('bugMirrorVideos', v.bugMirrorVideos);
   setVal('claudeCmd', v.claudeCmd); setVal('ollamaHost', v.ollamaHost); setVal('ragEmbedModel', v.ragEmbedModel);
+  setChk('ragSyncEnabled', v.ragSyncEnabled); setVal('ragSyncTimeoutSeconds', v.ragSyncTimeoutSeconds);
+  setVal('ragDriveTimeoutSeconds', v.ragDriveTimeoutSeconds);
+  setVal('ragDriveSkipFolders', (v.ragDriveSkipFolders || []).join('\n'));
+  setVal('ragDriveSkipNames', (v.ragDriveSkipNames || []).join('\n'));
+  setChk('weeklyReportEnabled', v.weeklyReportEnabled);
+  const wm = v.weeklyMail || {};
+  setChk('weeklyMailEnabled', wm.enabled); setVal('weeklyMailWeekday', wm.weekday);
+  setVal('weeklyMailHour', wm.hour); setVal('weeklyMailTemplateSubject', wm.templateSubject);
+  setVal('weeklyMailTo', (wm.to || []).join('\n')); setVal('weeklyMailCc', (wm.cc || []).join('\n'));
+  setVal('weeklyMailApproverIds', (wm.approverIds || []).join('\n'));
+  setVal('weeklyMailApproveTimeout', wm.approveTimeoutHours);
+  const md = v.memberDm || {};
+  setChk('memberDmEnabled', md.enabled); setVal('memberDmWeekday', md.weekday); setVal('memberDmHour', md.hour);
+  $('ga4Rows').innerHTML = '';
+  (v.ga4 && v.ga4.length ? v.ga4 : [{ pid: '', propId: '' }]).forEach(g => addGa4Row(g.pid, g.propId));
   setChk('sheetsMcpEnabled', v.sheetsMcpEnabled); setVal('driveFolderId', v.driveFolderId);
   setVal('mcpServiceAccountPath', v.mcpServiceAccountPath); setVal('gdriveServiceAccount', v.gdriveServiceAccount);
   setVal('notionSyncSecret', v.notionSyncSecret); setVal('notionGatewayUrl', v.notionGatewayUrl);
@@ -874,6 +1152,7 @@ function init(){
   $('systemPrompt').value = DEFAULT_SYSTEM_PROMPT;
   $('moods').value = DEFAULT_MOODS.join('\n');
   addForumRow('', '');
+  addGa4Row('', '');
 
   // Khôi phục nháp nếu có
   try{
@@ -890,6 +1169,7 @@ function init(){
   // Sự kiện form
   $('form').addEventListener('input', render);
   $('btnAddForum').addEventListener('click', () => { addForumRow('', ''); });
+  $('btnAddGa4').addEventListener('click', () => { addGa4Row('', ''); });
 
   // Toolbar
   $('btnWrite').addEventListener('click', writeToFolder);

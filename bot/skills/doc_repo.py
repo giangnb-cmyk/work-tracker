@@ -28,10 +28,13 @@ def db():
     return get_client()
 
 
-def insert_chunks(client, project_id, source: str, chunks: list, embeddings: list) -> int:
+def insert_chunks(client, project_id, source: str, chunks: list, embeddings: list,
+                  source_version=None) -> int:
     """Chen cac chunk (kem embedding) cua 1 nguon. Tra ve so chunk da chen.
 
     chunks: list (section, content); embeddings: list vector cung thu tu.
+    source_version: 'phien ban' cua nguon (Drive = modifiedTime) de sync tang dan;
+    None = khong theo doi phien ban (file trong docs/, link...).
     """
     rows = [
         {
@@ -41,6 +44,7 @@ def insert_chunks(client, project_id, source: str, chunks: list, embeddings: lis
             "chunk_index": idx,
             "content": content,
             "embedding": vector,
+            "source_version": source_version,
         }
         for idx, ((section, content), vector) in enumerate(zip(chunks, embeddings))
     ]
@@ -67,6 +71,24 @@ def match(client, query_embedding: list, project_id=None, top_k: int = 5) -> lis
         },
     ).execute()
     return res.data or []
+
+
+def source_versions(client, prefix: str, project_id=None) -> dict:
+    """{source: source_version} cua cac nguon co ten bat dau bang `prefix`.
+
+    Dung de sync TANG DAN: nguon nao con nguyen phien ban thi khong nap lai (embedding
+    local rat cham).
+
+    WHY chi lay chunk_index = 0: PostgREST mac dinh tra toi da 1000 dong. Kho Drive co
+    ~2.4k chunk -> select thang se bi CAT BOT trong im lang, thieu version cua nhung
+    nguon phia sau => lan nao cung tuong la "file moi" va nap lai ca kho (~2 gio).
+    Moi nguon luon co dung 1 dong chunk_index = 0 (insert_chunks danh so tu 0) va moi
+    chunk cung nguon deu cung version -> 1 dong/nguon la du, va an toan ve so luong.
+    """
+    q = (client.table(DOCUMENTS).select("source,source_version")
+         .like("source", f"{prefix}%").eq("chunk_index", 0))
+    q = q.is_("project_id", "null") if project_id is None else q.eq("project_id", project_id)
+    return {row["source"]: row.get("source_version") for row in q.execute().data or []}
 
 
 def list_sources(client, project_id=None) -> dict:

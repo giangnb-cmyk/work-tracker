@@ -25,6 +25,7 @@ import doc_reader
 import doc_repo as repo
 import web_reader
 from doc_ingest import build_pairs, store_pairs
+from drive_ingest import SOURCE_PREFIX as _DRIVE_PREFIX
 from embeddings import EmbeddingError
 
 _BOT_DIR = Path(__file__).resolve().parent.parent
@@ -34,6 +35,8 @@ _CONFIG_NAMES = {"links.txt", "readme.md"}
 # Nguon do cong cu KHAC quan ly (khong lay tu docs/) -> prune bo qua, khong xoa nham.
 # 'Google Drive' = danh muc do drive_catalog.py nap. Them nguon ngoai khac vao day neu co.
 _EXTERNAL_SOURCES = {"Google Drive"}
+# ...va moi nguon 'Drive: <ten file>' do drive_ingest.py nap (ruot tai lieu tren Drive).
+_EXTERNAL_PREFIXES = (_DRIVE_PREFIX,)
 
 
 def die(message: str):
@@ -114,11 +117,13 @@ def _ingest_links(client, urls: list, project_id, desired: set, protected: set):
 def _prune(client, project_id, keep: set):
     """Xoa khoi RAG nhung nguon khong con trong docs/ (mirror). Tra ve so nguon da xoa.
 
-    KHONG dung toi nguon do cong cu khac quan ly (vd drive_catalog.py -> 'Google Drive'),
-    neu khong moi lan sync docs/ se xoa nham danh muc Drive.
+    KHONG dung toi nguon do cong cu khac quan ly (drive_catalog.py -> 'Google Drive',
+    drive_ingest.py -> 'Drive: <ten file>'), neu khong moi lan sync docs/ se xoa sach
+    tai lieu Drive - ma nap lai mat ~2 gio embedding.
     """
     existing = set(repo.list_sources(client, project_id))
-    stale = existing - keep - _EXTERNAL_SOURCES
+    stale = {s for s in existing - keep - _EXTERNAL_SOURCES
+             if not s.startswith(_EXTERNAL_PREFIXES)}
     for source in sorted(stale):
         repo.delete_by_source(client, source, project_id)
         print(f"  - gỡ: {source}")
