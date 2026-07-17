@@ -46,7 +46,12 @@ Created/merged on first Google sign-in.
 > user by setting `role: "admin"` in the console.
 >
 > **Job role (`jobRole`)** — a separate discipline field the user picks on first sign-in:
-> `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`.
+> `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`
+> · `vfx_artist`.
+>
+> Cột `job_role` là **text tự do, KHÔNG có CHECK** — thêm vị trí mới chỉ cần sửa
+> `JOB_ROLES` trong `web/src/types.ts` (nhãn + icon + danh sách chọn đều suy ra từ đó),
+> không cần migration.
 > It does not affect permissions.
 
 ---

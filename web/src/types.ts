@@ -16,7 +16,8 @@ export type JobRole =
   | 'game_designer'
   | 'sound_designer'
   | 'ui_artist'
-  | 'animator';
+  | 'animator'
+  | 'vfx_artist';
 
 export const JOB_ROLES: { id: JobRole; label: string; icon: string }[] = [
   { id: 'developer', label: 'Developer', icon: '💻' },
@@ -25,6 +26,8 @@ export const JOB_ROLES: { id: JobRole; label: string; icon: string }[] = [
   { id: 'sound_designer', label: 'Sound Designer', icon: '🎵' },
   { id: 'ui_artist', label: 'UI Artist', icon: '🖌️' },
   { id: 'animator', label: 'Animator', icon: '🎞️' },
+  // Cạnh Animator: hai vị trí này hay đi cùng nhau trong pipeline.
+  { id: 'vfx_artist', label: 'VFX Artist', icon: '✨' },
 ];
 
 export const JOB_ROLE_LABEL: Record<JobRole, string> = JOB_ROLES.reduce(
