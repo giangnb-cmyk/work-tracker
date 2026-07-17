@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { FEATURE_KIND_LABEL, type FeatureLabel, type TeamMember } from '../types';
+import { FEATURE_KINDS, FEATURE_KIND_ICON, FEATURE_KIND_LABEL, type FeatureLabel, type TeamMember } from '../types';
 import { labelGroup } from '../lib/bugLabelGroups';
 import { DONE, OPEN, type FeatureFacet, type FeatureFilterToken } from '../lib/featureFilter';
 import TokenFilterBar, { type FacetDef, type FilterOpt } from './TokenFilterBar';
@@ -17,10 +17,13 @@ const FACETS: FacetDef<FeatureFacet>[] = [
   { key: 'member', label: 'Người làm', icon: '🙋' },
 ];
 
-const KIND_OPTS: FilterOpt[] = [
-  { value: 'delivery', label: FEATURE_KIND_LABEL.delivery, icon: '🎯' },
-  { value: 'ongoing', label: FEATURE_KIND_LABEL.ongoing, icon: '🔁' },
-];
+// Duyệt FEATURE_KINDS chứ không liệt kê tay: thêm loại mới mà quên sửa đây thì nó biến
+// mất khỏi bộ lọc trong im lặng.
+const KIND_OPTS: FilterOpt[] = FEATURE_KINDS.map((k) => ({
+  value: k,
+  label: FEATURE_KIND_LABEL[k],
+  icon: FEATURE_KIND_ICON[k],
+}));
 
 // Cùng màu với STATUS_COLOR done/todo của task để quét mắt ra nghĩa ngay.
 const PROGRESS_OPTS: FilterOpt[] = [

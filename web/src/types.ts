@@ -149,11 +149,28 @@ export interface TeamMember {
  * ongoing  = việc chạy liên tục (Polish, Gameplay tuning…) — không bao giờ "done",
  *            UI không hiện % mà hiện nhịp làm gần đây.
  */
-export type FeatureKind = 'delivery' | 'ongoing';
+export type FeatureKind = 'delivery' | 'standard' | 'ongoing';
+
+/** Thứ tự hiện ở ô chọn Loại. Xem migration 0030 (CHECK ở DB chốt đúng ba giá trị này). */
+export const FEATURE_KINDS: FeatureKind[] = ['delivery', 'standard', 'ongoing'];
 
 export const FEATURE_KIND_LABEL: Record<FeatureKind, string> = {
   delivery: 'Gói bán',
+  standard: 'Tính năng',
   ongoing: 'Liên tục',
+};
+
+export const FEATURE_KIND_ICON: Record<FeatureKind, string> = {
+  delivery: '🎯',
+  standard: '✨',
+  ongoing: '🔁',
+};
+
+/** Mô tả đầy đủ — hiện ở tooltip, không nhét vào ô chọn (chữ chen nhau, khó đọc). */
+export const FEATURE_KIND_HINT: Record<FeatureKind, string> = {
+  delivery: 'Thứ bán cho user: IAP, pack, offer. Có ngày xong, card hiện % hoàn thành.',
+  standard: 'Tính năng thường, không bán: Settings, Login, Tutorial… Có ngày xong, card hiện % hoàn thành.',
+  ongoing: 'Chạy liên tục: polish, tuning — không bao giờ "done". Card hiện nhịp 30 ngày thay vì %.',
 };
 
 /** A project-scoped label in the feature tag palette (Shop / Gameplay / …). */

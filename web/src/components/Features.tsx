@@ -17,6 +17,8 @@ import FeatureCard from './FeatureCard';
 import FeatureTeamRow from './FeatureTeamRow';
 import FeatureFilterBar, { isFeatureDone, matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
 import { groupFeaturesByVersion } from '../lib/featureGroups';
+import { versionRangeChips } from '../lib/versionRange';
+import { labelGroup } from '../lib/bugLabelGroups';
 import type { Feature, FeatureLabel, Task, TaskStatus } from '../types';
 
 const DAY = 86_400_000;
@@ -47,7 +49,7 @@ export default function Features() {
   const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
   const autoOpened = useRef(false);
 
-  const { labels } = useFeatureLabels(selectedProjectId);
+  const { labels, loading: labelsLoading } = useFeatureLabels(selectedProjectId);
   const sortedLabels = useMemo(() => sortFeatureLabels(labels), [labels]);
   const labelById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   // Lọc token như tab Bugs: loại / nhãn / version / người làm + tìm theo tên.
@@ -118,14 +120,18 @@ export default function Features() {
 
   /**
    * Vào tab thì mở sẵn version cao nhất — nhóm đầu tiên, vì groups đã sắp giảm dần.
-   * Chỉ chạy MỘT lần (ref), nếu không mỗi lần lọc làm groups đổi là nó lại bung nhóm
-   * đầu ra, đè lên thứ người dùng vừa tự đóng.
+   *
+   * PHẢI chờ `labelsLoading` xong: palette chưa về thì KHÔNG nhãn version nào tồn tại,
+   * mọi feature rơi hết vào nhóm "Chưa gắn version" — mở nhóm đó rồi cắm cờ autoOpened
+   * là version cao nhất không bao giờ được mở nữa (nhóm rỗng kia còn biến mất, thành ra
+   * đóng sạch). Chỉ chạy MỘT lần (ref): nếu không, mỗi lần lọc làm groups đổi là nó lại
+   * bung nhóm đầu ra, đè lên thứ người dùng vừa tự đóng.
    */
   useEffect(() => {
-    if (autoOpened.current || groups.length === 0) return;
+    if (autoOpened.current || labelsLoading || groups.length === 0) return;
     autoOpened.current = true;
     setOpenKeys(new Set([groups[0].key]));
-  }, [groups]);
+  }, [groups, labelsLoading]);
 
   function toggleGroup(key: string) {
     setOpenKeys((s) => {
@@ -135,6 +141,12 @@ export default function Features() {
       return n;
     });
   }
+
+  const ownLabelsOf = (f: Feature) =>
+    f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l));
+  /** Nhãn nhóm (Shop, IAP…) — version tách ra vì còn phải gộp thành khoảng. */
+  const groupChipsOf = (f: Feature) => ownLabelsOf(f).filter((l) => labelGroup(l.name) !== 'version');
+  const versionChipsOf = (f: Feature) => versionRangeChips(ownLabelsOf(f), labels);
 
   /**
    * Đang lọc/tìm thì mở hết: nhóm đóng sẽ giấu đúng thứ vừa lọc ra, nhìn như bộ lọc
@@ -170,7 +182,9 @@ export default function Features() {
     );
   }
 
-  if (featuresLoading) {
+  // Chờ CẢ palette nhãn: thiếu nó thì lưới vẽ ra một nhóm "Chưa gắn version" ôm hết
+  // feature, rồi nhãn về mới gom lại — người dùng thấy đúng một cú giật vô nghĩa.
+  if (featuresLoading || labelsLoading) {
     return <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>;
   }
 
@@ -223,7 +237,8 @@ export default function Features() {
                     <FeatureCard
                       key={f.id}
                       feature={f}
-                      labels={f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l))}
+                      labels={groupChipsOf(f)}
+                      versions={versionChipsOf(f)}
                       people={peopleByFeature.get(f.id) ?? EMPTY_PEOPLE}
                       done={stats.done}
                       total={stats.total}

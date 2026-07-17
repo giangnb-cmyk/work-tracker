@@ -9,7 +9,15 @@ import AttachmentsField from './task/AttachmentsField';
 import RefImagesSection from './task/RefImagesSection';
 import LabelSelect from './LabelSelect';
 import { labelGroup } from '../lib/bugLabelGroups';
-import type { Attachment, Feature, FeatureKind } from '../types';
+import {
+  FEATURE_KINDS,
+  FEATURE_KIND_HINT,
+  FEATURE_KIND_ICON,
+  FEATURE_KIND_LABEL,
+  type Attachment,
+  type Feature,
+  type FeatureKind,
+} from '../types';
 
 /** Màu gán tự động cho nhãn mới, xoay vòng theo số nhãn hiện có; version luôn xám. */
 const LABEL_COLORS = ['#6366f1', '#38bdf8', '#fbbf24', '#22c55e', '#f472b6', '#a78bfa', '#fb923c', '#10b981'];
@@ -139,22 +147,22 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
 
         <div className="field">
           <span>Loại</span>
+          {/* Mô tả nằm ở tooltip, không nhét vào nút: nhồi cả câu vào ô chọn thì ba nút
+              chen nhau, chữ bé, đọc mệt hơn là không có. */}
           <div className="fk-pills">
-            <button
-              type="button"
-              className={`fk-pill${kind === 'delivery' ? ' on' : ''}`}
-              onClick={() => setKind('delivery')}
-            >
-              🎯 Gói bán <small>ship cho user, có ngày xong</small>
-            </button>
-            <button
-              type="button"
-              className={`fk-pill${kind === 'ongoing' ? ' on' : ''}`}
-              onClick={() => setKind('ongoing')}
-            >
-              🔁 Liên tục <small>polish/tuning, không có “done”</small>
-            </button>
+            {FEATURE_KINDS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={`fk-pill${kind === k ? ' on' : ''}`}
+                onClick={() => setKind(k)}
+                title={FEATURE_KIND_HINT[k]}
+              >
+                {FEATURE_KIND_ICON[k]} {FEATURE_KIND_LABEL[k]}
+              </button>
+            ))}
           </div>
+          <p className="fk-hint">{FEATURE_KIND_HINT[kind]}</p>
         </div>
 
         <div className="grid-2">

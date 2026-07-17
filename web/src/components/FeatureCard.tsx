@@ -1,12 +1,15 @@
 import BugLabelChip from './bug/BugLabelChip';
 import FeatureAvatars, { type FeaturePerson } from './FeatureAvatars';
 import { CheckCircleIcon } from './icons';
+import type { VersionChip } from '../lib/versionRange';
 import type { Feature, FeatureLabel } from '../types';
 
 interface Props {
   feature: Feature;
-  /** Nhãn đã resolve từ labelIds, cha tra sẵn. */
+  /** Nhãn NHÓM (Shop, IAP…) đã resolve từ labelIds; version đi riêng ở `versions`. */
   labels: FeatureLabel[];
+  /** Chip version đã gộp khoảng (1.0.x → 1.5.x) — cha tính, xem lib/versionRange. */
+  versions: VersionChip[];
   /** Người có task trong feature, đã sắp sẵn (nhiều task trước). */
   people: FeaturePerson[];
   done: number;
@@ -19,7 +22,9 @@ interface Props {
 }
 
 /** Một thẻ feature trong lưới: icon, tên, nhãn, tiến độ, người làm. */
-export default function FeatureCard({ feature, labels, people, done, total, done30, finished, onOpen }: Props) {
+export default function FeatureCard({
+  feature, labels, versions, people, done, total, done30, finished, onOpen,
+}: Props) {
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
 
   return (
@@ -31,9 +36,10 @@ export default function FeatureCard({ feature, labels, people, done, total, done
       )}
       <span className="project-icon" style={{ background: `${feature.color}22` }}>{feature.icon}</span>
       <span className="project-name">{feature.name}</span>
-      {labels.length > 0 && (
+      {(labels.length > 0 || versions.length > 0) && (
         <span className="feat-chips feat-chips-lg">
           {labels.map((l) => <BugLabelChip key={l.id} label={l} />)}
+          {versions.map((v) => <BugLabelChip key={v.key} label={v} />)}
         </span>
       )}
       {feature.kind === 'ongoing' ? (

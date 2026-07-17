@@ -42,9 +42,12 @@ export interface FeatureStatsView {
  * - `ongoing` (Polish, tuning…) theo định nghĩa không bao giờ có "done" — xem DATA_MODEL;
  *   card của nó cũng hiện nhịp 30 ngày thay vì %.
  * - Chưa có task nào (0/0): chưa làm gì chứ không phải đã xong. Cùng cách card hiện 0%.
+ *
+ * Loại trừ theo 'ongoing' chứ KHÔNG liệt kê loại nào được tính: thêm loại mới (0030 thêm
+ * 'standard') mà quên sửa chỗ này thì nó âm thầm không bao giờ xong — sai kiểu im lặng.
  */
 export function isFeatureDone(f: Feature, stats: FeatureStatsView): boolean {
-  return f.kind === 'delivery' && stats.total > 0 && stats.done === stats.total;
+  return f.kind !== 'ongoing' && stats.total > 0 && stats.done === stats.total;
 }
 
 /**

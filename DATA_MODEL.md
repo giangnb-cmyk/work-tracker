@@ -138,10 +138,20 @@ A feature: a unit of product work **inside a project**. A task optionally attach
 feature (`tasks.featureId`). Admin-managed. In Postgres: `public.features`, `project_id`
 FK → `projects(id)` `on delete cascade`; RLS = read for all signed-in, write for admin.
 
-**Model quy ước** (migration 0026): một feature là **đơn vị nhỏ deliver được** (gói bán).
+**Model quy ước** (migration 0026): một feature là **đơn vị nhỏ deliver được**.
 Nhóm lớn ("Shop", "Gameplay"…) KHÔNG phải feature — nó là **nhãn**; version delivery
 ("1.2.0") cũng là nhãn, nhận diện bằng tên (cùng regex `labelGroup` với bug). Việc chạy
 liên tục không bao giờ xong (Polish…) vẫn là feature nhưng mang `kind = 'ongoing'`.
+
+`kind` có BA giá trị (migration 0030 thêm `standard`) — CHECK ở DB chốt đúng ba:
+- `delivery` — **gói bán**: thứ bán cho user (IAP, pack, offer). Có ngày xong, hiện % done.
+- `standard` — **tính năng thường**: có ngày xong nhưng KHÔNG bán (Settings, Login,
+  Tutorial…). Cư xử y hệt `delivery`, chỉ khác tên gọi.
+- `ongoing` — **liên tục**: polish/tuning, không bao giờ "done" → UI hiện nhịp 30 ngày
+  thay vì %, và `isFeatureDone` không bao giờ tính nó là hoàn thành.
+
+> Code xét "đã xong" phải loại trừ theo `!== 'ongoing'`, ĐỪNG liệt kê loại nào được tính:
+> thêm loại thứ tư mà quên sửa thì nó âm thầm không bao giờ xong.
 
 | Field         | Type      | Notes                                            |
 |---------------|-----------|--------------------------------------------------|
@@ -151,7 +161,7 @@ liên tục không bao giờ xong (Polish…) vẫn là feature nhưng mang `kin
 | `icon`        | string    | emoji shown on the feature card                  |
 | `color`       | string    | accent hex for the card                          |
 | `description` | string    | optional short description                       |
-| `kind`        | string    | `delivery` (mặc định — hiện % done) \| `ongoing` (liên tục — KHÔNG hiện %, hiện nhịp 30 ngày) |
+| `kind`        | string    | `delivery` (mặc định, gói bán) \| `standard` (tính năng thường) \| `ongoing` (liên tục — KHÔNG hiện %, hiện nhịp 30 ngày) — xem ở trên |
 | `labelIds`    | string[]  | ids into `feature_labels` — nhóm + version, dùng để lọc |
 | `createdAt`   | Timestamp | creation time                                    |
 | `createdBy`   | string    | uid of creator                                   |
