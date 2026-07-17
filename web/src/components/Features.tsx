@@ -14,7 +14,8 @@ import CreateTaskCard from './CreateTaskCard';
 import BugLabelChip from './bug/BugLabelChip';
 import FeatureAvatars, { type FeaturePerson } from './FeatureAvatars';
 import FeatureTeamRow from './FeatureTeamRow';
-import FeatureFilterBar, { matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
+import FeatureFilterBar, { isFeatureDone, matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
+import { CheckCircleIcon } from './icons';
 import type { Feature, FeatureLabel, Task, TaskStatus } from '../types';
 
 const DAY = 86_400_000;
@@ -166,11 +167,24 @@ export default function Features() {
           </button>
         )}
         {visibleFeatures.map((f) => {
-          const { done, total, done30 } = statsByFeature.get(f.id) ?? EMPTY_STATS;
+          const stats = statsByFeature.get(f.id) ?? EMPTY_STATS;
+          const { done, total, done30 } = stats;
           const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+          // Cùng luật với facet "Tiến độ" của bộ lọc — thẻ tô xanh và bộ lọc "Hoàn thành"
+          // phải chọn ra ĐÚNG một tập, lệch nhau là mất tin nhau.
+          const finished = isFeatureDone(f, stats);
           const chips = f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l));
           return (
-            <button key={f.id} className="project-card feat-card glass" onClick={() => setSelectedId(f.id)}>
+            <button
+              key={f.id}
+              className={`project-card feat-card glass${finished ? ' done' : ''}`}
+              onClick={() => setSelectedId(f.id)}
+            >
+              {finished && (
+                <span className="feat-done-mark" title="Đã hoàn thành" aria-label="Đã hoàn thành">
+                  <CheckCircleIcon size={20} />
+                </span>
+              )}
               <span className="project-icon" style={{ background: `${f.color}22` }}>{f.icon}</span>
               <span className="project-name">{f.name}</span>
               {chips.length > 0 && (

@@ -1783,7 +1783,23 @@ table.data-table { width: 100%; border-collapse: collapse; }
 /* Số task xong / nhịp 30 ngày trên card feature. .project-meta gốc (0.75rem) là cỡ chú
    thích cho card DỰ ÁN; ở card feature nó là số liệu chính nên to hơn. Bó trong
    .feat-card để tab Dự án (ProjectSelect, Projects) dùng chung class mà không đổi theo. */
+.feat-card { position: relative; }
 .feat-card .project-meta { font-size: 0.85rem; }
+
+/* Feature đã xong: ngả xanh + tick góc trên phải. Đổi CẢ màu LẪN icon chứ không chỉ
+   màu — chỉ dựa vào màu thì người mù màu (~8% nam) không đọc được trạng thái.
+   Hai class nên thắng .glass và .project-card:hover (cùng 0,2,0 nhưng đứng sau). */
+.feat-card.done {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.03));
+}
+.feat-card.done:hover { border-color: var(--green); }
+.feat-card.done .progress > span { background: linear-gradient(90deg, #16a34a, #4ade80); }
+.feat-card.done .feat-pct { color: var(--green); }
+.feat-done-mark {
+  position: absolute; top: 0.9rem; right: 0.9rem;
+  display: grid; place-items: center; color: var(--green);
+}
 
 /* Feature: nhãn + loại (delivery/ongoing) + thanh lọc */
 .feat-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; }

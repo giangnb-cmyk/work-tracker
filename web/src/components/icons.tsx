@@ -73,6 +73,16 @@ export function FileIcon({ size = 20, className }: IconProps) {
   );
 }
 
+/** Tick trong vòng tròn — dấu "đã xong" trên card feature. */
+export function CheckCircleIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.3 12.3l2.5 2.5 4.9-5.2" />
+    </svg>
+  );
+}
+
 /** Cây bút — sửa nội dung tại chỗ (bình luận…). */
 export function PencilIcon({ size = 20, className }: IconProps) {
   return (
