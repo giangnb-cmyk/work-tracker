@@ -1801,6 +1801,23 @@ table.data-table { width: 100%; border-collapse: collapse; }
   display: grid; place-items: center; color: var(--green);
 }
 
+/* Nhóm feature theo version — bấm đầu nhóm để xổ. */
+.feat-group { margin-bottom: 0.6rem; }
+.feat-group-head {
+  width: 100%; display: flex; align-items: center; gap: 0.6rem; text-align: left;
+  padding: 0.6rem 0.75rem; border-radius: 10px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft);
+  color: var(--text); transition: background 0.15s ease, border-color 0.15s ease;
+}
+.feat-group-head:hover { background: rgba(255, 255, 255, 0.06); border-color: var(--border); }
+.feat-group-head.open { border-color: rgba(99, 102, 241, 0.4); }
+.feat-group-caret { width: 0.8rem; flex-shrink: 0; color: var(--muted); font-size: 0.7rem; }
+.feat-group-none { font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+/* Đẩy hai số liệu sang mép phải, tách khỏi chip version bên trái. */
+.feat-group-count { margin-left: auto; font-size: 0.78rem; color: var(--muted); }
+.feat-group-done { font-size: 0.78rem; color: var(--muted); }
+.feat-group-grid { margin: 0.75rem 0 1.25rem; animation: fadeIn 0.2s ease; }
+
 /* Feature: nhãn + loại (delivery/ongoing) + thanh lọc */
 .feat-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; }
 /* Nhãn của feature (card + trang chi tiết) là thông tin CHÍNH — gói bán nào, version

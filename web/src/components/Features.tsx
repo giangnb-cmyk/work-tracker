@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
@@ -12,10 +12,11 @@ import TaskModal from './TaskModal';
 import FeatureModal from './FeatureModal';
 import CreateTaskCard from './CreateTaskCard';
 import BugLabelChip from './bug/BugLabelChip';
-import FeatureAvatars, { type FeaturePerson } from './FeatureAvatars';
+import { type FeaturePerson } from './FeatureAvatars';
+import FeatureCard from './FeatureCard';
 import FeatureTeamRow from './FeatureTeamRow';
 import FeatureFilterBar, { isFeatureDone, matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
-import { CheckCircleIcon } from './icons';
+import { groupFeaturesByVersion } from '../lib/featureGroups';
 import type { Feature, FeatureLabel, Task, TaskStatus } from '../types';
 
 const DAY = 86_400_000;
@@ -42,6 +43,9 @@ export default function Features() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Nhóm version đang xổ. Rỗng lúc đầu — effect bên dưới mở version cao nhất. */
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
+  const autoOpened = useRef(false);
 
   const { labels } = useFeatureLabels(selectedProjectId);
   const sortedLabels = useMemo(() => sortFeatureLabels(labels), [labels]);
@@ -110,6 +114,35 @@ export default function Features() {
     });
   }, [projectFeatures, tokens, query, statsByFeature, meId]);
 
+  const groups = useMemo(() => groupFeaturesByVersion(visibleFeatures, labels), [visibleFeatures, labels]);
+
+  /**
+   * Vào tab thì mở sẵn version cao nhất — nhóm đầu tiên, vì groups đã sắp giảm dần.
+   * Chỉ chạy MỘT lần (ref), nếu không mỗi lần lọc làm groups đổi là nó lại bung nhóm
+   * đầu ra, đè lên thứ người dùng vừa tự đóng.
+   */
+  useEffect(() => {
+    if (autoOpened.current || groups.length === 0) return;
+    autoOpened.current = true;
+    setOpenKeys(new Set([groups[0].key]));
+  }, [groups]);
+
+  function toggleGroup(key: string) {
+    setOpenKeys((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  }
+
+  /**
+   * Đang lọc/tìm thì mở hết: nhóm đóng sẽ giấu đúng thứ vừa lọc ra, nhìn như bộ lọc
+   * hỏng. Không đụng vào openKeys nên xoá lọc xong là các nhóm về đúng trạng thái cũ.
+   */
+  const filtering = tokens.length > 0 || query.trim().length > 0;
+  const isGroupOpen = (key: string) => filtering || openKeys.has(key);
+
   const selected = projectFeatures.find((f) => f.id === selectedId) ?? null;
 
   if (!selectedProjectId) {
@@ -143,9 +176,14 @@ export default function Features() {
 
   return (
     <div className="fade-in">
-      <div className="view-header">
-        <h1>Features</h1>
-        <p>Các hạng mục tính năng của {selectedProject?.name ?? 'dự án'}. Mỗi task gắn với một feature.</p>
+      <div className="view-header row between">
+        <div>
+          <h1>Features</h1>
+          <p>Các hạng mục tính năng của {selectedProject?.name ?? 'dự án'}, chia theo version.</p>
+        </div>
+        {isAdmin && (
+          <button className="btn-primary" onClick={() => setCreating(true)}>＋ Feature mới</button>
+        )}
       </div>
 
       {projectFeatures.length > 0 && (
@@ -159,61 +197,56 @@ export default function Features() {
         />
       )}
 
-      <div className="project-grid">
-        {isAdmin && (
-          <button className="project-card project-card-new" onClick={() => setCreating(true)}>
-            <span className="project-new-plus">＋</span>
-            <span>Tạo feature mới</span>
-          </button>
-        )}
-        {visibleFeatures.map((f) => {
-          const stats = statsByFeature.get(f.id) ?? EMPTY_STATS;
-          const { done, total, done30 } = stats;
-          const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-          // Cùng luật với facet "Tiến độ" của bộ lọc — thẻ tô xanh và bộ lọc "Hoàn thành"
-          // phải chọn ra ĐÚNG một tập, lệch nhau là mất tin nhau.
-          const finished = isFeatureDone(f, stats);
-          const chips = f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l));
-          return (
+      {groups.map((g) => {
+        const open = isGroupOpen(g.key);
+        const doneCount = g.features.filter((f) => isFeatureDone(f, statsByFeature.get(f.id) ?? EMPTY_STATS)).length;
+        return (
+          <section key={g.key} className="feat-group">
             <button
-              key={f.id}
-              className={`project-card feat-card glass${finished ? ' done' : ''}`}
-              onClick={() => setSelectedId(f.id)}
+              className={`feat-group-head${open ? ' open' : ''}`}
+              onClick={() => toggleGroup(g.key)}
+              aria-expanded={open}
             >
-              {finished && (
-                <span className="feat-done-mark" title="Đã hoàn thành" aria-label="Đã hoàn thành">
-                  <CheckCircleIcon size={20} />
-                </span>
-              )}
-              <span className="project-icon" style={{ background: `${f.color}22` }}>{f.icon}</span>
-              <span className="project-name">{f.name}</span>
-              {chips.length > 0 && (
-                <span className="feat-chips feat-chips-lg">
-                  {chips.map((l) => <BugLabelChip key={l.id} label={l} />)}
-                </span>
-              )}
-              {f.kind === 'ongoing' ? (
-                // Feature liên tục không có "done" — % vô nghĩa, hiện nhịp làm thay thế.
-                <span className="project-meta">🔁 {total - done} đang mở · {done30} xong /30 ngày</span>
-              ) : (
-                <>
-                  <span className="project-meta">{done}/{total} task xong</span>
-                  <span className="feat-prog">
-                    <span className="progress"><span style={{ width: `${percent}%` }} /></span>
-                    <span className="feat-pct mono">{percent}%</span>
-                  </span>
-                </>
-              )}
-              <FeatureAvatars people={peopleByFeature.get(f.id) ?? EMPTY_PEOPLE} />
+              <span className="feat-group-caret" aria-hidden>{open ? '▾' : '▸'}</span>
+              {g.label
+                ? <BugLabelChip label={g.label} />
+                : <span className="feat-group-none">Chưa gắn version</span>}
+              <span className="feat-group-count">{g.features.length} feature</span>
+              <span className="feat-group-done mono">{doneCount}/{g.features.length} xong</span>
             </button>
-          );
-        })}
-      </div>
 
-      {projectFeatures.length === 0 && !isAdmin && (
-        <div className="glass empty">Dự án này chưa có feature nào.</div>
+            {open && (
+              <div className="project-grid feat-group-grid">
+                {g.features.map((f) => {
+                  const stats = statsByFeature.get(f.id) ?? EMPTY_STATS;
+                  return (
+                    <FeatureCard
+                      key={f.id}
+                      feature={f}
+                      labels={f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l))}
+                      people={peopleByFeature.get(f.id) ?? EMPTY_PEOPLE}
+                      done={stats.done}
+                      total={stats.total}
+                      done30={stats.done30}
+                      // Cùng luật với facet "Tiến độ" của bộ lọc — thẻ tô xanh và bộ lọc
+                      // "Hoàn thành" phải chọn ra ĐÚNG một tập, lệch nhau là mất tin nhau.
+                      finished={isFeatureDone(f, stats)}
+                      onOpen={() => setSelectedId(f.id)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {projectFeatures.length === 0 && (
+        <div className="glass empty">
+          {isAdmin ? 'Dự án này chưa có feature nào — bấm “＋ Feature mới” ở trên.' : 'Dự án này chưa có feature nào.'}
+        </div>
       )}
-      {projectFeatures.length > 0 && visibleFeatures.length === 0 && (
+      {projectFeatures.length > 0 && groups.length === 0 && (
         <div className="glass empty">Không có feature nào khớp bộ lọc.</div>
       )}
 
