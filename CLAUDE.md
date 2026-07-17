@@ -154,6 +154,7 @@ bot-work-tracker/
 │   │                       #   project_repo, sprint_ops, sprint_report, reminder,
 │   │                       #   permissions (admin gate), errors, constants,
 │   │                       #   task_title (làm sạch tiêu đề — chặn ở code, không chỉ hint),
+│   │                       #   attachments (URL → attachment; song song web/src/lib/attachments.ts),
 │   │                       #   bug_sync (Discord forum ↔ bugs), doc_* (RAG),
 │   │                       #   member_dm (DM điểm tuần cho member — thứ 5 + test từ web)
 │   ├── settings.json       #   model, allowed users, channels, bug_forums

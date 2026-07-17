@@ -22,6 +22,7 @@ try:
 except Exception:
     pass
 
+import attachments as atts
 import notion_gateway
 import permissions
 import project_repo as projects
@@ -128,6 +129,17 @@ def _watcher_fields(client, token: str):
     return ids, names
 
 
+def _link_fields(links, names):
+    """Cac --link (+ --link-name ghep theo thu tu) -> list attachment. Rong -> []."""
+    result = []
+    for i, url in enumerate(links or []):
+        if not atts.is_http_url(url):
+            die(f"link không hợp lệ: '{url}' — cần URL đầy đủ bắt đầu bằng http:// hoặc https://")
+        name = names[i] if names and i < len(names) else ""
+        result.append(atts.make_link(url, name))
+    return result
+
+
 # --- Subcommand: create ------------------------------------------------------
 
 def cmd_create(args):
@@ -154,6 +166,7 @@ def cmd_create(args):
     sprint_id = sprint["_id"] if sprint else None
     assignee_id, assignee_name = _assignee_fields(client, args.assignee)
     watcher_ids, watcher_names = _watcher_fields(client, args.watchers)
+    link_atts = _link_fields(args.link, args.link_name)
     due_start, due_dt, due_from = _due_window(sprint, args.due)
 
     task_doc = {
@@ -175,6 +188,7 @@ def cmd_create(args):
         "source": "discord",
         "watcherIds": watcher_ids,
         "watcherNames": watcher_names,
+        "attachments": link_atts,
     }
     task_id = repo.insert_task(client, task_doc)  # Postgres la nguon su that -> ghi truoc, Notion sau
 
@@ -188,6 +202,8 @@ def cmd_create(args):
         f"project: {project['name']}, sprint: {where}{feat}{watch}, "
         f"hạn: {due_dt:%d/%m} — {due_from})."
     )
+    for att in link_atts:
+        print(f"Đã gắn tài liệu: {att['name']} — {att['url']}")
     # Noi ra khi da tu sua tieu de, de nguoi dung biet ma kiem lai — dung im lang.
     if extra:
         print(f"Lưu ý: đầu vào là một dòng bảng; đã lấy ô đầu làm tiêu đề, phần còn lại ({extra}) đưa vào mô tả.")
@@ -223,8 +239,12 @@ def cmd_update(args):
         die(f"không tìm thấy task id '{args.id}'")
 
     updates = _build_updates(client, args)
+    # --link = GAN THEM, khong thay the: noi vao list cu (khac --watchers von thay ca list).
+    new_atts = _link_fields(args.link, args.link_name)
+    if new_atts:
+        updates["attachments"] = (task.get("attachments") or []) + new_atts
     if not updates:
-        die("không có trường nào để cập nhật (dùng --status/--priority/--title/...)")
+        die("không có trường nào để cập nhật (dùng --status/--priority/--title/--desc/--link/...)")
 
     repo.update_task(client, task["_id"], updates)
 
@@ -234,7 +254,10 @@ def cmd_update(args):
         if k not in _HIDDEN_FIELDS
     )
     title = updates.get("title", task.get("title", ""))
-    print(f"Đã cập nhật task [{repo.short_id(task['_id'])}] \"{title}\": {changed}.")
+    head = f"Đã cập nhật task [{repo.short_id(task['_id'])}] \"{title}\""
+    print(f"{head}: {changed}." if changed else f"{head}.")
+    for att in new_atts:
+        print(f"Đã gắn tài liệu: {att['name']} — {att['url']}")
     print(_sync_update(client, task, updates))
 
     done_line = _notify_done_if_needed(task, updates)
@@ -293,6 +316,9 @@ def _build_updates(client, args) -> dict:
         if len(title) > MAX_TITLE:
             die(f"title dài {len(title)} ký tự, tối đa {MAX_TITLE}. Đặt tiêu đề ngắn gọn hơn.")
         updates["title"] = title
+    if args.desc is not None:
+        # THAY THE ca mo ta (giong --watchers). Muon giu phan cu thi chay `show` doc truoc.
+        updates["description"] = args.desc
     if args.points is not None:
         updates["points"] = max(0, args.points)
     if args.due is not None:
@@ -307,6 +333,41 @@ def _build_updates(client, args) -> dict:
         updates["watcherIds"] = watcher_ids
         updates["watcherNames"] = watcher_names
     return updates
+
+
+# --- Subcommand: show --------------------------------------------------------
+
+def cmd_show(args):
+    """In chi tiet 1 task. Ai cung xem duoc (giong list).
+
+    WHY: `update --desc` thay the ca mo ta — khong co lenh doc thi Claude buoc phai
+    doan phan cu roi ghi de mat. Day la buoc 'doc truoc khi ghi'.
+    """
+    client = repo.db()
+    task = repo.get_task(client, args.id)
+    if not task:
+        die(f"không tìm thấy task id '{args.id}'")
+
+    print(f"[{repo.short_id(task['_id'])}] {task.get('title') or '(không tên)'}")
+    print(
+        f"- trạng thái: {task.get('status', '?')} | ưu tiên: {task.get('priority', '?')} "
+        f"| điểm: {task.get('points', 0)}"
+    )
+    print(f"- giao cho: {task.get('assigneeName') or 'chưa giao'}")
+    print(f"- liên quan: {', '.join(task.get('watcherNames') or []) or 'không có'}")
+    if task.get("dueDate"):
+        print(f"- hạn: {repo._as_datetime(task['dueDate']):%d/%m/%Y}")
+    if task.get("notionUrl"):
+        print(f"- Notion: {task['notionUrl']}")
+    print(f"- mô tả: {task.get('description') or '(trống)'}")
+
+    task_atts = task.get("attachments") or []
+    if not task_atts:
+        print("- tài liệu: (chưa có)")
+        return
+    print(f"- tài liệu ({len(task_atts)}):")
+    for att in task_atts:
+        print(f"  • {att.get('name') or '(không tên)'} — {att.get('url', '')}")
 
 
 # --- Subcommand: list --------------------------------------------------------
@@ -371,9 +432,12 @@ def _normalize_or_die(fn, value, label, default=None):
 
 
 # Doi ten truong khi in ket qua update cho de doc tren Discord.
-_FIELD_LABEL = {"watcherNames": "liên quan", "assigneeName": "giao cho"}
+_FIELD_LABEL = {"watcherNames": "liên quan", "assigneeName": "giao cho", "description": "mô tả"}
 # uuid noi bo — nguoi dung khong doc duoc, va da the hien qua truong '*Name' tuong ung.
-_HIDDEN_FIELDS = ("watcherIds", "assigneeId")
+# 'attachments' co dong 'Đã gắn tài liệu' rieng, in ca list dict ra thi khong ai doc noi.
+_HIDDEN_FIELDS = ("watcherIds", "assigneeId", "attachments")
+
+_MAX_SHOW = 80  # mo ta dai ca doan -> cat cho dong ket qua tren Discord con doc duoc
 
 
 def _show(value):
@@ -381,8 +445,22 @@ def _show(value):
     if value is None:
         return "trống"
     if isinstance(value, list):
-        return ", ".join(str(v) for v in value) or "trống"
-    return str(value)
+        text = ", ".join(str(v) for v in value) or "trống"
+    else:
+        text = str(value)
+    return text if len(text) <= _MAX_SHOW else text[:_MAX_SHOW] + "…"
+
+
+def _add_link_args(parser) -> None:
+    """--link/--attach dung chung cho create va update (lap lai duoc cho nhieu tai lieu)."""
+    parser.add_argument(
+        "--link", "--attach", action="append", dest="link", metavar="URL",
+        help="Gan tai lieu/link (http(s)); lap lai --link de gan nhieu cai",
+    )
+    parser.add_argument(
+        "--link-name", action="append", dest="link_name", metavar="TEN",
+        help="Ten hien thi cho --link tuong ung theo thu tu (mac dinh: ten mien)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -402,6 +480,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--points", type=int, default=0, help="Story points")
     c.add_argument("--due", help="Han chot YYYY-MM-DD")
     c.add_argument("--desc", help="Mo ta")
+    _add_link_args(c)
     c.set_defaults(func=cmd_create)
 
     u = sub.add_parser("update", help="Cap nhat task theo id")
@@ -413,7 +492,13 @@ def build_parser() -> argparse.ArgumentParser:
     u.add_argument("--watchers", help="THAY THE danh sach nguoi lien quan; '' de xoa het")
     u.add_argument("--points", type=int, help="Story points")
     u.add_argument("--due", help="Han chot YYYY-MM-DD (de trong '' de xoa han)")
+    u.add_argument("--desc", help="THAY THE mo ta; '' de xoa (chay `show` de doc mo ta cu truoc)")
+    _add_link_args(u)
     u.set_defaults(func=cmd_update)
+
+    s = sub.add_parser("show", help="Xem chi tiet 1 task (mo ta, tai lieu)")
+    s.add_argument("--id", required=True, help="Task id (day du hoac 8 ky tu dau)")
+    s.set_defaults(func=cmd_show)
 
     l = sub.add_parser("list", help="Liet ke task")
     l.add_argument("--assignee", help="Ten nguoi | 'me'")

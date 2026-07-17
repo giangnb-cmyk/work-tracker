@@ -81,6 +81,8 @@ def _map_task(r: dict) -> dict:
         # thong bao hoan thanh — thieu 2 khoa nay thi no am tham cc rong mai mai.
         "watcherIds": r.get("watcher_ids") or [],
         "watcherNames": r.get("watcher_names") or [],
+        # WHY: task_ops gan THEM tai lieu -> phai doc duoc list cu, khong thi ghi de mat.
+        "attachments": r.get("attachments") or [],
     }
 
 
@@ -104,6 +106,7 @@ _TASK_COL = {
     "notionUrl": "notion_url",
     "watcherIds": "watcher_ids",
     "watcherNames": "watcher_names",
+    "attachments": "attachments",
 }
 
 
