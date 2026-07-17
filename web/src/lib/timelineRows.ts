@@ -60,7 +60,15 @@ export function aggregate(rows: FeatureRow[]) {
  * Hàng "Khác" (task chưa gắn feature) nhập vào nhóm "chưa gắn version": nó không thuộc
  * bản phát hành nào, nhưng rơi khỏi timeline thì còn tệ hơn.
  */
-export function buildVersionRows(rows: FeatureRow[], labels: FeatureLabel[]): VersionRow[] {
+/**
+ * @param projectStartMs mốc tạo dự án — điểm bắt đầu của bản ĐẦU TIÊN (nó không có bản
+ *   nào trước để bám vào). null = không biết -> bar co thành một mốc ở ngày phát hành.
+ */
+export function buildVersionRows(
+  rows: FeatureRow[],
+  labels: FeatureLabel[],
+  projectStartMs: number | null = null,
+): VersionRow[] {
   const featureRows = rows.filter((r) => r.feature !== null);
   const otherRow = rows.find((r) => r.feature === null) ?? null;
   const byId = new Map(featureRows.map((r) => [r.feature!.id, r]));
@@ -90,7 +98,7 @@ export function buildVersionRows(rows: FeatureRow[], labels: FeatureLabel[]): Ve
       });
     }
   }
-  return applyReleaseWindows(out);
+  return applyReleaseWindows(out, projectStartMs);
 }
 
 /**
@@ -99,22 +107,24 @@ export function buildVersionRows(rows: FeatureRow[], labels: FeatureLabel[]): Ve
  *
  * Vì sao không lấy mốc từ task: lịch phát hành chốt trước và không nhúc nhích khi một
  * task bị dời hạn. Suy ngược từ task ra là để cái đuôi vẫy con chó — nhìn vào tưởng lịch
- * đổi, trong khi sheet vẫn ghi y nguyên.
+ * đổi, trong khi sheet vẫn ghi y nguyên. Cũng vì thế mà mốc đầu KHÔNG lấy theo task sớm
+ * nhất: task dời một cái là bản 1.0.x đổi độ dài, dù chẳng có gì trong lịch đổi.
  *
- * Bản ĐẦU TIÊN không có "bản trước" -> lùi về ngày task sớm nhất của nó; không có task
- * nào có hạn thì bar co lại thành một mốc đúng ngày phát hành.
- * Version CHƯA chốt ngày -> giữ nguyên mốc suy từ task (hành vi cũ, không gãy).
+ * Bản ĐẦU TIÊN không có "bản trước" -> lấy mốc TẠO DỰ ÁN. Không biết mốc đó (hoặc nó
+ * muộn hơn cả ngày phát hành, tức dữ liệu vô lý) thì bar co lại thành một mốc đúng ngày
+ * phát hành, chứ không vẽ ngược về quá khứ.
  *
- * `out` đã sắp version giảm dần (groupFeaturesByVersion) nên "bản trước" nằm ở chỉ số
- * lớn hơn; nhóm "chưa gắn version" không có ngày nên tự rơi vào nhánh giữ nguyên.
+ * Version CHƯA chốt ngày -> giữ nguyên mốc suy từ task (hành vi cũ, không gãy); nhóm
+ * "chưa gắn version" không có ngày nên tự rơi vào nhánh đó.
  */
-function applyReleaseWindows(out: VersionRow[]): VersionRow[] {
+function applyReleaseWindows(out: VersionRow[], projectStartMs: number | null): VersionRow[] {
   const dated = out.filter((v) => v.releaseMs !== null);
   return out.map((v) => {
     if (v.releaseMs === null) return v;
-    const older = dated.filter((o) => (o.releaseMs as number) < v.releaseMs!);
+    const release = v.releaseMs;
+    const older = dated.filter((o) => (o.releaseMs as number) < release);
     const prev = older.length ? Math.max(...older.map((o) => o.releaseMs as number)) : null;
-    const start = prev ?? (v.hasDates ? Math.min(v.start, v.releaseMs) : v.releaseMs);
-    return { ...v, start, end: v.releaseMs, hasDates: true };
+    const first = projectStartMs !== null && projectStartMs < release ? projectStartMs : release;
+    return { ...v, start: prev ?? first, end: release, hasDates: true };
   });
 }

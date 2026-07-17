@@ -52,24 +52,33 @@ export default function Timeline() {
     [tasks],
   );
 
+  /** Mốc tạo dự án — điểm bắt đầu của bản đầu tiên (nó không có bản nào trước để bám). */
+  const projectStartMs = useMemo(() => {
+    const ms = selectedProject?.createdAt?.toMillis();
+    return ms ? startOfDay(ms) : null;
+  }, [selectedProject]);
+
   /**
-   * Khung "cả dự án": min→max các task có hạn, luôn chứa hôm nay VÀ mọi ngày phát hành.
+   * Khung "cả dự án": min→max các task có hạn, luôn chứa hôm nay, mọi ngày phát hành VÀ
+   * mốc tạo dự án.
    *
    * Phải tính cả ngày phát hành: lịch release chốt trước, thường nằm xa hơn hạn task
-   * cuối cùng — bỏ ra ngoài thì bar version bị kẹp lại ở mép, nhìn như đã tới nơi.
+   * cuối cùng — bỏ ra ngoài thì bar version bị kẹp lại ở mép, nhìn như đã tới nơi. Mốc
+   * tạo dự án cũng vậy, ở đầu kia: nó là điểm bắt đầu của bản đầu tiên.
    */
   const projectDomain = useMemo(() => {
     const now = startOfDay(Date.now());
     const marks = [
       ...taskBars.filter((b) => b.hasDates).flatMap((b) => [b.start, b.end]),
       ...labels.map((l) => l.releaseDate?.toMillis()).filter((ms): ms is number => Boolean(ms)),
+      ...(projectStartMs !== null ? [projectStartMs] : []),
     ];
     if (marks.length === 0) return { start: now - DAY, end: now + 30 * DAY };
     return {
       start: Math.min(...marks, now) - DAY,
       end: Math.max(...marks, now) + DAY,
     };
-  }, [taskBars, labels]);
+  }, [taskBars, labels, projectStartMs]);
 
   const domain = useMemo(
     () => (range ? { start: startOfDay(range.fromMs), end: startOfDay(range.toMs) } : projectDomain),
@@ -122,7 +131,10 @@ export default function Timeline() {
     );
   }, [taskBars, features, selectedProjectId, domain]);
 
-  const versionRows: VersionRow[] = useMemo(() => buildVersionRows(rows, labels), [rows, labels]);
+  const versionRows: VersionRow[] = useMemo(
+    () => buildVersionRows(rows, labels, projectStartMs),
+    [rows, labels, projectStartMs],
+  );
 
   const span = Math.max(DAY, domain.end - domain.start);
   const totalDays = Math.round(span / DAY);
