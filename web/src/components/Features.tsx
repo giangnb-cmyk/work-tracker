@@ -40,7 +40,9 @@ const EMPTY_PEOPLE: FeaturePerson[] = [];
 /** Features tab: a card grid of the project's features; open one to see its tasks. */
 export default function Features() {
   const { user, isAdmin } = useAuth();
-  const { features, featuresLoading, selectedProjectId, selectedProject, members } = useSprintContext();
+  const {
+    features, featuresLoading, selectedProjectId, selectedProject, selectedSprint, selectedSprintId, members,
+  } = useSprintContext();
   const { tasks, loading: tasksLoading } = useProjectTasks(selectedProjectId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
@@ -142,11 +144,46 @@ export default function Features() {
     });
   }
 
+  /**
+   * Feature ĐANG chạy trong sprint đang chọn = có ít nhất một task thuộc sprint đó.
+   * Suy từ task chứ không có liên kết sprint↔feature nào trong dữ liệu — và cũng đúng
+   * hơn: "đang làm gì trong sprint này" chính là câu hỏi task trả lời.
+   */
+  const sprintFeatures = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of tasks) {
+      if (t.featureId && t.sprintId === selectedSprintId) ids.add(t.featureId);
+    }
+    // Lọc theo visibleFeatures để bộ lọc/tìm kiếm cũng ăn vào khối này.
+    return visibleFeatures.filter((f) => ids.has(f.id));
+  }, [tasks, selectedSprintId, visibleFeatures]);
+
   const ownLabelsOf = (f: Feature) =>
     f.labelIds.map((id) => labelById.get(id)).filter((l): l is FeatureLabel => Boolean(l));
   /** Nhãn nhóm (Shop, IAP…) — version tách ra vì còn phải gộp thành khoảng. */
   const groupChipsOf = (f: Feature) => ownLabelsOf(f).filter((l) => labelGroup(l.name) !== 'version');
   const versionChipsOf = (f: Feature) => versionRangeChips(ownLabelsOf(f), labels);
+
+  /** Một card — dựng ở hai nơi (khối sprint và khối version) nên gom lại một chỗ. */
+  function renderCard(f: Feature) {
+    const stats = statsByFeature.get(f.id) ?? EMPTY_STATS;
+    return (
+      <FeatureCard
+        key={f.id}
+        feature={f}
+        labels={groupChipsOf(f)}
+        versions={versionChipsOf(f)}
+        people={peopleByFeature.get(f.id) ?? EMPTY_PEOPLE}
+        done={stats.done}
+        total={stats.total}
+        done30={stats.done30}
+        // Cùng luật với facet "Tiến độ" của bộ lọc — thẻ tô xanh và bộ lọc "Hoàn thành"
+        // phải chọn ra ĐÚNG một tập, lệch nhau là mất tin nhau.
+        finished={isFeatureDone(f, stats)}
+        onOpen={() => setSelectedId(f.id)}
+      />
+    );
+  }
 
   /**
    * Đang lọc/tìm thì mở hết: nhóm đóng sẽ giấu đúng thứ vừa lọc ra, nhìn như bộ lọc
@@ -210,6 +247,26 @@ export default function Features() {
         />
       )}
 
+      {/* Đang làm gì trong sprint này — câu hỏi hay hỏi nhất, nên đứng trên cùng và
+          KHÔNG gập lại. Feature ở đây vẫn xuất hiện lại trong khối version bên dưới:
+          đây là hai câu hỏi khác nhau ("đang làm gì" vs "bản nào ship gì"). */}
+      {sprintFeatures.length > 0 && (
+        <section className="feat-sprint">
+          <div className="mt-subhead">
+            <h2>🎯 Feature trong sprint này</h2>
+            <p className="muted">
+              {selectedSprint?.name ?? 'Backlog'} · {sprintFeatures.length} feature đang có task
+            </p>
+          </div>
+          <div className="project-grid">{sprintFeatures.map(renderCard)}</div>
+        </section>
+      )}
+
+      <div className="mt-subhead">
+        <h2>🏷️ Theo version</h2>
+        <p className="muted">Xổ một bản ra để xem feature của bản đó.</p>
+      </div>
+
       {groups.map((g) => {
         const open = isGroupOpen(g.key);
         const doneCount = g.features.filter((f) => isFeatureDone(f, statsByFeature.get(f.id) ?? EMPTY_STATS)).length;
@@ -228,29 +285,7 @@ export default function Features() {
               <span className="feat-group-done mono">{doneCount}/{g.features.length} xong</span>
             </button>
 
-            {open && (
-              <div className="project-grid feat-group-grid">
-                {g.features.map((f) => {
-                  const stats = statsByFeature.get(f.id) ?? EMPTY_STATS;
-                  return (
-                    <FeatureCard
-                      key={f.id}
-                      feature={f}
-                      labels={groupChipsOf(f)}
-                      versions={versionChipsOf(f)}
-                      people={peopleByFeature.get(f.id) ?? EMPTY_PEOPLE}
-                      done={stats.done}
-                      total={stats.total}
-                      done30={stats.done30}
-                      // Cùng luật với facet "Tiến độ" của bộ lọc — thẻ tô xanh và bộ lọc
-                      // "Hoàn thành" phải chọn ra ĐÚNG một tập, lệch nhau là mất tin nhau.
-                      finished={isFeatureDone(f, stats)}
-                      onOpen={() => setSelectedId(f.id)}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            {open && <div className="project-grid feat-group-grid">{g.features.map(renderCard)}</div>}
           </section>
         );
       })}
