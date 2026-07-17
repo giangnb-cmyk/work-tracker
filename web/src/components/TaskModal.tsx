@@ -48,10 +48,10 @@ export default function TaskModal({
   const isEdit = Boolean(task);
 
   // 3 mức quyền, từ hẹp đến rộng:
-  // - canEditFields: title/priority/sprint/watchers/points — admin; create mode thì ai
-  //   tạo cũng phải gõ được (points vẫn khoá riêng bằng isAdmin ở dưới).
-  // - canEditOwn: người nhận, feature, hạn chót, subtask, mô tả, tài liệu — member sửa
-  //   được trên task MÌNH TẠO (reporter). Trigger DB chặn points ở tầng RLS (0024).
+  // - canEditFields: priority/sprint/watchers/points — admin; create mode thì ai tạo cũng
+  //   phải gõ được (points vẫn khoá riêng bằng isAdmin ở dưới).
+  // - canEditOwn: TÊN task, người nhận, feature, hạn chót, subtask, mô tả, tài liệu —
+  //   member sửa được trên task MÌNH TẠO (reporter). Trigger DB chặn points (0024).
   // - canChangeStatus: reporter/assignee đổi trạng thái (như cũ).
   const isOwner = !isEdit || task?.reporterId === user?.uid;
   const canEditFields = isAdmin || !isEdit;
@@ -254,11 +254,15 @@ export default function TaskModal({
                   <span className="tm-idrow-spacer" />
                   <StatusToggle value={status} onChange={setStatus} disabled={!canChangeStatus} />
                 </div>
+                {/* canEditOwn chứ không phải canEditFields: người tạo task sửa được TÊN
+                    task của mình — gõ sai một chữ mà phải đi nhờ admin thì vô lý. RLS
+                    tasks_update (0002) vốn đã cho reporter/assignee ghi cả hàng, nên đây
+                    chỉ là mở đúng cái ô ở UI, không cần policy mới (xem 0024). */}
                 <input
                   className="tmodal-title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  disabled={!canEditFields}
+                  disabled={!canEditOwn}
                   placeholder="Tên task"
                 />
               </div>

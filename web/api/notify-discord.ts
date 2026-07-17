@@ -3,8 +3,8 @@
 // Auth: Supabase access token (web) or x-sync-secret header (bot). See _auth.ts.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authorize } from './_auth';
-import { DISCORD_ENABLED, postDone, type DonePayload } from './_discord';
+import { authorize } from './_auth.js';
+import { DISCORD_ENABLED, postDone, type DonePayload } from './_discord.js';
 
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');

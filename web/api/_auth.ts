@@ -2,7 +2,7 @@
 // Web callers present a Supabase access token (JWT); the bot presents the shared secret.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { SYNC_SECRET } from './_notion';
+import { SYNC_SECRET } from './_notion.js';
 
 const env = process.env;
 

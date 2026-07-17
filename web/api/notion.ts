@@ -4,7 +4,7 @@
 // Auth: Supabase access token (web) or x-sync-secret header (bot). See _auth.ts / _notion.ts.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authorize } from './_auth';
+import { authorize } from './_auth.js';
 import {
   buildProperties,
   DATABASE_ID,
@@ -12,7 +12,7 @@ import {
   NOTION_ENABLED,
   notion,
   type NotionTaskInput,
-} from './_notion';
+} from './_notion.js';
 
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');

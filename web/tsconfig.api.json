@@ -5,11 +5,18 @@
   // Trước đây `api/` không nằm trong project nào -> `tsc -b` bỏ qua hoàn toàn, mà Vercel
   // build function bằng esbuild (không typecheck). Lỗi kiểu ở đây không ai bắt cho tới lúc
   // nổ ngoài production.
+  //
+  // NodeNext, KHÔNG phải "bundler" — package.json có "type": "module" nên function chạy
+  // bằng ESM thật của Node, mà ESM BẮT BUỘC ghi đuôi file ở import quan hệ ('./_auth.js').
+  // "bundler" cho qua import thiếu đuôi lúc typecheck, rồi Node ném ERR_MODULE_NOT_FOUND
+  // lúc nạp module -> Vercel trả FUNCTION_INVOCATION_FAILED (500 trắng, không có body của
+  // ta) và CẢ HAI gateway chết trước khi chạy được dòng nào. Đúng lỗi đó đã sống trong
+  // production. NodeNext bắt lỗi này ngay ở `tsc -b`.
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "types": ["node"],
     "skipLibCheck": true,
     "resolveJsonModule": true,
