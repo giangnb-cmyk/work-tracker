@@ -117,8 +117,9 @@ export default function Timeline() {
     const out: FeatureRow[] = [];
     for (const f of features) {
       if (f.projectId !== selectedProjectId) continue;
-      const bars = byFeature.get(f.id);
-      if (bars?.length) out.push(make(f, bars));
+      // Feature CHƯA có task nào vẫn có hàng (bars rỗng -> "chưa có hạn"): xổ một version
+      // ghi "14 feature" ra mà trống trơn thì còn khó hiểu hơn là không cho xổ.
+      out.push(make(f, byFeature.get(f.id) ?? []));
     }
     const other = byFeature.get('other');
     if (other?.length) out.push(make(null, other));

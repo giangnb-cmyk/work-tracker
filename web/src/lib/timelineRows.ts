@@ -1,6 +1,7 @@
 // Dựng các hàng của Timeline (version → feature → task). THUẦN — không React, test được.
 
 import { NO_VERSION, groupFeaturesByVersion } from './featureGroups';
+import { labelGroup } from './bugLabelGroups';
 import type { Feature, FeatureLabel, Task } from '../types';
 
 export interface TaskBar {
@@ -73,31 +74,46 @@ export function buildVersionRows(
   const otherRow = rows.find((r) => r.feature === null) ?? null;
   const byId = new Map(featureRows.map((r) => [r.feature!.id, r]));
 
-  const out: VersionRow[] = groupFeaturesByVersion(
-    featureRows.map((r) => r.feature!),
-    labels,
-  ).map((g) => {
-    const rs = g.features.map((f) => byId.get(f.id)).filter((r): r is FeatureRow => Boolean(r));
-    return {
-      key: g.key,
-      label: g.label,
-      rows: rs,
-      ...aggregate(rs),
-      releaseMs: g.label?.releaseDate?.toMillis() ?? null,
-    };
-  });
+  const grouped = groupFeaturesByVersion(featureRows.map((r) => r.feature!), labels);
+  const byKey = new Map(grouped.map((g) => [g.key, g]));
 
-  if (otherRow) {
-    const i = out.findIndex((v) => v.key === NO_VERSION);
-    if (i >= 0) {
-      const merged = [...out[i].rows, otherRow];
-      out[i] = { ...out[i], rows: merged, ...aggregate(merged) };
-    } else {
-      out.push({
-        key: NO_VERSION, label: null, rows: [otherRow], ...aggregate([otherRow]), releaseMs: null,
-      });
-    }
+  /**
+   * Duyệt từ PALETTE chứ không từ groupFeaturesByVersion: hàm đó bỏ nhóm rỗng (đúng cho
+   * tab Features, ở đó version chưa có feature nào chỉ là nhiễu). Nhưng Timeline dựng
+   * từ dưới lên — không task thì không feature-row, không feature-row thì mất luôn cả
+   * version. Mà một bản ĐÃ CHỐT NGÀY PHÁT HÀNH là mốc có thật: giấu nó đi thì lộ trình
+   * chẳng còn gì để xem, đúng lúc chưa kịp tạo task mới là lúc cần nhìn lịch nhất.
+   */
+  const versions = labels
+    .filter((l) => labelGroup(l.name) === 'version')
+    .sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true }));
+
+  const out: VersionRow[] = versions
+    .map((l) => {
+      const g = byKey.get(l.id);
+      const rs = (g?.features ?? [])
+        .map((f) => byId.get(f.id))
+        .filter((r): r is FeatureRow => Boolean(r));
+      return {
+        key: l.id,
+        label: l,
+        rows: rs,
+        ...aggregate(rs),
+        releaseMs: l.releaseDate?.toMillis() ?? null,
+      };
+    })
+    // Version vừa chưa có việc gì VỪA chưa chốt ngày thì đúng là nhiễu — bỏ.
+    .filter((v) => v.rows.length > 0 || v.releaseMs !== null);
+
+  const noVersion = byKey.get(NO_VERSION);
+  const restRows = [
+    ...(noVersion?.features ?? []).map((f) => byId.get(f.id)).filter((r): r is FeatureRow => Boolean(r)),
+    ...(otherRow ? [otherRow] : []),
+  ];
+  if (restRows.length > 0) {
+    out.push({ key: NO_VERSION, label: null, rows: restRows, ...aggregate(restRows), releaseMs: null });
   }
+
   return applyReleaseWindows(out, projectStartMs);
 }
 
