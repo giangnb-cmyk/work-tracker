@@ -27,6 +27,7 @@ import notion_gateway
 import permissions
 import project_repo as projects
 import task_repo as repo
+import web_link
 from constants import (
     STATUS_TODO,
     STATUS_DONE,
@@ -129,6 +130,13 @@ def _watcher_fields(client, token: str):
     return ids, names
 
 
+def _print_task_link(task_id: str) -> None:
+    """In link web cua task de nguoi dung bam thang vao. Im lang neu chua cau hinh."""
+    url = web_link.task_url(task_id)
+    if url:
+        print(f"Link: {url}")
+
+
 def _link_fields(links, names):
     """Cac --link (+ --link-name ghep theo thu tu) -> list attachment. Rong -> []."""
     result = []
@@ -202,6 +210,7 @@ def cmd_create(args):
         f"project: {project['name']}, sprint: {where}{feat}{watch}, "
         f"hạn: {due_dt:%d/%m} — {due_from})."
     )
+    _print_task_link(task_id)
     for att in link_atts:
         print(f"Đã gắn tài liệu: {att['name']} — {att['url']}")
     # Noi ra khi da tu sua tieu de, de nguoi dung biet ma kiem lai — dung im lang.
@@ -359,6 +368,7 @@ def cmd_show(args):
         print(f"- hạn: {repo._as_datetime(task['dueDate']):%d/%m/%Y}")
     if task.get("notionUrl"):
         print(f"- Notion: {task['notionUrl']}")
+    _print_task_link(task["_id"])
     print(f"- mô tả: {task.get('description') or '(trống)'}")
 
     task_atts = task.get("attachments") or []

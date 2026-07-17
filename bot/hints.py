@@ -60,7 +60,11 @@ TASK_HINT = (
     "the existing watchers too.\n"
     "- list (anyone): [--assignee <name|me>] [--sprint <name|active|backlog>] [--status <...>]. "
     "'me' maps to the sender. Example 'xem task cua toi' -> list --assignee me.\n"
-    "Relay the script's printed output. The task id in [brackets] is a short id you can reuse."
+    "Relay the script's printed output. The task id in [brackets] is a short id you can reuse.\n"
+    "When the script prints a 'Link: <url>' line, that is the task's page on the web app: "
+    "ALWAYS include that url in your reply (as-is, never shortened or relabelled) so people "
+    "can click straight through to the task. No 'Link:' line = the web url is not configured; "
+    "just leave it out, do NOT invent one."
 )
 
 TASK_INTAKE_HINT = (

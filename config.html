@@ -216,6 +216,11 @@
               <label>Bug sync channel ID<span class="tgt">bug_sync_channel_id</span></label>
               <input type="text" id="bugSyncChannelId" placeholder="0" inputmode="numeric" />
             </div>
+            <div class="field wide">
+              <label>URL web đã deploy<span class="tgt">bot · WEB_BASE_URL</span></label>
+              <input type="text" id="webBaseUrl" placeholder="https://your-app.vercel.app" />
+              <span class="hint">Bot gắn link <code>/tasks/&lt;id&gt;</code> vào thông báo tạo task &amp; hoàn thành. Để trống = thông báo không có link. Dùng URL công khai, KHÔNG dùng localhost — link này gửi cho cả team.</span>
+            </div>
           </div>
         </div>
       </details>
@@ -624,6 +629,7 @@ function collect(){
       enabled: $('memberDmEnabled').checked,
       weekday: num('memberDmWeekday',3), hour: num('memberDmHour',9)
     },
+    webBaseUrl: val('webBaseUrl'),
     claudeCmd: val('claudeCmd')||'claude', ollamaHost: val('ollamaHost'), ragEmbedModel: val('ragEmbedModel'),
     ragSyncEnabled: $('ragSyncEnabled').checked, ragSyncTimeoutSeconds: num('ragSyncTimeoutSeconds',900),
     ragDriveTimeoutSeconds: num('ragDriveTimeoutSeconds',10800),
@@ -694,6 +700,12 @@ function buildBotEnv(v){
     '',
     '# Lenh goi Claude CLI (mac dinh claude).',
     'CLAUDE_CMD='+(v.claudeCmd||'claude'),
+    '',
+    '# --- Link web trong thong bao (tuy chon) ---',
+    '# URL goc cua web da deploy -> bot gan link <url>/tasks/<id> vao thong bao tao task',
+    '# va thong bao hoan thanh. De trong = thong bao khong co link (khong loi).',
+    '# Dung URL cong khai, KHONG dung localhost: link nay gui cho ca team tren Discord.',
+    'WEB_BASE_URL='+v.webBaseUrl,
     '',
     '# --- RAG tai lieu (bge-m3 qua Ollama) ---',
     'OLLAMA_HOST='+v.ollamaHost,
@@ -949,6 +961,7 @@ function applyBotEnv(m){
   if (m.DISCORD_TOKEN) setVal('discordToken', m.DISCORD_TOKEN);
   if (m.SUPABASE_URL) setVal('supabaseUrl', m.SUPABASE_URL);
   if (m.SUPABASE_SERVICE_ROLE_KEY) setVal('supabaseServiceKey', m.SUPABASE_SERVICE_ROLE_KEY);
+  if ('WEB_BASE_URL' in m) setVal('webBaseUrl', m.WEB_BASE_URL);
   if (m.CLAUDE_CMD) setVal('claudeCmd', m.CLAUDE_CMD);
   if (m.OLLAMA_HOST) setVal('ollamaHost', m.OLLAMA_HOST);
   if (m.RAG_EMBED_MODEL) setVal('ragEmbedModel', m.RAG_EMBED_MODEL);
@@ -1117,6 +1130,7 @@ function restore(v){
   setVal('bugSyncChannelId', v.bugSyncChannelId === '0' ? '' : v.bugSyncChannelId);
   setVal('bugSyncHour', v.bugSyncHour); setVal('bugSyncTz', v.bugSyncTz);
   setVal('bugSyncPollSeconds', v.bugSyncPollSeconds); setChk('bugMirrorVideos', v.bugMirrorVideos);
+  setVal('webBaseUrl', v.webBaseUrl);
   setVal('claudeCmd', v.claudeCmd); setVal('ollamaHost', v.ollamaHost); setVal('ragEmbedModel', v.ragEmbedModel);
   setChk('ragSyncEnabled', v.ragSyncEnabled); setVal('ragSyncTimeoutSeconds', v.ragSyncTimeoutSeconds);
   setVal('ragDriveTimeoutSeconds', v.ragDriveTimeoutSeconds);

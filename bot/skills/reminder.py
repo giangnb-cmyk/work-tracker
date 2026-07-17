@@ -27,6 +27,7 @@ import discord
 from dotenv import load_dotenv
 
 import task_repo as repo
+import web_link
 
 # .env va settings.json nam o thu muc bot/ (cha cua skills/).
 _BOT_DIR = Path(__file__).resolve().parent.parent
@@ -127,6 +128,10 @@ def build_done_message(client, task: dict) -> str:
     cc_ids = _cc_discord_ids(client, task, cache, exclude=assignee_did)
     if cc_ids:
         parts.append("cc " + " ".join(f"<@{d}>" for d in cc_ids))
+    # Link cuoi cau: bam thang vao task khoi phai tu mo web di tim.
+    url = web_link.task_url(task.get("id") or task.get("_id"))
+    if url:
+        parts.append(url)
     return " ".join(parts)
 
 

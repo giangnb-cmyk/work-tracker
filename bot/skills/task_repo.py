@@ -289,17 +289,29 @@ def update_sprint(client, sprint_id: str, fields: dict) -> None:
 # --- Tasks ---------------------------------------------------------------
 
 def get_task(client, task_id: str):
-    """Lay 1 task theo id day du hoac id rut gon (8 ky tu dau). None neu khong co."""
+    """Lay 1 task theo id day du hoac id rut gon. None neu khong co.
+
+    Nhan ca dang nguoi dung copy tu web: '#71EC49'. WHY: TaskModal hien 6 ky tu VIET HOA
+    (`id.slice(0,6).toUpperCase()`), con day so khop prefix — khong bo '#' va ha chu
+    thuong thi id nguoi dung nhin thay tren man hinh lai bao 'không tìm thấy task'.
+    Prefix trung nhieu task -> nem ResolveError chu KHONG lay dai: doan bua o day nghia
+    la sua nham task cua nguoi khac.
+    """
+    key = (task_id or "").strip().lstrip("#").lower()
+    if not key:
+        return None
     try:
-        res = client.table(TASKS).select("*").eq("id", task_id).limit(1).execute()
+        res = client.table(TASKS).select("*").eq("id", key).limit(1).execute()
         if res.data:
             return _map_task(res.data[0])
     except Exception:
-        pass  # task_id khong phai uuid day du -> thu prefix ben duoi
-    for r in client.table(TASKS).select("*").execute().data:
-        if str(r["id"]).startswith(task_id):
-            return _map_task(r)
-    return None
+        pass  # khong phai uuid day du -> thu prefix ben duoi
+    hits = [r for r in client.table(TASKS).select("*").execute().data
+            if str(r["id"]).lower().startswith(key)]
+    if len(hits) > 1:
+        names = ", ".join(f"{r['id'][:8]} ({r.get('title', '')[:30]})" for r in hits[:4])
+        raise ResolveError(f"id '{task_id}' khớp {len(hits)} task, cần id dài hơn: {names}")
+    return _map_task(hits[0]) if hits else None
 
 
 def query_tasks(client, sprint_id="__ANY__", assignee_id=None, status=None):
