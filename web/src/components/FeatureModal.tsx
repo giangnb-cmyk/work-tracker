@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AttachmentsField from './task/AttachmentsField';
 import RefImagesSection from './task/RefImagesSection';
 import LabelSelect from './LabelSelect';
+import Switch from './Switch';
 import { labelGroup } from '../lib/bugLabelGroups';
 import {
   FEATURE_KINDS,
@@ -152,7 +153,10 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
         </label>
 
         <div className="field">
-          <span>Loại</span>
+          {/* .field-label chứ không phải <span> trần: nhãn chỉ được style qua
+              `label.field > span`, mà đây là <div> — để trần thì nó to và trắng, lệch
+              hẳn với "Icon"/"Tên feature" ngay phía trên. */}
+          <span className="field-label">Loại</span>
           {/* Mô tả nằm ở tooltip, không nhét vào nút: nhồi cả câu vào ô chọn thì ba nút
               chen nhau, chữ bé, đọc mệt hơn là không có. */}
           <div className="fk-pills">
@@ -172,25 +176,29 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
         </div>
 
         {/* Ghi đè tay: feature ship từ trước khi có tracker thì không có task để suy ra.
-            'ongoing' theo định nghĩa không bao giờ xong nên không cho tick — hiện ra mà
+            'ongoing' theo định nghĩa không bao giờ xong nên không cho bật — hiện ra mà
             bấm không ăn còn khó hiểu hơn là ẩn đi. */}
         {kind !== 'ongoing' && (
-          <label className="field feat-donebox">
-            <input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} disabled={saving} />
-            <span>
-              Đã hoàn thành
-              <small>
-                {wasDone && feature?.doneAt
-                  ? `Đánh dấu xong ${formatDate(feature.doneAt)}.`
-                  : 'Tick nếu feature đã xong nhưng không có task nào để tính (import từ dự án chạy trước đó).'}
-              </small>
-            </span>
-          </label>
+          <div className="field">
+            <span className="field-label">Trạng thái</span>
+            <Switch
+              checked={done}
+              onChange={setDone}
+              label={done ? 'Đã hoàn thành' : 'Chưa hoàn thành'}
+              disabled={saving}
+              ariaLabel="Đánh dấu feature đã hoàn thành"
+            />
+            <p className="fk-hint">
+              {done && wasDone && feature?.doneAt
+                ? `Đã đánh dấu hoàn thành ${formatDate(feature.doneAt)}.`
+                : 'Bật nếu feature đã xong nhưng không có task nào để tính (import từ dự án chạy trước đó).'}
+            </p>
+          </div>
         )}
 
         <div className="grid-2">
           <div className="field">
-            <span>Nhãn — nhóm (Shop, Gameplay…)</span>
+            <span className="field-label">Nhãn — nhóm (Shop, Gameplay…)</span>
             <LabelSelect
               options={groupLabels}
               selectedIds={labelIds}
@@ -201,7 +209,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
             />
           </div>
           <div className="field">
-            <span>Version delivery</span>
+            <span className="field-label">Version delivery</span>
             <LabelSelect
               options={versionLabels}
               selectedIds={labelIds}

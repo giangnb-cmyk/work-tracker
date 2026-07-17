@@ -1863,11 +1863,6 @@ table.data-table { width: 100%; border-collapse: collapse; }
    dòng — HTML mặc định nuốt \n, dồn cả danh sách thành một đoạn dài đọc không ra. */
 .feat-desc { margin: 0; white-space: pre-wrap; }
 
-/* Ô tick "Đã hoàn thành" trong modal feature. */
-.feat-donebox { display: flex; align-items: flex-start; gap: 0.55rem; cursor: pointer; }
-.feat-donebox input { margin-top: 0.15rem; width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; }
-.feat-donebox > span { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.85rem; color: var(--text); }
-.feat-donebox small { font-size: 0.74rem; color: var(--muted); line-height: 1.45; }
 
 /* Ai đang làm feature. Khác chồng avatar ngoài card: ở đây có chỗ nên hiện luôn TÊN,
    khỏi phải rê chuột đoán ai là ai. */
