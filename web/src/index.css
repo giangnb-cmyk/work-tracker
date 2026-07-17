@@ -1891,14 +1891,20 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .lsel-vals { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
 .lsel-ph { color: var(--muted); font-size: 0.85rem; }
 .lsel-caret { flex-shrink: 0; color: var(--muted); font-size: 0.7rem; }
-/* In-flow (không absolute) như .ss-panel: modal có overflow-y nên panel nổi sẽ bị CẮT ở
-   mép — để nó nong modal ra rồi cuộn thì không mất lựa chọn nào. Nền ĐẶC vì tổ tiên
-   .modal/.glass có backdrop-filter, blur của con không với tới nội dung dưới nó. */
+/* NỔI ĐÈ, không in-flow: panel in-flow nong ô grid ra và đẩy tụt mọi thứ bên dưới mỗi
+   lần mở — đúng lý do SearchableSelect có panel='overlay'. Không lo bị modal cắt: khối
+   chứa (.lsel) nằm TRONG vùng cuộn của modal nên panel tính vào phần cuộn được, cùng
+   lắm là phải cuộn xuống chứ không mất. Nền ĐẶC vì tổ tiên .modal/.glass có
+   backdrop-filter — blur của con không với tới nội dung dưới nó (xem --glass-solid). */
 .lsel-pop {
-  position: relative; z-index: 50; margin-top: 4px; padding: 0.3rem;
-  max-height: 240px; overflow-y: auto;
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60;
+  padding: 0.3rem; max-height: 280px; overflow-y: auto;
   background: var(--glass-solid); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.6);
 }
+/* Chip ở đây là thứ để ĐỌC và bấm trúng, không phải chú thích bên lề — cho bằng cỡ chip
+   trên card feature (.feat-chips-lg) thay vì cỡ .sm mặc định. */
+.lsel .bug-chip { font-size: 0.8rem; padding: 0.3rem 0.62rem; gap: 0.35rem; }
 .lsel-opt {
   width: 100%; display: flex; align-items: center; gap: 0.45rem; text-align: left;
   padding: 0.35rem 0.4rem; border: none; border-radius: 7px; background: none; cursor: pointer;
