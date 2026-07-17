@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useMembers } from '../hooks/useMembers';
+import { useSprintContext } from '../contexts/SprintContext';
 import { fetchMemberDmRequest, requestMemberDmTest } from '../lib/memberDmWrites';
 import SearchableSelect from './SearchableSelect';
 
@@ -16,7 +16,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 export default function MemberDmTest() {
   const { user, isAdmin } = useAuth();
-  const { members } = useMembers();
+  // Lấy members từ context CHỨ KHÔNG gọi useMembers() lần nữa: SprintContext đã subscribe
+  // `profiles` rồi, mà useLiveQuery đặt tên channel theo table+filter nên hook thứ hai sinh
+  // ra đúng topic `live:profiles:all` trùng y hệt. Hai channel cùng topic subscribe song
+  // song là hỏng realtime, và Supabase retry liên tục nên lỗi nổ ra không dứt.
+  // Cùng lý do với chỗ Features.tsx truyền task xuống thay vì để con tự fetch.
+  const { members } = useSprintContext();
   const [target, setTarget] = useState('');
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);

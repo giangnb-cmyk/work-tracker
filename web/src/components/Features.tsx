@@ -122,9 +122,9 @@ export default function Features() {
         labels={selected.labelIds
           .map((id) => labelById.get(id))
           .filter((l): l is FeatureLabel => Boolean(l))}
-        // Truyền task xuống thay vì để con tự gọi useProjectTasks lần nữa: cùng projectId
-        // sẽ sinh kênh realtime TRÙNG TÊN (`live:tasks:project_id=eq.<id>`) với kênh của
-        // component này — hai channel cùng topic subscribe song song là hỏng realtime.
+        // Truyền task xuống thay vì để con tự gọi useProjectTasks lần nữa. Trùng topic
+        // realtime giờ đã vô hại (useLiveQuery tự thêm id riêng cho mỗi instance), nhưng
+        // fetch lại y hệt bộ task đó vẫn là thừa — một query, một channel là đủ.
         tasks={tasks}
         loading={tasksLoading}
         onBack={() => setSelectedId(null)}
