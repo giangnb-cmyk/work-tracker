@@ -7,6 +7,7 @@ import Login from './components/Login';
 import Layout from './components/Layout';
 import RolePicker from './components/RolePicker';
 import ProjectSelect from './components/ProjectSelect';
+import ErrorCenter from './components/ErrorCenter';
 
 /** Inside the providers: pick a project first, then show the workspace. */
 function ProjectGate() {
@@ -52,6 +53,9 @@ export default function App() {
   return (
     <AuthProvider>
       <Gate />
+      {/* NGOÀI Gate: lỗi lúc đang đăng nhập hoặc lúc chọn dự án cũng phải hiện được,
+          mà những màn đó nằm trên các nhánh return sớm của Gate. */}
+      <ErrorCenter />
     </AuthProvider>
   );
 }

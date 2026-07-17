@@ -3,6 +3,7 @@
 // Postgres is the source of truth if Notion fails.
 
 import { supabase } from '../supabase';
+import { reportError } from './errorBus';
 import { archiveNotionPage, createNotionPage, updateNotionPage } from './notionSync';
 import { taskPatchToRow } from './mappers';
 import { endOfWorkWeek } from './format';
@@ -174,7 +175,10 @@ async function syncNewToNotion(
         .eq('id', id);
     }
   } catch (err) {
-    console.error('Đồng bộ tạo Notion thất bại (task vẫn đã lưu)', err);
+    // Fire-and-forget theo nghĩa "không chặn việc tạo task", KHÔNG phải "im như không có
+    // gì". Nuốt hẳn vào console thì cú sync hỏng là vô hình: task nằm im ngoài Notion và
+    // người tạo chỉ phát hiện khi tình cờ thấy nút "Tạo task trên Notion" hiện ra.
+    reportError('Notion · tạo task', err, 'Task vẫn đã lưu. Mở task rồi bấm “Tạo task trên Notion” để thử lại.');
   }
 }
 
@@ -187,7 +191,7 @@ async function safeNotionUpdate(
   try {
     await updateNotionPage(notionPageId, task, assigneeNotionUserId, notionProjectId);
   } catch (err) {
-    console.error('Đồng bộ cập nhật Notion thất bại', err);
+    reportError('Notion · cập nhật', err, 'Thay đổi vẫn đã lưu trong app; chỉ trang Notion là chưa theo kịp.');
   }
 }
 
@@ -196,7 +200,8 @@ async function safeNotionArchive(notionPageId: string) {
     await archiveNotionPage(notionPageId);
   } catch (err) {
     // Task đã xoá khỏi Postgres rồi — không có gì để rollback, và cũng không nên: đây là
-    // side-sync. Log lại để còn dọn tay trang Notion mồ côi.
-    console.error(`Xoá trang Notion ${notionPageId} thất bại (task đã xoá khỏi app)`, err);
+    // side-sync. Nhưng nó để lại một trang Notion MỒ CÔI phải dọn tay, nên kèm luôn id
+    // vào nhật ký: chôn trong console thì không ai biết mà đi dọn.
+    reportError('Notion · xoá task', err, `Task đã xoá khỏi app. Trang Notion ${notionPageId} còn sót lại, cần xoá tay.`);
   }
 }

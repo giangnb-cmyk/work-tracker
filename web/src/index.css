@@ -1939,3 +1939,151 @@ table.data-table { width: 100%; border-collapse: collapse; }
     flex-direction: row; flex-wrap: wrap;
   }
 }
+
+/* ============================================================================
+   Trung tâm lỗi — toast góc dưới phải + ngăn kéo nhật ký
+   ========================================================================== */
+
+/* Cả cụm nằm TRÊN .modal-overlay (z-index 100) và .lightbox (130): lỗi hay nổ ra đúng
+   lúc đang thao tác trong modal, xếp dưới thì người dùng không bao giờ thấy nó. */
+.errlog-toasts {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 4.75rem; /* chừa chỗ cho .errlog-fab ngồi bên dưới */
+  z-index: 140;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(380px, calc(100vw - 2.5rem));
+  pointer-events: none; /* khoảng trống giữa các toast không được nuốt click xuống app */
+}
+.errlog-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-left: 3px solid var(--red);
+  animation: errSlideIn 0.25s ease;
+}
+@keyframes errSlideIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.errlog-toast-icon { color: var(--red); line-height: 1.35; flex-shrink: 0; }
+.errlog-toast-body { flex: 1; min-width: 0; }
+.errlog-toast-msg {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  /* Message có thể là cả stack dài -> cắt 3 dòng; đọc đủ thì mở panel. */
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.errlog-note {
+  margin: 0 0 0.35rem; font-size: 0.72rem; color: var(--muted); overflow-wrap: anywhere;
+}
+.errlog-toast-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--sky); font-size: 0.75rem; font-weight: 600;
+}
+.errlog-toast-link:hover { text-decoration: underline; }
+.errlog-toast-x {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 0.75rem; padding: 0.1rem 0.2rem; flex-shrink: 0;
+}
+.errlog-toast-x:hover { color: var(--text); }
+
+.errlog-src {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--red);
+}
+
+.errlog-fab {
+  position: fixed;
+  right: 1.25rem; bottom: 1.25rem; z-index: 140;
+  display: flex; align-items: center; gap: 0.35rem;
+  padding: 0.5rem 0.8rem; border-radius: 999px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: #fca5a5; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+  transition: background 0.18s ease, transform 0.15s ease;
+}
+.errlog-fab:hover { background: rgba(239, 68, 68, 0.25); transform: translateY(-2px); }
+
+.errlog-scrim {
+  position: fixed; inset: 0; z-index: 145;
+  background: rgba(2, 6, 23, 0.5);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.errlog-scrim.on { opacity: 1; pointer-events: auto; }
+
+/* position: fixed là BẮT BUỘC — để in-flow thì mở ra là đẩy layout (xem .ss-panel).
+   Nền phải ĐỤC + blur chứ không phải tint: panel đè lên nội dung cuộn phía sau, tint
+   trong suốt sẽ để chữ lòi qua. visibility giữ cho panel đã đóng không ăn phím Tab. */
+.errlog-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 150;
+  width: min(440px, 100vw);
+  display: flex; flex-direction: column;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.28s;
+}
+.errlog-panel.on { transform: translateX(0); visibility: visible; }
+
+.errlog-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 1rem 1.1rem; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.errlog-head h3 { margin: 0; font-size: 0.95rem; display: flex; align-items: center; gap: 0.45rem; }
+.errlog-count {
+  background: rgba(239, 68, 68, 0.2); color: #fca5a5;
+  font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 999px;
+}
+.errlog-close {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 0.85rem; padding: 0.25rem 0.4rem; border-radius: 6px;
+}
+.errlog-close:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+
+/* Panel cao đúng viewport (top:0;bottom:0) nên flex:1 + overflow-y ĐÚNG LÀ chỗ cuộn —
+   khác .tab-scroller vốn không bao giờ tràn vì .app-shell dùng min-height. */
+.errlog-list {
+  flex: 1; overflow-y: auto; padding: 0.8rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+.errlog-item {
+  padding: 0.65rem 0.75rem; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border); border-left: 3px solid var(--red);
+}
+.errlog-item-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.errlog-time { font-size: 0.68rem; color: var(--muted); }
+.errlog-item-msg { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--text); overflow-wrap: anywhere; }
+.errlog-detail-toggle {
+  margin-top: 0.35rem; background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--muted); font-size: 0.7rem; font-weight: 600;
+}
+.errlog-detail-toggle:hover { color: var(--text); }
+/* <pre> mặc định nhảy sang monospace của trình duyệt — ép về đúng một họ chữ của app. */
+.errlog-detail {
+  margin: 0.4rem 0 0; padding: 0.55rem; border-radius: 8px;
+  background: var(--bg-deep); border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.68rem; line-height: 1.5; color: var(--muted);
+  max-height: 220px; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.errlog-foot {
+  padding: 0.7rem 1.1rem; border-top: 1px solid var(--border);
+  font-size: 0.68rem; flex-shrink: 0;
+}

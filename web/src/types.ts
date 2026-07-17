@@ -63,6 +63,28 @@ export interface AppNotification {
   createdAt?: Timestamp;
 }
 
+/**
+ * Một lỗi runtime hiện lên cho người dùng (toast + panel nhật ký).
+ *
+ * KHÁC `AppNotification`: cái kia là thông báo nghiệp vụ, lưu trong Postgres và gửi cho
+ * người khác. Cái này sống trong bộ nhớ tab, chỉ của phiên hiện tại, mất khi F5 — nó trả
+ * lời "vừa nãy hỏng cái gì", không phải để lưu trữ.
+ */
+export interface AppError {
+  id: string;
+  /** Nhóm hiển thị trên nhãn, vd 'Notion', 'Task'. */
+  source: string;
+  message: string;
+  /**
+   * Câu trấn an/ngữ cảnh đi kèm, vd "Task vẫn đã lưu". Không có nó thì một dòng
+   * "Notion gateway lỗi 500" trần trụi dễ khiến người dùng tưởng mất luôn task.
+   */
+  note?: string;
+  /** Stack (Error) hoặc JSON (lỗi dạng object) — xổ ra trong panel khi cần. */
+  detail?: string;
+  at: Date;
+}
+
 /** Admin-managed sign-in allowlist. Empty (both arrays) = allow anyone (bootstrap). */
 export interface AccessConfig {
   emails: string[];
