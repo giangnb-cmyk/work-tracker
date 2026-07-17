@@ -30,7 +30,7 @@ export default function NotificationBell() {
     if (!newest || newest.id === lastSeenId.current) return;
     lastSeenId.current = newest.id;
     if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-      new Notification('Bot Work Tracker', { body: newest.body });
+      new Notification('Work Tracker', { body: newest.body });
     }
   }, [items]);
 

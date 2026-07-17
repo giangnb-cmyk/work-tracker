@@ -8,7 +8,7 @@ export default function Login() {
     <div className="login-wrap">
       <div className="login-card glass fade-in">
         <div className="mark">✅</div>
-        <h1>Bot Work Tracker</h1>
+        <h1>Work Tracker</h1>
         <p>Quản lý sprint &amp; task cho team. Đăng nhập bằng Google để tiếp tục.</p>
         <button className="google-btn" onClick={signIn}>
           <GoogleIcon />

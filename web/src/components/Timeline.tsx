@@ -1,54 +1,44 @@
 import { useMemo, useState } from 'react';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
+import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import DateRangePicker from './DateRangePicker';
 import TaskModal from './TaskModal';
 import { TIMELINE_PRESETS, startOfDay, type DateRange } from '../lib/dateRange';
-import { STATUS_LABEL, type Feature, type Task, type TaskStatus } from '../types';
+import { buildVersionRows, type FeatureRow, type TaskBar, type VersionRow } from '../lib/timelineRows';
+import TimelineFeatureRow, { type TimelineScale } from './timeline/TimelineFeatureRow';
+import type { Feature, Task } from '../types';
 
 const DAY = 86_400_000;
-const STATUS_COLOR: Record<TaskStatus, string> = {
-  todo: '#94a3b8',
-  in_progress: '#38bdf8',
-  review: '#c084fc',
-  done: '#22c55e',
-};
-const OTHER_COLOR = '#64748b'; // hàng "Khác" — task chưa gắn feature
 
 function label(ms: number): string {
   return new Date(ms).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
 
-interface TaskBar {
-  task: Task;
-  start: number;
-  end: number;
-  hasDates: boolean;
-}
-
-interface FeatureRow {
-  feature: Feature | null; // null = "Khác"
-  /** Task trong khoảng đang xem — có hạn trước (theo ngày bắt đầu), chưa hạn sau. */
-  bars: TaskBar[];
-  start: number;
-  end: number;
-  hasDates: boolean;
-  done: number;
-  total: number;
-}
-
 /**
- * Timeline CẢ DỰ ÁN, gộp theo feature: mỗi hàng một feature, bar phủ từ task sớm nhất
- * tới hạn muộn nhất, fill = % task xong. Bấm hàng để xổ task bên trong. Khoảng thời
- * gian chọn bằng DateRangePicker (cùng bộ với tab Truy cập, nhưng cho phép tương lai).
+ * Timeline CẢ DỰ ÁN theo ba tầng: version → feature → task. Bar của tầng nào cũng phủ
+ * từ task sớm nhất tới hạn muộn nhất của nó, fill = % task xong. Mặc định đóng hết —
+ * mở ra mới thấy tầng dưới; đóng lại thì đây chính là lộ trình phát hành.
+ *
+ * Khoảng thời gian chọn bằng DateRangePicker (cùng bộ với tab Truy cập, nhưng cho phép
+ * tương lai).
  */
 export default function Timeline() {
   const { selectedProjectId, selectedProject, features } = useSprintContext();
   const { tasks, loading } = useProjectTasks(selectedProjectId);
+  const { labels } = useFeatureLabels(selectedProjectId);
   // null = "cả dự án": khung tự co giãn theo min→max hạn của toàn bộ task.
   const [range, setRange] = useState<DateRange | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openVersions, setOpenVersions] = useState<Set<string>>(new Set());
+  const [openFeatures, setOpenFeatures] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Task | null>(null);
+
+  const toggle = (set: Set<string>, key: string) => {
+    const next = new Set(set);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  };
 
   const taskBars: TaskBar[] = useMemo(
     () =>
@@ -123,6 +113,8 @@ export default function Timeline() {
     );
   }, [taskBars, features, selectedProjectId, domain]);
 
+  const versionRows: VersionRow[] = useMemo(() => buildVersionRows(rows, labels), [rows, labels]);
+
   const span = Math.max(DAY, domain.end - domain.start);
   const totalDays = Math.round(span / DAY);
   const step = totalDays > 180 ? 30 : totalDays > 90 ? 14 : totalDays > 30 ? 7 : totalDays > 14 ? 2 : 1;
@@ -136,6 +128,7 @@ export default function Timeline() {
   const pct = (ms: number) => ((ms - domain.start) / span) * 100;
   const clampPct = (v: number) => Math.max(0, Math.min(100, v));
   const todayPct = pct(startOfDay(Date.now()));
+  const scale: TimelineScale = { pct, clampPct, todayPct, label };
 
   if (!selectedProjectId) {
     return <div className="glass empty">Hãy chọn một dự án trước.</div>;
@@ -151,7 +144,7 @@ export default function Timeline() {
       <div className="view-header row between">
         <div>
           <h1>Timeline · {selectedProject?.name ?? 'Dự án'}</h1>
-          <p>Cả dự án, gộp theo feature — bấm một hàng để xem task bên trong.</p>
+          <p>Theo version — xổ một bản ra để xem feature, xổ feature để xem task.</p>
         </div>
         <div className="row" style={{ gap: '0.5rem' }}>
           {range && (
@@ -163,14 +156,14 @@ export default function Timeline() {
 
       {tasks.length === 0 ? (
         <div className="glass empty">Chưa có task.</div>
-      ) : rows.length === 0 ? (
+      ) : versionRows.length === 0 ? (
         <div className="glass empty">Không có task nào trong khoảng này.</div>
       ) : (
         <div className="glass tl-wrap">
           <div className="tl-scroll">
             {/* Axis */}
             <div className="tl-axis">
-              <div className="tl-row-label tl-axis-label muted">Feature</div>
+              <div className="tl-row-label tl-axis-label muted">Version · Feature · Task</div>
               <div className="tl-track tl-axis-track">
                 {ticks.map((t) => (
                   <span key={t} className="tl-tick" style={{ left: `${pct(t)}%` }}>{label(t)}</span>
@@ -181,53 +174,45 @@ export default function Timeline() {
               </div>
             </div>
 
-            {/* Feature rows */}
-            {rows.map((row) => {
-              const f = row.feature;
-              const id = f?.id ?? 'other';
-              const color = f?.color ?? OTHER_COLOR;
-              const ongoing = f?.kind === 'ongoing';
-              const open = expandedId === id;
-              const donePct = row.total === 0 ? 0 : Math.round((row.done / row.total) * 100);
-              const left = clampPct(pct(row.start));
-              const right = clampPct(pct(row.end + DAY));
+            {/* Version → feature → task */}
+            {versionRows.map((v) => {
+              const vOpen = openVersions.has(v.key);
+              const vDonePct = v.total === 0 ? 0 : Math.round((v.done / v.total) * 100);
+              const vLeft = clampPct(pct(v.start));
+              const vRight = clampPct(pct(v.end + DAY));
               return (
-                <div key={id}>
-                  <div className="tl-row tl-feat" onClick={() => setExpandedId(open ? null : id)}>
-                    <div className="tl-row-label" title={f?.name ?? 'Task chưa gắn feature'}>
-                      <span className={`tl-caret${open ? ' open' : ''}`} aria-hidden>▸</span>
+                <div key={v.key}>
+                  <div
+                    className="tl-row tl-ver"
+                    onClick={() => setOpenVersions((s) => toggle(s, v.key))}
+                  >
+                    <div className="tl-row-label">
+                      <span className={`tl-caret${vOpen ? ' open' : ''}`} aria-hidden>▸</span>
                       <span className="tl-name">
-                        {f ? `${f.icon} ${f.name}` : '📦 Khác'}{ongoing ? ' 🔁' : ''}
+                        {v.label ? `🏷️ ${v.label.name}` : '📦 Chưa gắn version'}
                       </span>
                       <span className="muted tl-who mono">
-                        {ongoing ? `${row.total - row.done} mở` : `${row.done}/${row.total}`}
+                        {v.rows.length} feature · {v.done}/{v.total}
                       </span>
                     </div>
                     <div className="tl-track">
                       {todayPct >= 0 && todayPct <= 100 && (
                         <span className="tl-today faint" style={{ left: `${todayPct}%` }} />
                       )}
-                      {row.hasDates ? (
+                      {v.hasDates ? (
                         <span
-                          className="tl-bar tl-feat-bar"
-                          title={
-                            ongoing
-                              ? `Liên tục · ${row.total} task · ${label(row.start)} → ${label(row.end)}`
-                              : `${label(row.start)} → ${label(row.end)} · ${donePct}% xong`
-                          }
+                          className="tl-bar tl-feat-bar tl-ver-bar"
+                          title={`${label(v.start)} → ${label(v.end)} · ${vDonePct}% xong`}
                           style={{
-                            left: `${left}%`,
-                            width: `${Math.max(1.5, right - left)}%`,
-                            // ongoing: sọc chéo "chạy mãi", không có fill %; delivery: nền
-                            // nhạt + fill đặc theo % task xong.
-                            background: ongoing
-                              ? `repeating-linear-gradient(45deg, ${color}66 0 8px, ${color}22 8px 16px)`
-                              : `${color}33`,
+                            left: `${vLeft}%`,
+                            width: `${Math.max(1.5, vRight - vLeft)}%`,
+                            background: 'rgba(99, 102, 241, 0.2)',
                           }}
                         >
-                          {!ongoing && (
-                            <span className="tl-feat-fill" style={{ width: `${donePct}%`, background: color }} />
-                          )}
+                          <span
+                            className="tl-feat-fill"
+                            style={{ width: `${vDonePct}%`, background: 'var(--primary)' }}
+                          />
                         </span>
                       ) : (
                         <span className="tl-nodate muted">chưa có hạn</span>
@@ -235,38 +220,16 @@ export default function Timeline() {
                     </div>
                   </div>
 
-                  {/* Task con khi xổ ra */}
-                  {open && row.bars.map((b) => {
-                    const tLeft = clampPct(pct(b.start));
-                    const tRight = clampPct(pct(b.end + DAY));
-                    return (
-                      <div className="tl-row tl-sub" key={b.task.id} onClick={() => setEditing(b.task)}>
-                        <div className="tl-row-label" title={b.task.title}>
-                          <span className="tl-dot" style={{ background: STATUS_COLOR[b.task.status] }} />
-                          <span className="tl-name">{b.task.title}</span>
-                          <span className="muted tl-who">{b.task.assigneeName || '—'}</span>
-                        </div>
-                        <div className="tl-track">
-                          {todayPct >= 0 && todayPct <= 100 && (
-                            <span className="tl-today faint" style={{ left: `${todayPct}%` }} />
-                          )}
-                          {b.hasDates ? (
-                            <span
-                              className="tl-bar"
-                              title={`${STATUS_LABEL[b.task.status]} · ${label(b.start)} → ${label(b.end)}`}
-                              style={{
-                                left: `${tLeft}%`,
-                                width: `${Math.max(1.5, tRight - tLeft)}%`,
-                                background: STATUS_COLOR[b.task.status],
-                              }}
-                            />
-                          ) : (
-                            <span className="tl-nodate muted">chưa có hạn</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {vOpen && v.rows.map((row) => (
+                    <TimelineFeatureRow
+                      key={`${v.key}:${row.feature?.id ?? 'other'}`}
+                      row={row}
+                      open={openFeatures.has(`${v.key}:${row.feature?.id ?? 'other'}`)}
+                      onToggle={() => setOpenFeatures((s) => toggle(s, `${v.key}:${row.feature?.id ?? 'other'}`))}
+                      onOpenTask={setEditing}
+                      scale={scale}
+                    />
+                  ))}
                 </div>
               );
             })}
