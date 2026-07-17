@@ -857,17 +857,6 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bug-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 .bug-row-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .bug-row-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-/* Cùng khuôn hộp với .bug-chip.sm (font-size, line-height, padding, viền) để badge trạng
-   thái và chip nhãn đứng cạnh nhau không so le. Giữ RIÊNG border-radius vuông hơn: cùng
-   cỡ nhưng khác dáng thì vẫn phân biệt được "trạng thái" với "nhãn". */
-.bug-row-status {
-  display: inline-flex; align-items: center; line-height: 1;
-  font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
-  padding: 0.14rem 0.42rem; border-radius: 6px;
-  color: var(--st, #94a3b8);
-  background: color-mix(in srgb, var(--st, #94a3b8) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--st, #94a3b8) 45%, transparent);
-}
 .bug-row-ref { font-size: 0.76rem; }
 .bug-row-num { font-family: var(--font-mono); margin-left: 0.1rem; }
 .bug-row-side { display: flex; align-items: center; gap: 0.85rem; flex-shrink: 0; }

@@ -1,8 +1,7 @@
 import Avatar from '../Avatar';
 import BugLabelChip from './BugLabelChip';
 import { formatDate, timeAgo } from '../../lib/format';
-import { isRedundantStatusLabel } from '../../lib/bugStatus';
-import { BUG_STATUS_LABEL, type Bug, type BugLabel } from '../../types';
+import type { Bug, BugLabel } from '../../types';
 
 interface Props {
   bugs: Bug[];
@@ -24,11 +23,12 @@ export default function BugList({ bugs, labelsById, projectName, onOpen }: Props
             <div className="bug-row-title">
               <span className="bug-row-ic" aria-hidden>🐞</span>
               <span className="bug-row-name">{b.title}</span>
-              <span className={`bug-row-status s-${b.status}`}>{BUG_STATUS_LABEL[b.status]}</span>
-              {/* Bỏ chip trùng với badge trạng thái ngay bên cạnh — xem isRedundantStatusLabel. */}
+              {/* Trạng thái đọc thẳng từ chip nhãn workflow (Done/Deployed… có icon) —
+                  không kèm badge chữ nữa: status vốn được mirror thành nhãn nên hiện cả
+                  hai là một thứ nói hai lần. */}
               {b.labelIds
                 .map((id) => labelsById.get(id))
-                .filter((l): l is BugLabel => l !== undefined && !isRedundantStatusLabel(l.name, b.status))
+                .filter((l): l is BugLabel => l !== undefined)
                 .map((l) => <BugLabelChip key={l.id} label={l} small />)}
             </div>
             <div className="bug-row-ref muted">

@@ -25,20 +25,6 @@ export const STATUS_TAG_NAME: Record<BugStatus, string | null> = {
 const STATUS_NAMES = new Set(['fixing', 'pending', 'deployed', 'done']);
 
 /**
- * Nhãn này có đang bị badge trạng thái nói hộ không? -> chỗ nào đã hiện badge thì khỏi
- * hiện thêm chip trùng (bug xong hiện cả "DONE" lẫn chip "✅ Done" là thừa).
- *
- * So với ĐÚNG nhãn của `status` hiện tại, KHÔNG phải cả bộ workflow. Nếu dữ liệu lệch
- * (status=done mà vẫn còn nhãn Fixing) thì chip Fixing phải hiện ra cho thấy mà sửa —
- * giấu cả bộ là giấu luôn cái sai. 'Re-open' cũng vì thế mà vẫn hiện: không status nào
- * nói hộ nó.
- */
-export function isRedundantStatusLabel(name: string, status: BugStatus): boolean {
-  const tag = STATUS_TAG_NAME[status];
-  return tag !== null && name.trim().toLowerCase() === tag.toLowerCase();
-}
-
-/**
  * The label set a bug should have for `status`: drop any existing workflow labels,
  * then add the one matching `status` (if that label exists in the palette).
  */
