@@ -39,7 +39,10 @@ const EMPTY_PEOPLE: FeaturePerson[] = [];
 
 /** Features tab: a card grid of the project's features; open one to see its tasks. */
 export default function Features() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, can } = useAuth();
+  // Tạo feature: admin hoặc member được cấp 'feature.create' (RLS features_insert, 0034).
+  // Sửa/xoá feature vẫn admin-only — quyền lẻ chỉ mở phần TẠO.
+  const canCreate = can('feature.create');
   const {
     features, featuresLoading, selectedProjectId, selectedProject, selectedSprint, selectedSprintId, members,
   } = useSprintContext();
@@ -231,7 +234,7 @@ export default function Features() {
           <h1>Features</h1>
           <p>Các hạng mục tính năng của {selectedProject?.name ?? 'dự án'}, chia theo version.</p>
         </div>
-        {isAdmin && (
+        {canCreate && (
           <button className="btn-primary" onClick={() => setCreating(true)}>＋ Feature mới</button>
         )}
       </div>
@@ -292,7 +295,7 @@ export default function Features() {
 
       {projectFeatures.length === 0 && (
         <div className="glass empty">
-          {isAdmin ? 'Dự án này chưa có feature nào — bấm “＋ Feature mới” ở trên.' : 'Dự án này chưa có feature nào.'}
+          {canCreate ? 'Dự án này chưa có feature nào — bấm “＋ Feature mới” ở trên.' : 'Dự án này chưa có feature nào.'}
         </div>
       )}
       {projectFeatures.length > 0 && groups.length === 0 && (

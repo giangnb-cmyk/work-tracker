@@ -1,6 +1,15 @@
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { createMember, MemberConflictError, updateMember, type MemberInput } from '../lib/memberWrites';
-import { JOB_ROLES, type JobRole, type TeamMember, type UserRole } from '../types';
+import {
+  JOB_ROLES,
+  MEMBER_PERMS,
+  USER_ROLE_LABEL,
+  type JobRole,
+  type MemberPerm,
+  type TeamMember,
+  type UserRole,
+} from '../types';
 
 interface MemberModalProps {
   member?: TeamMember | null; // null = add new
@@ -9,10 +18,15 @@ interface MemberModalProps {
 
 /** Admin dialog to add or edit a team member (role + Discord/Notion links). */
 export default function MemberModal({ member, onClose }: MemberModalProps) {
+  const { isOwner } = useAuth();
   const isEdit = Boolean(member);
+  // Chỉ owner phong/gỡ admin (0037). Không cho đổi role của CHÍNH owner qua UI — tránh tự
+  // hạ quyền rồi khoá mình ra ngoài; muốn chuyển owner thì làm ở DB.
+  const canSetRole = isOwner && member?.role !== 'owner';
   const [displayName, setDisplayName] = useState(member?.displayName ?? '');
   const [email, setEmail] = useState(member?.email ?? '');
   const [role, setRole] = useState<UserRole>(member?.role ?? 'member');
+  const [perms, setPerms] = useState<MemberPerm[]>(member?.perms ?? []);
   const [jobRole, setJobRole] = useState<JobRole>(member?.jobRole ?? 'developer');
   const [discordId, setDiscordId] = useState(member?.discordId ?? '');
   const [notionUserId, setNotionUserId] = useState(member?.notionUserId ?? '');
@@ -26,13 +40,14 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
     }
     setSaving(true);
     setError(null);
-    const input: MemberInput = { displayName, email, role, jobRole, discordId, notionUserId };
+    const input: MemberInput = { displayName, email, role, perms, jobRole, discordId, notionUserId };
     try {
       if (isEdit && member) {
         await updateMember(member.uid, {
           displayName: displayName.trim(),
           email: email.trim(),
           role,
+          perms,
           jobRole,
           discordId: discordId.trim(),
           notionUserId: notionUserId.trim(),
@@ -66,16 +81,46 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
         <div className="grid-2">
           <label className="field">
             <span>Vai trò</span>
-            <select className="select" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
-              <option value="member">Thành viên</option>
-              <option value="admin">Admin</option>
-            </select>
+            {canSetRole ? (
+              // Owner không tự đưa mình vào ô này — chỉ cấp/gỡ admin cho người khác.
+              <select className="select" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+                <option value="member">Thành viên</option>
+                <option value="admin">Admin</option>
+              </select>
+            ) : (
+              <select className="select" value={role} disabled title="Chỉ owner đổi được vai trò">
+                <option value={role}>{USER_ROLE_LABEL[role]}</option>
+              </select>
+            )}
           </label>
           <label className="field">
             <span>Discord User ID</span>
             <input className="input" value={discordId} onChange={(e) => setDiscordId(e.target.value)} placeholder="ví dụ 123456789012345678" />
           </label>
         </div>
+        {role === 'member' && (
+          <div className="field">
+            <span className="field-label">Quyền thêm</span>
+            <div className="perm-list">
+              {MEMBER_PERMS.map((p) => (
+                <label key={p.id} className="perm-row">
+                  <input
+                    type="checkbox"
+                    checked={perms.includes(p.id)}
+                    onChange={(e) =>
+                      setPerms((prev) => (e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id)))
+                    }
+                  />
+                  <span>
+                    {p.label}
+                    <small className="muted"> — {p.hint}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         <label className="field">
           <span>Chuyên môn</span>
           <select className="select" value={jobRole} onChange={(e) => setJobRole(e.target.value as JobRole)}>

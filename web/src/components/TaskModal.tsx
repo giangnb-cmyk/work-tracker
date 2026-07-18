@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Timestamp } from '../lib/time';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
-import { becameDone, createTask, deleteTask, syncTaskToNotion, updateTask } from '../lib/taskWrites';
+import { becameDone, createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDateRange, timeAgo, toInputDate } from '../lib/format';
 import AttachmentsField from './task/AttachmentsField';
@@ -42,7 +42,7 @@ export default function TaskModal({
   defaultStatus,
   onClose,
 }: TaskModalProps) {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, can } = useAuth();
   const { members, sprints, projects, features } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
   const isEdit = Boolean(task);
@@ -58,9 +58,13 @@ export default function TaskModal({
   const canEditOwn = isAdmin || isOwner;
   const canChangeStatus = isAdmin || task?.assigneeId === user?.uid || task?.reporterId === user?.uid;
   const canSave = canEditFields || canEditOwn || canChangeStatus;
+  // Xoá: admin hoặc member được cấp quyền lẻ 'task.delete' (RLS tasks_delete, 0034).
+  const canDelete = can('task.delete');
 
   const [title, setTitle] = useState(task?.title ?? '');
-  const [description, setDescription] = useState(task?.description ?? '');
+  // Task cũ tên dài + mô tả trống: mở ra là ô Mô tả hiện luôn nguyên tiêu đề để đọc trọn
+  // (input tiêu đề không xuống dòng). Chưa lưu tới khi có sửa gì đó — mở-để-đọc không ghi DB.
+  const [description, setDescription] = useState(() => descWithLongTitle(task?.title ?? '', task?.description ?? ''));
   const [sprintId, setSprintId] = useState<string | null>(task?.sprintId ?? defaultSprintId);
   // Project isn't editable in the modal — you're already inside one.
   const [projectId] = useState<string | null>(task?.projectId ?? defaultProjectId ?? null);
@@ -381,7 +385,7 @@ export default function TaskModal({
 
           {/* Footer: edits autosave (no Save/Cancel); creation is explicit. */}
           <div className="tmodal-footer">
-            {isEdit && isAdmin && (
+            {isEdit && canDelete && (
               <button className="btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>🗑 Xoá task</button>
             )}
             <div className="tmodal-foot-spacer" />

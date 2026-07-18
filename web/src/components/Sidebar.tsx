@@ -37,6 +37,7 @@ const ADMIN_NAV: NavDef[] = [
   { id: 'visits', label: 'Truy cập', icon: '👣' },
   { id: 'sprints', label: 'Quản lý Sprint', icon: '🗂️' },
   { id: 'team', label: 'Thành viên', icon: '👥' },
+  { id: 'log', label: 'Hệ thống', icon: '🖥️' },
   { id: 'settings', label: 'Cấu hình', icon: '⚙️' },
 ];
 
@@ -53,7 +54,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ active, onSelect }: SidebarProps) {
-  const { profile, isAdmin, isRealAdmin, viewAsMember, setViewAsMember, signOut } = useAuth();
+  const { profile, isAdmin, isOwner, isRealAdmin, viewAsMember, setViewAsMember, signOut } = useAuth();
   const { selectedProject, selectProject } = useSprintContext();
   const [editingProfile, setEditingProfile] = useState(false);
   // Đang đứng trong một view quản trị thì mở sẵn — không thì mục đang chọn bị giấu trong
@@ -126,7 +127,7 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
               {profile?.displayName}
             </div>
             <div className="muted" style={{ fontSize: '0.7rem' }}>
-              {isAdmin ? 'Admin' : 'Thành viên'}
+              {isOwner ? 'Owner' : isAdmin ? 'Admin' : 'Thành viên'}
             </div>
           </div>
         </button>

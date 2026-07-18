@@ -328,6 +328,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 .field-label,
 label.field > span { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem; }
 
+/* Quyền lẻ cấp cho member (MemberModal): checkbox + chú thích cùng dòng. */
+.perm-list { display: flex; flex-direction: column; gap: 0.45rem; }
+.perm-row { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.88rem; cursor: pointer; }
+.perm-row input[type="checkbox"] { accent-color: var(--primary); cursor: pointer; }
+.perm-row small { font-size: 0.78rem; }
+
 /* Documents (task modal): link cards + kebab menu. Icon appears once a link is pasted. */
 .doc-field { display: flex; flex-direction: column; gap: 0.6rem; }
 .doc-addrow { display: flex; align-items: center; gap: 0.45rem; animation: fadeIn 0.2s ease; }
@@ -1304,6 +1310,8 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .badge.status-planning { background: rgba(148, 163, 184, 0.15); color: var(--muted); }
 .badge.status-active { background: rgba(34, 197, 94, 0.14); color: var(--green); }
 .badge.status-completed { background: rgba(99, 102, 241, 0.15); color: var(--primary); }
+/* Owner = tầng trên admin (0037): gold để nổi khỏi badge admin xanh lá. */
+.badge.role-owner { background: rgba(251, 191, 36, 0.16); color: #fbbf24; }
 
 /* Avatar */
 .avatar {
@@ -2283,3 +2291,59 @@ table.data-table { width: 100%; border-collapse: collapse; }
   padding: 0.7rem 1.1rem; border-top: 1px solid var(--border);
   font-size: 0.68rem; flex-shrink: 0;
 }
+
+/* ============================================================================
+   Nhật ký hệ thống (tab Hệ thống, components/SystemLog.tsx)
+   ========================================================================== */
+/* Hàng điều khiển: chip lọc bên trái, ô tìm kiếm bên phải; xuống dòng khi hẹp. */
+.log-controls {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.75rem; margin-bottom: 1.1rem;
+}
+.log-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.log-search { position: relative; flex: 1; min-width: 220px; max-width: 360px; }
+.log-search-icon {
+  position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
+  font-size: 0.8rem; opacity: 0.6; pointer-events: none;
+}
+.log-search .input { width: 100%; padding-left: 2rem; }
+.log-filters .chip {
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.35rem 0.8rem;
+  color: var(--muted); font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+.log-filters .chip:hover { border-color: rgba(99, 102, 241, 0.5); color: var(--text); }
+.log-filters .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.log-list { padding: 0.4rem; display: flex; flex-direction: column; }
+.log-row {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.75rem 0.6rem;
+}
+.log-row + .log-row { border-top: 1px solid var(--border-soft); }
+
+/* Badge tròn mang màu theo loại hành động — đọc lướt biết ngay xoá/tạo/đổi quyền. */
+.log-badge {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 0.95rem;
+  border: 1px solid transparent;
+}
+.log-badge.tone-danger { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); }
+.log-badge.tone-ok     { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.35); }
+.log-badge.tone-warn   { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.35); }
+
+.log-main { flex: 1; min-width: 0; }
+.log-summary { font-size: 0.9rem; color: var(--text); overflow-wrap: anywhere; }
+
+.log-diff { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem; }
+.log-diff-item {
+  font-size: 0.72rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); color: var(--muted);
+}
+.log-diff-item.diff-add  { background: rgba(34, 197, 94, 0.16); color: #86efac; }
+.log-diff-item.diff-rm   { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
+.log-diff-item.diff-role { background: rgba(99, 102, 241, 0.16); color: #c7d2fe; }
+
+.log-meta { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.4rem; font-size: 0.75rem; }
+.log-actor { display: inline-flex; align-items: center; gap: 0.4rem; }

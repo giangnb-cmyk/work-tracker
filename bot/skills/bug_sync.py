@@ -7,8 +7,12 @@ Discord -> app (khi sync / 9h sang / bam nut):
   - GIU status/assignee da chinh trong app; upsert theo discord_thread_id
 
 app -> Discord (bot day dinh ky qua push_pending):
-  - bug co pending_discord_push=true (nguoi dung doi nhan tren app) -> set lai
-    applied_tags cua thread cho khop. Nhan app chua co forum tag se duoc tao moi.
+  - bug co pending_discord_push=true:
+      * DA co discord_thread_id (bug goc tu Discord, nguoi dung doi nhan tren app) ->
+        set lai applied_tags cua thread cho khop. Nhan app chua co forum tag se tao moi.
+      * CHUA co thread (bug TAO TU WEB) -> tao bai forum MOI (title + mo ta + tag khop
+        web), luu discord_thread_id/guild_id nguoc ve bug.
+  - project khong cau hinh forum -> khong day duoc, xoa co.
   - trong luc pending, sync Discord->app KHONG ghi de label cua bug do (app thang).
 
 Chay: bot.py goi truc tiep; hoac `python skills/bug_sync.py` (mo client ngan).
@@ -48,6 +52,8 @@ BUG_LABELS = "bug_labels"
 PROFILES = "profiles"
 MAX_APPLIED_TAGS = 5   # Discord: 1 bai forum toi da 5 tag
 MAX_TAG_NAME = 20      # Discord: ten forum tag toi da 20 ky tu
+MAX_THREAD_NAME = 100  # Discord: ten thread (bai forum) toi da 100 ky tu
+MAX_STARTER_LEN = 1990 # Discord: 1 tin nhan toi da 2000 ky tu (chua 10 cho an toan)
 STORAGE_BUCKET = "attachments"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # >50MB: giu link Discord (co the het han) thay vi tai len
 # Video an dung luong (uoc tinh forum ~1GB video) -> mac dinh KHONG mirror video.
@@ -113,7 +119,8 @@ def load_forum_configs() -> list[dict]:
     for c in _SETTINGS.get("bug_forums") or []:
         pid, fid = c.get("project_id"), c.get("forum_channel_id")
         if pid and fid:
-            out.append({"project_id": str(pid), "forum_channel_id": int(fid)})
+            out.append({"project_id": str(pid), "forum_channel_id": int(fid),
+                        "notify_role": c.get("notify_role")})
     return out
 
 
@@ -123,6 +130,20 @@ def forum_for_project(project_id: str) -> dict | None:
         if c["project_id"] == str(project_id):
             return c
     return configs[0] if len(configs) == 1 else None
+
+
+def _resolve_role(guild, spec):
+    """Role Discord tu spec = id (so) HOAC ten (khop khong phan biet hoa/dau). None neu khong co."""
+    if not spec or guild is None:
+        return None
+    s = str(spec).strip()
+    if s.isdigit():
+        return guild.get_role(int(s))
+    target = _fold(s)
+    for r in guild.roles:
+        if _fold(r.name) == target:
+            return r
+    return None
 
 
 # --- Doc forum (async) ------------------------------------------------------
@@ -148,6 +169,16 @@ def _platform_from_title(title: str) -> str | None:
         if re.search(rf"\b{key}\b", t):
             return name
     return None
+
+
+# Mention role o DAU tin dau (vd '@DEV M1' — bot chen luc tao bug tu web, hoac nguoi that
+# go nhu vay). Token '<@&id>' la PING chu khong phai noi dung bug -> loc khoi mo ta khi import.
+_LEADING_ROLE_MENTIONS = re.compile(r"^(?:\s*<@&\d+>)+\s*")
+
+
+def _strip_leading_pings(text: str) -> str:
+    """Bo cac mention role o dau chuoi -> mo ta sach (giu nguyen mention giua noi dung)."""
+    return _LEADING_ROLE_MENTIONS.sub("", text or "")
 
 
 async def _get_forum(client, forum_channel_id: int):
@@ -285,8 +316,13 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list, by_thr
         if key in by_thread:
             row = by_thread[key]
             patch = {"title": it["title"], "description": it["description"],
-                     "reporter_id": reporter_id, "reporter_name": reporter_name,
                      "attachments": it["attachments"], "discord_guild_id": it["guild_id"]}
+            # Chi cap nhat reporter khi thread owner khop 1 profile. Thread do BOT tao (bug
+            # bao tu web) co owner la BOT -> rep None -> GIU nguyen reporter web da dat,
+            # khong ghi de thanh bot.
+            if rep:
+                patch["reporter_id"] = reporter_id
+                patch["reporter_name"] = reporter_name
             # Ghi de created_at moi lan sync: Discord la nguon su that cho "bug bao luc nao",
             # va day cung la duong backfill cho bug da sync sai truoc do (ghi cung mot gia
             # tri moi lan nen lap lai vo hai).
@@ -335,7 +371,7 @@ async def sync_forum(client, sb, project_id: str, forum_channel_id: int) -> dict
         try:
             starter = t.starter_message or await t.fetch_message(t.id)
             if starter:
-                desc = starter.content or ""
+                desc = _strip_leading_pings(starter.content or "")
                 author = starter.author
         except Exception:
             pass
@@ -370,9 +406,15 @@ async def sync_all(client, sb) -> list[tuple[dict, dict]]:
 
 
 async def push_pending(client, sb) -> int:
-    """app -> Discord: day nhung bug co pending_discord_push=true len forum thread."""
+    """app -> Discord: day bug co pending_discord_push=true len forum.
+
+    - DA co discord_thread_id -> set lai applied_tags cua thread cho khop nhan app.
+    - CHUA co thread (bug bao tu web) -> TAO bai forum moi (title + mo ta + tag), ping role dev.
+    - project khong cau hinh forum -> khong day duoc, xoa co (khoi lap lai mai).
+    """
     rows = await asyncio.to_thread(
-        lambda: sb.table(BUGS).select("id,project_id,discord_thread_id,label_ids")
+        lambda: sb.table(BUGS)
+        .select("id,project_id,discord_thread_id,label_ids,title,description")
         .eq("pending_discord_push", True).execute().data
     )
     if not rows:
@@ -380,40 +422,50 @@ async def push_pending(client, sb) -> int:
 
     by_proj = defaultdict(list)
     for r in rows:
-        if r.get("discord_thread_id"):
-            by_proj[r["project_id"]].append(r)
-        else:  # bug app-only: khong co thread de day -> xoa co
-            await asyncio.to_thread(
-                lambda rid=r["id"]: sb.table(BUGS).update({"pending_discord_push": False}).eq("id", rid).execute()
-            )
+        by_proj[r["project_id"]].append(r)
 
     pushed = 0
     for pid, bugs in by_proj.items():
         cfg = forum_for_project(pid)
-        if not cfg:
+        if not cfg:  # khong co forum cho project nay -> khong day duoc, xoa co
+            for b in bugs:
+                await asyncio.to_thread(
+                    lambda rid=b["id"]: sb.table(BUGS).update(
+                        {"pending_discord_push": False}).eq("id", rid).execute()
+                )
             continue
         try:
             ch = await _get_forum(client, cfg["forum_channel_id"])
         except Exception as e:
             log.warning("push: không lấy được forum %s: %s", cfg["forum_channel_id"], e)
             continue
+        notify_role = _resolve_role(ch.guild, cfg.get("notify_role"))
+        if cfg.get("notify_role") and not notify_role:
+            log.warning("push: không tìm thấy role '%s' trong guild %s để ping",
+                        cfg.get("notify_role"), ch.guild.id)
         labelrows = await asyncio.to_thread(
-            lambda: sb.table(BUG_LABELS).select("id,name,icon,discord_tag_id").eq("project_id", pid).execute().data
+            lambda: sb.table(BUG_LABELS).select("id,name,icon,discord_tag_id")
+            .eq("project_id", pid).execute().data
         )
         label_info = {r["id"]: r for r in labelrows}
         avail = {str(t.id): t for t in ch.available_tags}
         for b in bugs:
             try:
-                await _push_one(client, sb, ch, avail, label_info, b)
+                if b.get("discord_thread_id"):
+                    await _push_one(client, sb, ch, avail, label_info, b)
+                else:
+                    await _create_thread(client, sb, ch, avail, label_info, b, notify_role)
                 pushed += 1
             except Exception:
                 log.exception("push bug %s thất bại", b.get("id"))
     return pushed
 
 
-async def _push_one(client, sb, ch, avail: dict, label_info: dict, bug: dict) -> None:
+async def _tag_objs_for_bug(sb, ch, avail: dict, label_info: dict, label_ids: list) -> list:
+    """label_ids cua bug -> list ForumTag (toi da MAX_APPLIED_TAGS). Nhan tao trong app
+    chua co forum tag thi TAO MOI + luu discord_tag_id nguoc ve bug_labels."""
     tag_objs = []
-    for lid in (bug.get("label_ids") or []):
+    for lid in (label_ids or []):
         info = label_info.get(lid)
         if not info:
             continue
@@ -435,12 +487,47 @@ async def _push_one(client, sb, ch, avail: dict, label_info: dict, bug: dict) ->
         tag = avail.get(dtid)
         if tag and tag not in tag_objs:
             tag_objs.append(tag)
+    return tag_objs[:MAX_APPLIED_TAGS]
 
+
+async def _push_one(client, sb, ch, avail: dict, label_info: dict, bug: dict) -> None:
+    """Bug DA co thread -> set lai applied_tags cho khop nhan app, roi xoa co."""
+    tag_objs = await _tag_objs_for_bug(sb, ch, avail, label_info, bug.get("label_ids"))
     tid = int(bug["discord_thread_id"])
     thread = ch.get_thread(tid) or await client.fetch_channel(tid)
-    await thread.edit(applied_tags=tag_objs[:MAX_APPLIED_TAGS])
+    await thread.edit(applied_tags=tag_objs)
     await asyncio.to_thread(
         lambda: sb.table(BUGS).update({"pending_discord_push": False}).eq("id", bug["id"]).execute()
+    )
+
+
+async def _create_thread(client, sb, ch, avail: dict, label_info: dict, bug: dict,
+                         notify_role=None) -> None:
+    """Bug bao TU WEB (chua co thread) -> tao bai forum moi (title + mo ta + tag khop web),
+    luu discord_thread_id/guild_id nguoc ve bug roi xoa co.
+
+    notify_role: Role Discord (vd 'DEV M1') -> mention o DAU tin dau (giong nguoi that post
+    — xem anh nguoi dung gui) de bao nhom dev co bug moi. sync_forum strip mention dau nay
+    khi doc lai nen mo ta ben app khong dinh token '<@&...>'.
+
+    LUU Y idempotency: ghi thread_id nguoc NGAY sau khi tao. Neu buoc ghi that bai, co van
+    con true -> lan poll sau tao THREAD TRUNG (rui ro nho; Supabase write hiem khi loi)."""
+    tag_objs = await _tag_objs_for_bug(sb, ch, avail, label_info, bug.get("label_ids"))
+    name = (bug.get("title") or "").strip()[:MAX_THREAD_NAME] or "(không tiêu đề)"
+    body = (bug.get("description") or "").strip() or "(tạo từ web, chưa có mô tả)"
+    prefix = f"{notify_role.mention}\n" if notify_role else ""
+    content = (prefix + body)[:MAX_STARTER_LEN]
+    allowed = (discord.AllowedMentions(roles=[notify_role]) if notify_role
+               else discord.AllowedMentions.none())
+    created = await ch.create_thread(name=name, content=content, applied_tags=tag_objs,
+                                     allowed_mentions=allowed)
+    thread = created.thread
+    await asyncio.to_thread(
+        lambda: sb.table(BUGS).update({
+            "discord_thread_id": str(thread.id),
+            "discord_guild_id": str(ch.guild.id),
+            "pending_discord_push": False,
+        }).eq("id", bug["id"]).execute()
     )
 
 

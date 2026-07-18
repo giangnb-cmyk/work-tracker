@@ -29,7 +29,8 @@ Created/merged on first Google sign-in.
 | `email`       | string    | Google account email                                         |
 | `displayName` | string    | Full name from Google                                        |
 | `photoURL`    | string    | Avatar url (may be empty)                                    |
-| `role`        | string    | permission level: `admin` \| `member` (default `member`)     |
+| `role`        | string    | permission level: `owner` \| `admin` \| `member` (default `member`, enum `user_role`) |
+| `perms`       | string[]  | quyền lẻ admin cấp thêm cho member: `task.delete` \| `feature.create` (migration 0034). Admin nghiễm nhiên có đủ — mảng này chỉ có nghĩa với member. |
 | `jobRole`     | string    | job discipline (see enum below); chosen at first sign-in     |
 | `discordId`   | string    | Discord user id, links a Discord account to this user (opt.) |
 | `notionUserId`| string    | Notion user id, for assigning the Notion "people" prop (opt.)|
@@ -44,6 +45,21 @@ Created/merged on first Google sign-in.
 > UI gate). Title/priority/sprint/watchers stay admin-only. New tasks default their due
 > date to the sprint's last day (web TaskModal + bot `_due_window`). Promote the first
 > user by setting `role: "admin"` in the console.
+>
+> **Owner (migration 0037)** — one tier above admin. Owner có **mọi quyền admin**
+> (`is_admin()` bao cả owner) **cộng** độc quyền cấp/đổi vai trò: phong admin, gỡ admin.
+> Admin thường KHÔNG đổi được cột `role` của bất kỳ ai — chốt bằng trigger
+> `profiles_guard_role` + hàm `is_owner()`. UI: ô "Vai trò" trong `MemberModal` chỉ owner
+> chỉnh được (và không tự hạ vai trò owner qua UI). Bot gom owner vào `ADMIN_ROLES`
+> (`skills/constants.py`) — bot không có skill đổi vai trò nên không phân biệt owner/admin.
+>
+> **Quyền lẻ (`perms`, migration 0034)** — admin cấp thêm từng quyền cho member trên tab
+> Thành viên: `task.delete` (xoá task BẤT KỲ — RLS `tasks_delete`) và `feature.create`
+> (tạo feature — RLS `features_insert`; sửa/xoá feature vẫn admin). RLS đọc qua
+> `has_perm(p)` (admin luôn true); trigger `profiles_guard_perms` chặn member tự sửa
+> `perms` của chính mình. Nguồn danh sách quyền + nhãn UI: `MEMBER_PERMS` trong
+> `web/src/types.ts`. Bot KHÔNG đọc `perms` — gate của bot vẫn là admin-only
+> (`skills/permissions.py`, cố ý chặt hơn RLS).
 >
 > **Job role (`jobRole`)** — a separate discipline field the user picks on first sign-in:
 > `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`
@@ -142,7 +158,9 @@ kết thúc). `bot/skills/weekly_report.py` ghi 2 ô:
 
 A feature: a unit of product work **inside a project**. A task optionally attaches to one
 feature (`tasks.featureId`). Admin-managed. In Postgres: `public.features`, `project_id`
-FK → `projects(id)` `on delete cascade`; RLS = read for all signed-in, write for admin.
+FK → `projects(id)` `on delete cascade`; RLS = read for all signed-in; **insert** for
+admin hoặc member được cấp quyền lẻ `feature.create` (migration 0034); update/delete
+vẫn admin-only.
 
 **Model quy ước** (migration 0026): một feature là **đơn vị nhỏ deliver được**.
 Nhóm lớn ("Shop", "Gameplay"…) KHÔNG phải feature — nó là **nhãn**; version delivery
@@ -270,6 +288,27 @@ không có policy UPDATE/DELETE nên feed là bất biến.
 > (UI hiện "Hệ thống"). `created_at` vẫn chính xác.
 > ⚠️ Chỉ có dữ liệu **từ khi áp 0007**; `migrate_from_firestore.py` không insert vào bảng này
 > nên task từ thời Firestore vĩnh viễn không có mốc thời gian.
+
+## `audit_log` (nhật ký hệ thống)
+
+`{ id, actor_id, actor_name, action, entity_type, entity_id, summary, project_id, meta, created_at }`
+— migration `0035`. Tab **Hệ thống** (`components/SystemLog.tsx`, admin-only, view id `log`).
+
+Ghi các hành động quản trị mà `activity` (per-task, cascade khi xoá task) KHÔNG giữ được:
+- `task.delete` — trigger `after delete on tasks`; `meta = {title,status}` chụp lại **ngay lúc
+  xoá** (sau đó hàng task không còn để tra tiêu đề). Đây là lý do phải dùng trigger chứ không
+  ghi phía client.
+- `feature.create` — trigger `after insert on features`; `meta = {name}`.
+- `member.perms` — trigger `after insert or update on profiles` khi **role HOẶC perms** đổi (bỏ
+  qua lượt tự tạo hồ sơ lúc đăng nhập và mọi update không đụng role/perms). `meta =
+  {member_name, role_old/new, perms_old/new}`.
+
+Cùng pattern `activity` (0007): ghi bằng **trigger SECURITY DEFINER** nên không giả mạo/bỏ sót
+được; **không có policy insert** → client không tự bịa dòng log. RLS select `is_admin()` (như
+`visits`); member đọc ra rỗng, không lỗi. `actor_name` = `'Bot'` khi ghi bằng service-role.
+
+> ⚠️ `member.perms` đọc cột `profiles.perms` (migration `0034`) → **áp 0034 TRƯỚC 0035**.
+> ⚠️ Chỉ có dữ liệu **từ khi áp 0035**; hành động trước đó không hồi tố được.
 
 ## `task_sprints` (lịch sử sprint của task)
 

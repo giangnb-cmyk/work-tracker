@@ -9,7 +9,7 @@ import { useSyncExternalStore } from 'react';
 /** Mọi tab của app. Path hợp lệ = '/' + id (riêng board có alias đẹp /sprint). */
 export const ALL_VIEWS = [
   'dashboard', 'board', 'mytasks', 'features', 'backlog', 'bugs', 'timeline',
-  'performance', 'visits', 'sprints', 'team', 'settings',
+  'performance', 'visits', 'sprints', 'team', 'log', 'settings',
 ] as const;
 export type ViewId = (typeof ALL_VIEWS)[number];
 

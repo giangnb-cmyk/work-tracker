@@ -6,7 +6,9 @@ import Avatar from './Avatar';
 import MemberModal from './MemberModal';
 import ConfirmDialog from './ConfirmDialog';
 import { formatDate } from '../lib/format';
-import { JOB_ROLE_LABEL, type TeamMember } from '../types';
+import { JOB_ROLE_LABEL, MEMBER_PERMS, USER_ROLE_LABEL, type TeamMember } from '../types';
+
+const PERM_LABEL: Record<string, string> = Object.fromEntries(MEMBER_PERMS.map((p) => [p.id, p.label]));
 
 /** Team roster. Admins can add/edit/delete members; members see it read-only. */
 export default function Team() {
@@ -74,9 +76,18 @@ export default function Team() {
                 <td className="muted">{m.email || '—'}</td>
                 <td className="muted">{m.jobRole ? JOB_ROLE_LABEL[m.jobRole] : '—'}</td>
                 <td>
-                  <span className={`badge ${m.role === 'admin' ? 'status-active' : 'status-planning'}`}>
-                    {m.role === 'admin' ? 'Admin' : 'Thành viên'}
+                  <span
+                    className={`badge ${
+                      m.role === 'owner' ? 'role-owner' : m.role === 'admin' ? 'status-active' : 'status-planning'
+                    }`}
+                  >
+                    {USER_ROLE_LABEL[m.role]}
                   </span>
+                  {m.role === 'member' && m.perms.length > 0 && (
+                    <div className="muted" style={{ fontSize: '0.72rem', marginTop: '0.2rem' }}>
+                      + {m.perms.map((p) => PERM_LABEL[p] ?? p).join(' · ')}
+                    </div>
+                  )}
                 </td>
                 <td className="muted mono" style={{ fontSize: '0.78rem' }}>{m.discordId || '—'}</td>
                 <td className="muted">{m.notionUserId ? '✓' : '—'}</td>

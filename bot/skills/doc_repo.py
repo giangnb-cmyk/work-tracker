@@ -29,13 +29,16 @@ def db():
 
 
 def insert_chunks(client, project_id, source: str, chunks: list, embeddings: list,
-                  source_version=None) -> int:
+                  source_version=None, section_urls=None, default_url=None) -> int:
     """Chen cac chunk (kem embedding) cua 1 nguon. Tra ve so chunk da chen.
 
     chunks: list (section, content); embeddings: list vector cung thu tu.
     source_version: 'phien ban' cua nguon (Drive = modifiedTime) de sync tang dan;
     None = khong theo doi phien ban (file trong docs/, link...).
+    section_urls: {section: url} — link mo DUNG cho theo section (Google Sheets: tung tab).
+    default_url: link dung khi section khong co trong section_urls (vd webViewLink cua file).
     """
+    section_urls = section_urls or {}
     rows = [
         {
             "project_id": project_id,
@@ -45,12 +48,28 @@ def insert_chunks(client, project_id, source: str, chunks: list, embeddings: lis
             "content": content,
             "embedding": vector,
             "source_version": source_version,
+            "source_url": section_urls.get(section, default_url),
         }
         for idx, ((section, content), vector) in enumerate(zip(chunks, embeddings))
     ]
     for i in range(0, len(rows), _INSERT_BATCH):
         client.table(DOCUMENTS).insert(rows[i:i + _INSERT_BATCH]).execute()
     return len(rows)
+
+
+def update_source_urls(client, source: str, section_urls: dict, project_id=None) -> int:
+    """Cap nhat source_url cho cac chunk da co cua 1 nguon (khong dung toi embedding).
+
+    Dung de 'relink' nhanh: gan link toi dung tab cho tai lieu Sheets da nap tu truoc,
+    khong phai embedding lai ca kho (~3s/chunk). Tra ve so chunk da cap nhat.
+    """
+    updated = 0
+    for section, url in section_urls.items():
+        q = (client.table(DOCUMENTS).update({"source_url": url})
+             .eq("source", source).eq("section", section))
+        q = q.is_("project_id", "null") if project_id is None else q.eq("project_id", project_id)
+        updated += len(q.execute().data or [])
+    return updated
 
 
 def delete_by_source(client, source: str, project_id=None) -> None:

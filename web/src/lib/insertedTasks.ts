@@ -67,7 +67,8 @@ export function isPlanningDay(ms: number): boolean {
  */
 function classify(task: Task, memberById: Map<string, TeamMember>): InsertKind {
   if (task.reporterId && task.reporterId === task.assigneeId) return 'self';
-  if (task.reporterId && memberById.get(task.reporterId)?.role === 'admin') return 'admin';
+  const reporterRole = task.reporterId ? memberById.get(task.reporterId)?.role : undefined;
+  if (reporterRole === 'admin' || reporterRole === 'owner') return 'admin';
   return 'other';
 }
 

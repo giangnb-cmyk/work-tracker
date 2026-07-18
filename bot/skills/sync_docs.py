@@ -108,7 +108,7 @@ def _ingest_links(client, urls: list, project_id, desired: set, protected: set):
             continue
         print(f"  - {url}: {len(pairs)} chunk, embedding...", flush=True)
         try:
-            store_pairs(client, url, pairs, project_id, replace=True)
+            store_pairs(client, url, pairs, project_id, replace=True, default_url=url)
         except EmbeddingError as e:
             die(str(e))
         desired.add(url)

@@ -5,10 +5,10 @@ ma web duoc Postgres bao ve deu vo hieu o day. Khong tu check thi bat ky ai tag
 bot cung ghi duoc nhu admin (bot dang chay safe mode voi allowed_user_ids rong
 -> ca server deu ra lenh duoc).
 
-Luat (co y CHAT HON RLS):
-- Tao task: ai cung duoc      -> khop policy tasks_insert.
-- Moi lenh ghi khac:  admin   -> RLS cho ca reporter/assignee sua task, bot thi khong.
-Fail closed: khong nhan dien duoc nguoi gui -> tu choi.
+Luat (theo yeu cau chu du an):
+- Tao task, SUA task, tra cuu tai lieu: AI CUNG duoc (member tag bot lam 3 viec nay).
+- Moi lenh ghi khac (feature/sprint/project/weekly report/member DM): admin HOAC owner.
+Fail closed: khong nhan dien duoc nguoi gui -> tu choi cac lenh can quyen.
 
 Danh tinh lay tu env BOT_SENDER_ID (bot.py dat tu message.author.id), KHONG lay
 tu noi dung tin nhan -> khong the gia mao bang cach go "toi la admin".
@@ -17,11 +17,11 @@ tu noi dung tin nhan -> khong the gia mao bang cach go "toi la admin".
 import os
 
 import task_repo as repo
-from constants import ROLE_ADMIN
+from constants import ADMIN_ROLES
 from errors import PermissionDenied
 
 # Hanh dong member duoc phep (de o day cho ro luat, tranh rai rac trong tung skill).
-MEMBER_ACTIONS = ("tạo task",)
+MEMBER_ACTIONS = ("tạo task", "cập nhật task", "tra cứu tài liệu")
 
 
 def current_user(client):
@@ -37,9 +37,9 @@ def current_user(client):
 
 
 def is_admin(client) -> bool:
-    """True neu nguoi gui co profile va role = admin."""
+    """True neu nguoi gui co profile va role admin/owner (owner bao gom admin)."""
     user = current_user(client)
-    return bool(user and user.get("role") == ROLE_ADMIN)
+    return bool(user and user.get("role") in ADMIN_ROLES)
 
 
 def require_admin(client, action: str) -> dict:
@@ -54,10 +54,10 @@ def require_admin(client, action: str) -> dict:
             f"không xác định được bạn là ai nên không thể {action}. "
             "Nhờ admin vào web > Thành viên điền Discord ID cho tài khoản của bạn."
         )
-    if user.get("role") != ROLE_ADMIN:
+    if user.get("role") not in ADMIN_ROLES:
         who = user.get("displayName") or "bạn"
         raise PermissionDenied(
-            f"chỉ admin mới được {action} — {who} đang là member. "
-            f"Member chỉ có thể nhờ bot {MEMBER_ACTIONS[0]}."
+            f"chỉ admin/owner mới được {action} — {who} đang là member. "
+            f"Member chỉ có thể nhờ bot: {', '.join(MEMBER_ACTIONS)}."
         )
     return user

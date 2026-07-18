@@ -13,12 +13,14 @@ _SKILLS_DIR = str(Path(__file__).parent / "skills")
 
 # Luat quyen dat TRUOC cac skill hint de Claude khong tim duong lach khi bi tu choi.
 PERMISSION_HINT = (
-    " PERMISSIONS: Creating a task is open to EVERYONE. Every OTHER write - updating a "
-    "task, and anything touching features / sprints / projects - is ADMIN ONLY. The skill "
-    "itself checks the sender's Discord id against profiles.role, so just run it and let "
-    "it decide; never claim someone is admin. If a script prints 'LOI: chỉ admin ...' or "
-    "'LOI: không xác định được bạn là ai ...', relay that message politely and STOP: do "
-    "NOT retry, and do NOT reach for another skill to work around it."
+    " PERMISSIONS: Three things are open to EVERYONE - CREATING a task, UPDATING a task, "
+    "and SEARCHING documents (doc search). Every OTHER write - features / sprints / "
+    "projects / weekly report / weekly mail / member DM - is ADMIN or OWNER only. The "
+    "skill itself checks the sender's Discord id against profiles.role (owner counts as "
+    "admin), so just run it and let it decide; never claim someone is admin. If a script "
+    "prints 'LOI: chỉ admin ...' or 'LOI: không xác định được bạn là ai ...', relay that "
+    "message politely and STOP: do NOT retry, and do NOT reach for another skill to work "
+    "around it."
 )
 
 TASK_HINT = (
@@ -36,7 +38,7 @@ TASK_HINT = (
     "gap, sprint dang chay' -> create --title \"Fix login\" --assignee \"Nam\" --priority gap "
     "--sprint active. Omit --project only if the team has a single project; if the skill "
     "answers that it needs a project, ASK the user which one - never guess.\n"
-    "- update (ADMIN ONLY): --id <taskId> plus any of --status (todo|in_progress|review|done, "
+    "- update (anyone): --id <taskId> plus any of --status (todo|in_progress|review|done, "
     "accepts 'dang lam'/'xong'/'review'/'can lam') --priority --title --assignee --watchers "
     "--points --due --desc --link. Example 'task 3f9a1b2c xong roi' -> update --id 3f9a1b2c "
     "--status xong.\n"
@@ -205,7 +207,14 @@ DOC_HINT = (
     f'`python "{_SKILLS_DIR}/doc_search.py" "<cau hoi>" [--project <id>] [--top-k N]`. '
     "It returns the most relevant chunks with their source. Answer ONLY from those "
     "chunks and cite the source [1],[2]...; if nothing relevant is returned, say the "
-    "document store has no matching info (do NOT invent an answer)."
+    "document store has no matching info (do NOT invent an answer).\n"
+    "  LINK: a chunk may carry a '🔗 <url>' line = the link to OPEN that source at the "
+    "right place. For a Google Sheet it deep-links to the EXACT TAB (the url ends with "
+    "'#gid=...'), so the tab the answer came from is the tab the link opens. When the user "
+    "asks you to send / open / 'gui tai lieu' / 'mo dung tab' / where the info lives, "
+    "include that url VERBATIM (never trim the '#gid=' part, never relabel it). If the "
+    "matching chunk has NO 🔗 line, say you don't have a link for it — do NOT invent one "
+    "or hand out a generic file link when the user asked for a specific tab."
 )
 
 SHEET_HINT = (

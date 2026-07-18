@@ -105,6 +105,12 @@ def friendly(mime: str) -> str:
     return MIME_FRIENDLY.get(mime, (mime or "?").split(".")[-1])
 
 
+def sheet_tab_url(sheet_id: str, gid) -> str:
+    """Link mo Google Sheet ngay tai DUNG tab (gid). webViewLink chi mo tab dang active,
+    dia chi '#gid=' moi dua thang toi tab can — de bot 'gui tai lieu dung tab'."""
+    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit#gid={gid}"
+
+
 def resolve_key(cli_key=None) -> Path:
     """Duong dan service account: --key > env GDRIVE_SERVICE_ACCOUNT > mac dinh keys/..."""
     raw = cli_key or os.getenv("GDRIVE_SERVICE_ACCOUNT") or str(_DEFAULT_KEY)

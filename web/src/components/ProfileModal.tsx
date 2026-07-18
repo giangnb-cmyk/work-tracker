@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { USER_ROLE_LABEL } from '../types';
 
 interface ProfileModalProps {
   onClose: () => void;
@@ -50,6 +51,16 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Hồ sơ của tôi</h2>
+
+        {/* Vai trò chỉ để XEM — đổi vai trò là việc của owner ở tab Thành viên (RLS chặn tự phong). */}
+        {profile && (
+          <div className="field">
+            <span className="field-label">Vai trò</span>
+            <span className={`badge ${profile.role === 'owner' ? 'role-owner' : profile.role === 'admin' ? 'status-active' : 'status-planning'}`}>
+              {USER_ROLE_LABEL[profile.role]}
+            </span>
+          </div>
+        )}
 
         <label className="field">
           <span>Tên hiển thị *</span>

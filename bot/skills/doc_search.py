@@ -57,6 +57,9 @@ def cmd_search(args):
         section = h.get("section", "")
         where = f"{src} — {section}" if section else src
         print(f"\n[{i}] (độ liên quan {sim_s}) nguồn: {where}")
+        url = h.get("source_url")
+        if url:  # link mo DUNG cho (Google Sheets: dung tab qua #gid) — de bot gui cho nguoi
+            print(f"    🔗 {url}")
         print(_clip(h.get("content", "")))
 
 

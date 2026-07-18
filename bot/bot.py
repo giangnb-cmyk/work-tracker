@@ -31,6 +31,9 @@ CLAUDE_CMD = os.getenv("CLAUDE_CMD", "claude")
 SETTINGS_FILE = Path(__file__).parent / "settings.json"
 _settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8")) if SETTINGS_FILE.exists() else {}
 CLAUDE_MODEL = _settings.get("model", "").strip()
+# Reasoning effort (KHONG doi model): low|medium|high|xhigh|max. '' = mac dinh cua model.
+# Ha xuong medium/low de tra loi nhanh hon — bot chu yeu tao task / tim tai lieu.
+CLAUDE_EFFORT = _settings.get("effort", "").strip()
 CLAUDE_TIMEOUT = int(_settings.get("timeout_seconds", 300))
 MAX_PARALLEL = int(_settings.get("max_parallel", 2))
 SYSTEM_PROMPT = _settings.get("system_prompt") or (
@@ -203,6 +206,8 @@ def _build_args(prompt: str) -> list:
     ]
     if CLAUDE_MODEL:
         args += ["--model", CLAUDE_MODEL]
+    if CLAUDE_EFFORT:  # ha effort -> tra loi nhanh hon, giu nguyen model
+        args += ["--effort", CLAUDE_EFFORT]
     # Nap RIENG config MCP google-sheets cho bot (--strict-mcp-config -> bo qua .mcp.json,
     # tranh keo theo Supabase HTTP MCP lam treo phien khong tuong tac).
     if SHEETS_MCP_ENABLED:

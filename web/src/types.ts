@@ -6,8 +6,30 @@ import type { Timestamp } from './lib/time';
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type SprintStatus = 'planning' | 'active' | 'completed';
-export type UserRole = 'admin' | 'member'; // permission level (NOT job discipline)
+/**
+ * Tầng phân quyền (KHÔNG phải chuyên môn). owner > admin > member: owner có mọi quyền
+ * admin (is_admin bao owner) + ĐỘC QUYỀN cấp/đổi vai trò — xem migration 0037.
+ */
+export type UserRole = 'owner' | 'admin' | 'member';
+
+export const USER_ROLE_LABEL: Record<UserRole, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  member: 'Thành viên',
+};
 export type TaskSource = 'web' | 'discord';
+
+/**
+ * Quyền lẻ admin cấp thêm cho member (admin nghiễm nhiên có đủ — xem has_perm(), 0034).
+ * Giá trị phải khớp chuỗi RLS dùng trong migration; thêm quyền mới = thêm vào đây
+ * + policy tương ứng, KHÔNG cần đổi schema.
+ */
+export type MemberPerm = 'task.delete' | 'feature.create';
+
+export const MEMBER_PERMS: { id: MemberPerm; label: string; hint: string }[] = [
+  { id: 'task.delete', label: 'Xoá task', hint: 'Xoá được task bất kỳ (mặc định chỉ admin và người tạo task)' },
+  { id: 'feature.create', label: 'Tạo feature', hint: 'Tạo feature mới; sửa/xoá feature vẫn là việc của admin' },
+];
 
 /** Job discipline — separate from the admin/member permission role. */
 export type JobRole =
@@ -54,6 +76,36 @@ export interface Activity {
   /** Mốc sửa nội dung gần nhất (chỉ bình luận); undefined = chưa sửa. DB tự điền — xem 0029. */
   editedAt?: Timestamp;
 }
+
+/**
+ * Nhật ký hệ thống (audit log, migration 0035) — hành động quản trị: xoá task, tạo
+ * feature, đổi vai trò/quyền member. Ghi bằng trigger DB; client chỉ đọc (admin).
+ * `action` để rộng thành string để action mới ở DB không làm gãy client cũ.
+ */
+export type AuditAction = 'task.delete' | 'feature.create' | 'member.perms';
+
+export interface AuditEntry {
+  id: string;
+  /** Ai thực hiện — null nếu ghi từ console/không có phiên; actorName='Bot' khi service-role. */
+  actorId: string | null;
+  actorName: string;
+  action: AuditAction | string;
+  entityType: string;
+  /** Id đối tượng bị tác động (có thể đã bị xoá, vd task). */
+  entityId: string | null;
+  summary: string;
+  projectId: string | null;
+  /** Chi tiết có cấu trúc: task.delete → {title,status}; member.perms → {role_*,perms_*}. */
+  meta: Record<string, unknown>;
+  createdAt?: Timestamp;
+}
+
+/** Nhãn + icon cho từng loại hành động trong Nhật ký. `tone` map sang class màu badge. */
+export const AUDIT_ACTION_META: Record<string, { label: string; icon: string; tone: 'danger' | 'ok' | 'warn' }> = {
+  'task.delete': { label: 'Xoá task', icon: '🗑️', tone: 'danger' },
+  'feature.create': { label: 'Tạo feature', icon: '🧩', tone: 'ok' },
+  'member.perms': { label: 'Đổi quyền', icon: '🔑', tone: 'warn' },
+};
 
 /** An in-app notification delivered to one user (the web half of completion notices). */
 export interface AppNotification {
@@ -139,6 +191,8 @@ export interface TeamMember {
   displayName: string;
   photoURL: string;
   role: UserRole;
+  /** Quyền lẻ được cấp thêm — chỉ có nghĩa với member; admin có đủ mọi quyền. */
+  perms: MemberPerm[];
   jobRole?: JobRole;
   discordId?: string;
   notionUserId?: string;

@@ -18,17 +18,37 @@ interface CreateOpts {
   watcherNames: string[];
 }
 
+/**
+ * Ngưỡng "tiêu đề quá dài": câu dài kiểu mô tả bug bị cắt một dòng ở list và cả ô tiêu đề
+ * chi tiết (input một dòng), đọc không hết.
+ */
+export const LONG_TITLE_CHARS = 80;
+
+/**
+ * Mô tả nên lưu/hiển thị: khi tiêu đề vượt {@link LONG_TITLE_CHARS} mà mô tả CÒN TRỐNG, lấy
+ * nguyên tiêu đề làm mô tả để mở chi tiết đọc trọn (ô tiêu đề không xuống dòng được). Mô tả
+ * đã có nội dung thì tôn trọng, không đè. Idempotent: seed xong mô tả hết trống nên lần sau
+ * không seed lại; và người dùng vẫn xoá được nếu không muốn (không ép ở updateTask).
+ */
+export function descWithLongTitle(title: string, description: string): string {
+  const t = title.trim();
+  const d = description.trim();
+  return d === '' && t.length > LONG_TITLE_CHARS ? t : d;
+}
+
 export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise<string> {
   // Auto due window: starts today, ends Friday of this week (unless a due end was picked).
   const now = new Date();
   const dueStart = Timestamp.fromDate(now);
   const dueDate = Timestamp.fromDate(input.dueDate ?? endOfWorkWeek(now));
+  // Tên dài mà chưa có mô tả → chép tiêu đề vào mô tả để đọc được ở chi tiết.
+  const description = descWithLongTitle(input.title, input.description);
 
   const { data, error } = await supabase
     .from('tasks')
     .insert({
       title: input.title.trim(),
-      description: input.description.trim(),
+      description,
       sprint_id: input.sprintId,
       project_id: input.projectId,
       feature_id: input.featureId,
@@ -55,7 +75,7 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
   const created = {
     id,
     title: input.title,
-    description: input.description,
+    description,
     status: input.status,
     priority: input.priority,
     assigneeName: opts.assigneeName,

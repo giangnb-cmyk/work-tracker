@@ -89,6 +89,8 @@ def cmd_sync(args):
         return
 
     pairs = [(f.get("name", "?"), _entry_text(f, f.get("_parent", ""))) for f in files]
+    # section == ten file -> gan luon webViewLink de hit danh muc co san link mo file.
+    section_urls = {f.get("name", "?"): f.get("webViewLink") for f in files if f.get("webViewLink")}
     print(f"Tạo embedding bge-m3 cho {len(pairs)} mục...", flush=True)
     try:
         vectors = embed_batch([content for _, content in pairs])
@@ -97,7 +99,7 @@ def cmd_sync(args):
 
     client = repo.db()
     repo.delete_by_source(client, _SOURCE, args.project)  # replace toan bo danh muc cu
-    n = repo.insert_chunks(client, args.project, _SOURCE, pairs, vectors)
+    n = repo.insert_chunks(client, args.project, _SOURCE, pairs, vectors, section_urls=section_urls)
     print(f"Xong: nạp {n} mục vào kho (nguồn '{_SOURCE}'). "
           f"Hỏi thử: python skills\\doc_search.py \"tài liệu ... nằm ở đâu\"")
 

@@ -3,8 +3,9 @@
 Claude goi script nay (che do an toan chi cho phep chay dung cac file skill).
 In ket qua de doc de Claude thuat lai; loi thi in dong 'LOI: ...' va thoat != 0.
 
-Quyen: tao task thi ai cung duoc (khop RLS tasks_insert); SUA task thi chi admin
-(chat hon RLS mot cach co chu y) — xem permissions.py.
+Quyen: tao + SUA task thi ai cung duoc (theo yeu cau — member tag bot de tao/sua task
+va tra cuu tai lieu); moi lenh khac (feature/sprint/project/report) can admin/owner
+— xem permissions.py.
 
 Vi du:
     python task_ops.py create --title "Fix login" --project "Web" --assignee "Nam" --watchers "Ánh, Thúy" --sprint active
@@ -240,9 +241,13 @@ def _sync_create(client, task_id, task_doc, assignee_id, notion_project_id) -> s
 # --- Subcommand: update ------------------------------------------------------
 
 def cmd_update(args):
-    """Sua task. CHI admin — chat hon RLS (web con cho reporter/assignee sua)."""
+    """Sua task. AI CUNG sua duoc (theo yeu cau: member tag bot de tao + sua task).
+
+    LUU Y: rong hon RLS web (web chi cho admin/reporter/assignee sua) — bot bo qua RLS
+    nen day la lop chan duy nhat; co chu y mo cho moi nguoi. Moi lenh KHAC (feature/
+    sprint/project/report) van can admin/owner -> permissions.require_admin.
+    """
     client = repo.db()
-    permissions.require_admin(client, "sửa task")
     task = repo.get_task(client, args.id)
     if not task:
         die(f"không tìm thấy task id '{args.id}'")

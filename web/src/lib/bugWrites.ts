@@ -50,6 +50,10 @@ export async function createBug(input: NewBugInput): Promise<string> {
       reporter_id: input.reporterId,
       reporter_name: input.reporterName,
       order: Date.now(),
+      // Báo bot mirror bug này lên forum Discord: tạo bài (title + mô tả + tag khớp web)
+      // và ping role dev. Bot tự xoá cờ nếu project không cấu hình forum. Xem
+      // bug_sync.push_pending / _create_thread.
+      pending_discord_push: true,
     })
     .select('id')
     .single();

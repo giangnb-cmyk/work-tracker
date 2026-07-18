@@ -17,7 +17,7 @@ import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
 import { logVisit } from '../lib/visitWrites';
 import { navigate } from '../lib/router';
 import { rowToMember } from '../lib/mappers';
-import type { JobRole, TeamMember, UserRole } from '../types';
+import type { JobRole, MemberPerm, TeamMember, UserRole } from '../types';
 
 /** Minimal user shape the app consumes (keeps `uid` naming across components). */
 interface AppUser {
@@ -42,11 +42,23 @@ interface AuthState {
   /** Quyền HIỆU LỰC — đã trừ chế độ xem thử. MỌI cổng phân quyền phải dùng cái này. */
   isAdmin: boolean;
   /**
+   * Là OWNER (hiệu lực, đã trừ xem thử). Owner = admin + độc quyền cấp/đổi vai trò (0037).
+   * Chỉ gate riêng thao tác phong/gỡ admin — mọi thứ khác cứ dùng `isAdmin` (đã bao owner).
+   */
+  isOwner: boolean;
+  /**
+   * Quyền lẻ hiệu lực (0034): admin luôn có; member theo `profile.perms` do admin cấp.
+   * Gate theo quyền lẻ thì dùng cái này thay vì `isAdmin` — nó đã bao admin rồi.
+   */
+  can: (perm: MemberPerm) => boolean;
+  /**
    * Quyền THẬT theo profile, không bị chế độ xem thử ảnh hưởng.
    * CHỈ dùng cho chính công tắc xem thử — nếu dùng nó để gate tính năng thì chế độ xem
    * thử sẽ vô nghĩa ở chỗ đó.
    */
   isRealAdmin: boolean;
+  /** Owner THẬT theo profile, bỏ qua xem thử — dùng cho cổng phong/gỡ admin trong UI. */
+  isRealOwner: boolean;
   viewAsMember: boolean;
   setViewAsMember: (on: boolean) => void;
   loading: boolean;
@@ -248,7 +260,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  const isRealAdmin = profile?.role === 'admin';
+  // Owner kế thừa mọi quyền admin (is_admin bao owner ở DB, 0037) — soi ở client cũng vậy.
+  const isRealAdmin = profile?.role === 'admin' || profile?.role === 'owner';
+  const isRealOwner = profile?.role === 'owner';
+
+  /**
+   * Chế độ xem thử hạ về member THƯỜNG — không tính cả perms lẻ của chính mình,
+   * để admin thấy đúng giao diện của member chưa được cấp gì.
+   */
+  function can(perm: MemberPerm): boolean {
+    if (viewAsMember) return false;
+    return isRealAdmin || (profile?.perms ?? []).includes(perm);
+  }
 
   /**
    * Chế độ xem thử CHỈ được phép GIẢM quyền, không bao giờ cấp thêm — nên `isAdmin` luôn
@@ -268,7 +291,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // `role` là vai trò HIỆU LỰC nên chế độ xem thử phản chiếu đúng ở đây luôn.
       role: isRealAdmin && !viewAsMember ? 'admin' : 'member',
       isAdmin: isRealAdmin && !viewAsMember,
+      isOwner: isRealOwner && !viewAsMember,
+      can,
       isRealAdmin,
+      isRealOwner,
       viewAsMember,
       setViewAsMember,
       loading,
@@ -279,7 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, profile, loading, error, isRealAdmin, viewAsMember],
+    [user, profile, loading, error, isRealAdmin, isRealOwner, viewAsMember],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

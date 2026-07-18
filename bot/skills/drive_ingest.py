@@ -29,6 +29,7 @@ Vi du (chay trong thu muc bot/):
     python skills\\drive_ingest.py --skip-name balance  # bo qua them file co ten chua 'balance'
     python skills\\drive_ingest.py --no-skip            # nap TAT CA, bo moi bo loc
     python skills\\drive_ingest.py --force              # nap lai ca file khong doi
+    python skills\\drive_ingest.py --relink             # chi gan link tung tab cho Sheet da nap
     python skills\\drive_ingest.py --project <id>       # gan tai lieu vao 1 project
 """
 
@@ -187,6 +188,35 @@ def _read_sections(job: _Job, f: dict) -> list:
         return sheets_reader.read_sheet(job.sess, f["id"])
 
 
+def _tab_section_urls(sess, f: dict) -> dict:
+    """{nhan section: link tab} cho 1 Google Sheet — de bot mo DUNG tab (#gid).
+
+    Nhan section trung dinh dang doc_reader/_read_xlsx + sheets_reader.read_sheet sinh ra
+    ("sheet '<ten tab>'"). {} neu khong lay duoc gid (van con link file lam mac dinh).
+    """
+    try:
+        gids = sheets_reader.tab_gids(sess, f["id"])
+    except sheets_reader.SheetReadError:
+        return {}
+    urls = {}
+    for title, gid in gids.items():
+        url = drive.sheet_tab_url(f["id"], gid)
+        urls[f"sheet '{title}'"] = url
+        # Drive export .xlsx cat ten tab con 31 ky tu (gioi han Excel) -> openpyxl doc ten
+        # da cat, nhan section khong khop ten day du. Them ca ban cat de van map dung link.
+        if len(title) > 31:
+            urls[f"sheet '{title[:31]}'"] = url
+    return urls
+
+
+def _source_links(job: _Job, f: dict) -> tuple:
+    """(section_urls, default_url): link mo dung cho. Sheets -> tung tab; file khac -> webViewLink."""
+    default = f.get("webViewLink")
+    if f.get("mimeType") != drive.SHEET_MIME:
+        return {}, default
+    return _tab_section_urls(job.sess, f), default
+
+
 def _ingest_one(job: _Job, f: dict) -> int:
     """Tai + doc + (nap) 1 tai lieu. Tra ve so chunk; 0 = bo qua. Nem loi cho caller loc."""
     name = f.get("name", "?")
@@ -198,8 +228,10 @@ def _ingest_one(job: _Job, f: dict) -> int:
         print(f"  - {name}: {len(pairs)} chunk (dry-run, không nạp)")
         return len(pairs)
     print(f"  - {name}: {len(pairs)} chunk, embedding...", flush=True)
+    section_urls, default_url = _source_links(job, f)
     store_pairs(job.client, SOURCE_PREFIX + name, pairs, job.project_id, replace=True,
-                source_version=f.get("modifiedTime"))
+                source_version=f.get("modifiedTime"),
+                section_urls=section_urls, default_url=default_url)
     return len(pairs)
 
 
@@ -262,7 +294,43 @@ def _list_targets(sess, skip: SkipRules) -> tuple:
     return kept, dropped, len(files)
 
 
+def cmd_relink(args):
+    """Gan lai source_url (link tung tab) cho cac Google Sheet DA nap, khong embedding lai.
+
+    Dung 1 lan sau khi them cot documents.source_url (migration 0038): tai lieu Sheets cu
+    co ngay link toi dung tab ma khong phai nap lai ca kho (~3s/chunk). Chi dung toi Sheets.
+    """
+    try:
+        sess = drive.make_session(drive.resolve_key(args.key))
+        print("Đang liệt kê Google Sheets trên Drive...", flush=True)
+        files = drive.list_documents(sess)
+    except drive.DriveError as e:
+        die(str(e))
+
+    client = repo.db()
+    known = set(repo.source_versions(client, SOURCE_PREFIX, args.project))  # nguon Drive da nap
+    total, done = 0, 0
+    for f in files:
+        if f.get("mimeType") != drive.SHEET_MIME:
+            continue
+        source = SOURCE_PREFIX + f.get("name", "?")
+        if source not in known:
+            continue  # Sheet chua nap ruot -> khong co chunk de gan link
+        urls = _tab_section_urls(sess, f)
+        if not urls:
+            print(f"  - {source}: không lấy được gid các tab, bỏ qua.")
+            continue
+        n = repo.update_source_urls(client, source, urls, args.project)
+        print(f"  - {source}: gắn link {n} chunk theo tab")
+        done += 1 if n else 0
+        total += n
+    print(f"\nXong relink: {done} Sheet, {total} chunk có link tới đúng tab "
+          f"(không embedding lại).")
+
+
 def cmd_sync(args):
+    if args.relink:  # relink = chi gan lai link, khong nap/embedding
+        return cmd_relink(args)
     skip = SkipRules.from_args(args)
     try:
         sess = drive.make_session(drive.resolve_key(args.key))
@@ -309,6 +377,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-prune", action="store_true", help="Khong xoa nguon Drive da bi go")
     p.add_argument("--force", action="store_true",
                    help="Nap lai CA tai lieu khong doi (mac dinh chi nap file co sua tren Drive)")
+    p.add_argument("--relink", action="store_true",
+                   help="Chi gan lai link tung tab cho Sheet da nap (khong embedding lai) — "
+                        "backfill nhanh sau migration 0038")
     p.add_argument("--dry-run", action="store_true", help="Chi dem chunk, khong embed/nap")
     p.set_defaults(func=cmd_sync)
     return p

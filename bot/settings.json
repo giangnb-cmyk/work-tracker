@@ -1,6 +1,8 @@
 {
   "_note_model": "Set 'model' to one of: '' (default), 'sonnet', 'opus', 'haiku', or a full id like 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'.",
   "model": "claude-opus-4-8",
+  "_note_effort": "Reasoning effort khi Claude tra loi — KHONG doi model, chi giam muc suy luan noi bo de tra loi NHANH + re hon. Gia tri: '' (mac dinh cua model), 'low', 'medium', 'high', 'xhigh', 'max'. Bot chu yeu tao task / tim tai lieu nen 'medium' la du va nhanh hon han mac dinh. Muon nhanh toi da thi de 'low' (nhanh nhat, nhung co the au hon khi xu ly note hop nhieu task cung luc / phan giai nguoi nhan mo ho). Doi xong phai RESTART bot moi an.",
+  "effort": "medium",
   "timeout_seconds": 300,
   "max_parallel": 2,
   "_note_bypass": "bypass_permissions=true lets Claude run tools without asking. DANGEROUS: anyone who tags the bot could make Claude run commands on this machine. Fill allowed_user_ids (Discord IDs allowed to command the bot) when bypass is on. run-bot-safe.bat forces bypass OFF.",
@@ -25,9 +27,10 @@
   ],
   "_note_mood_override": "Ep tam trang co dinh. De TRONG '' = random doi theo ngay. Dien SO thu tu (1..so luong moods) de chon 1 tam trang. Hoac go THANG mot cau mo ta tam trang tuy y.",
   "mood_override": "",
-  "_note_bug_forums": "Dong bo HAI CHIEU bug voi forum Discord. Moi muc: project_id (uuid tu web) + forum_channel_id (ID kenh Forum). Discord->app: moi bai post -> 1 bug, forum tags -> nhan. app->Discord: doi nhan tren app se set lai tag cua thread. Bot can quyen 'Manage Threads' (sua tag thread) + 'Manage Channels' (tao tag moi). Chay tu dong luc bug_sync_hour, khi bam 'Sync' tren web, hoac '@bot sync bug'.",
+  "_note_bug_forums": "Dong bo HAI CHIEU bug voi forum Discord. Moi muc: project_id (uuid tu web) + forum_channel_id (ID kenh Forum) + notify_role (tuy chon). Discord->app: moi bai post -> 1 bug, forum tags -> nhan. app->Discord: doi nhan tren app set lai tag cua thread; bug BAO TU WEB (chua co thread) duoc TAO thanh bai forum moi (title + mo ta + tag khop web). Bot can quyen 'Manage Threads' + 'Manage Channels' (tao tag moi) + 'Create Posts' (tao bai forum). Chay tu dong luc bug_sync_hour, khi bam 'Sync' tren web, hoac '@bot sync bug'.",
+  "_note_bug_notify_role": "notify_role (tuy chon, trong moi muc bug_forums): ten HOAC id role Discord duoc PING (mention o dau bai, giong nguoi that post) khi bug bao tu web tao thanh bai forum — bao nhom dev co bug moi. Vd 'DEV M1'. Khop ten khong phan biet hoa/dau. De PING keu that su, role phai bat 'Allow anyone to @mention this role' HOAC bot co quyen 'Mention @everyone, @here, and All Roles'. Bo trong = khong ping.",
   "bug_forums": [
-    { "project_id": "620a1a7d-d779-4c3e-b7e1-796c97e16be5", "forum_channel_id": 1458356915930403026 }
+    { "project_id": "620a1a7d-d779-4c3e-b7e1-796c97e16be5", "forum_channel_id": 1458356915930403026, "notify_role": "DEV M1" }
   ],
   "bug_sync_hour": 9,
   "bug_sync_tz": "Asia/Ho_Chi_Minh",

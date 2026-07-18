@@ -45,6 +45,22 @@ def tab_titles(sess: requests.Session, sheet_id: str) -> list:
     return [s["properties"]["title"] for s in r.json().get("sheets", [])]
 
 
+def tab_gids(sess: requests.Session, sheet_id: str) -> dict:
+    """{ten tab: gid} — gid la so sau lung '#gid=' de link toi DUNG tab.
+
+    Mot lan goi (fields=sheets.properties(sheetId,title)) du re: dung de nap RAG biet
+    tab nao thi mo o dia chi nao. Nem SheetReadError khi loi (caller van co link file).
+    """
+    try:
+        r = sess.get(f"{API}/{sheet_id}",
+                     params={"fields": "sheets.properties(sheetId,title)"}, timeout=_TIMEOUT)
+    except requests.RequestException as e:
+        raise SheetReadError(f"gọi Sheets API thất bại: {e}") from e
+    _check(r, "đọc gid các tab")
+    return {s["properties"]["title"]: s["properties"]["sheetId"]
+            for s in r.json().get("sheets", [])}
+
+
 def _fetch_ranges(sess: requests.Session, sheet_id: str, tabs: list) -> list:
     """batchGet nhieu tab 1 lan -> list valueRange (cung thu tu ranges gui di)."""
     ranges = [f"{_quote(t)}!A1:{_MAX_COL}{MAX_ROWS_PER_TAB}" for t in tabs]

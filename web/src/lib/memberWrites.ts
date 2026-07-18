@@ -7,12 +7,13 @@
 
 import { supabase } from '../supabase';
 import type { PostgrestError } from '@supabase/supabase-js';
-import type { JobRole, TeamMember, UserRole } from '../types';
+import type { JobRole, MemberPerm, TeamMember, UserRole } from '../types';
 
 export interface MemberInput {
   displayName: string;
   email: string;
   role: UserRole;
+  perms: MemberPerm[];
   jobRole: JobRole;
   discordId: string;
   notionUserId: string;
@@ -49,6 +50,7 @@ export async function createMember(input: MemberInput): Promise<string> {
       display_name: input.displayName.trim(),
       email: input.email.trim(),
       role: input.role,
+      perms: input.perms,
       job_role: input.jobRole,
       discord_id: input.discordId.trim(),
       notion_user_id: input.notionUserId.trim(),
@@ -65,6 +67,7 @@ export async function updateMember(uid: string, patch: Partial<TeamMember>): Pro
   if (patch.displayName !== undefined) row.display_name = patch.displayName;
   if (patch.email !== undefined) row.email = patch.email;
   if (patch.role !== undefined) row.role = patch.role;
+  if (patch.perms !== undefined) row.perms = patch.perms;
   if (patch.jobRole !== undefined) row.job_role = patch.jobRole;
   if (patch.discordId !== undefined) row.discord_id = patch.discordId;
   if (patch.notionUserId !== undefined) row.notion_user_id = patch.notionUserId;

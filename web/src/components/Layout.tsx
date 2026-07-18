@@ -22,6 +22,7 @@ const Performance = lazy(() => import('./Performance'));
 const Visits = lazy(() => import('./Visits'));
 const SprintManager = lazy(() => import('./SprintManager'));
 const Team = lazy(() => import('./Team'));
+const SystemLog = lazy(() => import('./SystemLog'));
 const Settings = lazy(() => import('./Settings'));
 // Lazy để TaskModal (nó import tĩnh) không bị kéo vào bundle khởi động.
 const TaskDeepLink = lazy(() => import('./TaskDeepLink'));
@@ -62,6 +63,7 @@ export default function Layout() {
             {activeView === 'visits' && <Visits />}
             {activeView === 'sprints' && <SprintManager />}
             {activeView === 'team' && <Team />}
+            {activeView === 'log' && <SystemLog />}
             {activeView === 'settings' && <Settings />}
             {/* Deep link /tasks/<id>: modal task đè lên view nền (route.view = board). */}
             {route.taskId && <TaskDeepLink taskId={route.taskId} fallbackPath={pathFor(activeView)} />}

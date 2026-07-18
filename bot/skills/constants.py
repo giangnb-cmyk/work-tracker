@@ -32,8 +32,13 @@ SPRINT_COMPLETED = "completed"
 SPRINT_STATUSES = frozenset({SPRINT_PLANNING, SPRINT_ACTIVE, SPRINT_COMPLETED})
 
 # --- User role ---
+# owner > admin > member (migration 0037). Owner ke thua moi quyen admin, nen o phia
+# bot cu gom ca hai vao ADMIN_ROLES — bot khong phan biet owner/admin (viec cap/doi
+# vai tro chi lam tren web, bot khong co skill do).
+ROLE_OWNER = "owner"
 ROLE_ADMIN = "admin"
 ROLE_MEMBER = "member"
+ADMIN_ROLES = frozenset({ROLE_OWNER, ROLE_ADMIN})
 
 # Bang dong nghia: chap nhan bien the tieng Viet / khong dau / viet tat.
 # Key deu la chu thuong, khong dau (goi normalize truoc khi tra cuu).

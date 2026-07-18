@@ -7,6 +7,7 @@ import type {
   Activity,
   AppNotification,
   Attachment,
+  AuditEntry,
   Bug,
   BugLabel,
   Feature,
@@ -28,6 +29,7 @@ export function rowToMember(r: Row): TeamMember {
     displayName: r.display_name ?? '',
     photoURL: r.photo_url ?? '',
     role: r.role,
+    perms: r.perms ?? [],
     jobRole: r.job_role ?? undefined,
     discordId: r.discord_id ?? undefined,
     notionUserId: r.notion_user_id ?? undefined,
@@ -215,6 +217,21 @@ export function rowToActivity(r: Row): Activity {
     body: r.body ?? '',
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     editedAt: Timestamp.fromISO(r.edited_at) ?? undefined,
+  };
+}
+
+export function rowToAudit(r: Row): AuditEntry {
+  return {
+    id: r.id,
+    actorId: r.actor_id ?? null,
+    actorName: r.actor_name ?? '',
+    action: r.action,
+    entityType: r.entity_type ?? '',
+    entityId: r.entity_id ?? null,
+    summary: r.summary ?? '',
+    projectId: r.project_id ?? null,
+    meta: r.meta ?? {},
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
   };
 }
 
