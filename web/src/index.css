@@ -1297,6 +1297,39 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 /* Cụm nút thao tác trong 1 ô bảng (vd Sửa + Xoá ở Quản lý Sprint). */
 .row-actions { display: flex; gap: 0.4rem; }
 
+/* Gắn task có sẵn vào feature (màn chi tiết feature). */
+.feat-attach { margin-bottom: 0.75rem; }
+.feat-attach-toggle {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border);
+  border-radius: 10px; padding: 0.6rem 0.9rem; cursor: pointer;
+  color: var(--muted); font-size: 0.85rem; font-weight: 600;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.feat-attach-toggle:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); border-color: var(--primary); }
+.feat-attach-caret { font-size: 0.7rem; }
+.feat-attach-panel {
+  margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.3rem;
+  max-height: 340px; overflow-y: auto;
+  background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.5rem;
+}
+.feat-attach-empty { padding: 0.4rem 0.5rem; font-size: 0.85rem; }
+.feat-attach-row {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%; text-align: left;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid transparent;
+  border-radius: 8px; padding: 0.5rem 0.7rem; cursor: pointer; color: var(--text);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.feat-attach-row:hover { background: rgba(99, 102, 241, 0.12); border-color: var(--primary); }
+.feat-attach-title { flex: 1; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feat-attach-cur { font-size: 0.76rem; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feat-attach-cta { font-size: 0.78rem; font-weight: 600; color: var(--primary); white-space: nowrap; }
+.feat-attach-divider {
+  margin: 0.35rem 0.2rem 0.15rem; padding-top: 0.5rem; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 0.74rem;
+}
+
 .caveat { margin: 0 0 2rem; padding-left: 1.1rem; color: var(--muted); font-size: 0.78rem; line-height: 1.6; }
 .caveat li { margin-bottom: 0.3rem; }
 

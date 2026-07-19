@@ -17,7 +17,7 @@ export function useProjectTasks(projectId: string | null) {
     return (data ?? []).map(rowToTask);
   }, [projectId]);
 
-  const { data: tasks, loading } = useLiveQuery<Task>({
+  const { data: tasks, loading, refetch } = useLiveQuery<Task>({
     table: 'tasks',
     fetcher,
     filter: projectId ? `project_id=eq.${projectId}` : undefined,
@@ -25,5 +25,5 @@ export function useProjectTasks(projectId: string | null) {
     enabled: Boolean(projectId),
   });
 
-  return { tasks, loading };
+  return { tasks, loading, refetch };
 }

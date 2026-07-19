@@ -322,7 +322,10 @@ export default function TaskModal({
                   <span>Feature</span>
                   <select className="select" value={featureId ?? ''} onChange={(e) => setFeatureId(e.target.value || null)} disabled={!canEditOwn}>
                     <option value="">— Chưa gắn —</option>
-                    {projectFeatures.map((f) => (<option key={f.id} value={f.id}>{f.icon} {f.name}</option>))}
+                    {/* Tên ĐỨNG TRƯỚC icon: gõ phím trong select nhảy theo ký tự ĐẦU của
+                        option — để icon lên đầu thì mọi option đều bắt đầu bằng cùng 1 emoji
+                        nên typeahead của trình duyệt vô dụng (list feature dài nên cần nó). */}
+                    {projectFeatures.map((f) => (<option key={f.id} value={f.id}>{f.name} {f.icon}</option>))}
                   </select>
                 </label>
                 <label className="tm-field">

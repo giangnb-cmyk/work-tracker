@@ -4,7 +4,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import { sortFeatureLabels } from '../lib/featureLabelSort';
-import { becameDone, moveTask } from '../lib/taskWrites';
+import { becameDone, moveTask, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import { sortTasksByProgress } from '../lib/taskGrouping';
 import TaskListRow from './TaskListRow';
@@ -46,7 +46,7 @@ export default function Features() {
   const {
     features, featuresLoading, selectedProjectId, selectedProject, selectedSprint, selectedSprintId, members,
   } = useSprintContext();
-  const { tasks, loading: tasksLoading } = useProjectTasks(selectedProjectId);
+  const { tasks, loading: tasksLoading, refetch: refetchTasks } = useProjectTasks(selectedProjectId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [creating, setCreating] = useState(false);
@@ -213,6 +213,7 @@ export default function Features() {
         // fetch lại y hệt bộ task đó vẫn là thừa — một query, một channel là đủ.
         tasks={tasks}
         loading={tasksLoading}
+        refetchTasks={refetchTasks}
         onBack={() => setSelectedId(null)}
         onEdit={isAdmin ? () => setEditingFeature(selected) : undefined}
         editingFeature={editingFeature}
@@ -320,6 +321,8 @@ interface DetailProps {
   /** Task của cả project, do component cha fetch — xem chú thích ở chỗ gọi. */
   tasks: Task[];
   loading: boolean;
+  /** Nạp lại task ngay sau khi gắn task vào feature (khỏi đợi realtime). */
+  refetchTasks: () => Promise<void>;
   onBack: () => void;
   onEdit?: () => void;
   editingFeature: Feature | null;
@@ -327,13 +330,15 @@ interface DetailProps {
 }
 
 function FeatureDetail({
-  feature, labels, versions, people, tasks, loading, onBack, onEdit, editingFeature, onCloseEdit,
+  feature, labels, versions, people, tasks, loading, refetchTasks, onBack, onEdit, editingFeature, onCloseEdit,
 }: DetailProps) {
   const { user, isAdmin } = useAuth();
-  const { members, selectedSprintId } = useSprintContext();
+  const { members, features, selectedSprint, selectedSprintId } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
 
   const jobRoleOf = useMemo(() => {
     const map = new Map(members.map((m) => [m.uid, m.jobRole]));
@@ -346,6 +351,36 @@ function FeatureDetail({
     [tasks, feature.id],
   );
   const canChangeStatus = (t: Task) => isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid;
+
+  const featureById = useMemo(() => new Map(features.map((f) => [f.id, f])), [features]);
+  const featureNameOf = (id: string | null) => {
+    const f = id ? featureById.get(id) : null;
+    return f ? `${f.icon} ${f.name}` : '';
+  };
+
+  /**
+   * Ứng viên để gắn: task Ở SPRINT ĐANG CHỌN, chưa nằm trong feature này. Tách hai nhóm —
+   * CHƯA gắn feature lên trước (mục tiêu chính), rồi tới task đã thuộc feature khác (đổi
+   * feature vẫn được). Cả hai giữ thứ tự "chưa xong lên trước" như danh sách chính.
+   */
+  const { unattached, otherFeature } = useMemo(() => {
+    const inSprint = tasks.filter((t) => t.sprintId === selectedSprintId && t.featureId !== feature.id);
+    return {
+      unattached: sortTasksByProgress(inSprint.filter((t) => !t.featureId)),
+      otherFeature: sortTasksByProgress(inSprint.filter((t) => t.featureId)),
+    };
+  }, [tasks, selectedSprintId, feature.id]);
+
+  async function attach(task: Task) {
+    setAttachError(null);
+    try {
+      await updateTask(task, { featureId: feature.id });
+      await refetchTasks(); // task nhảy vào feature này NGAY, không đợi realtime
+    } catch (err) {
+      console.error('Gắn task vào feature thất bại', err);
+      setAttachError('Gắn task thất bại (cần quyền admin).');
+    }
+  }
 
   function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
@@ -385,6 +420,42 @@ function FeatureDetail({
           {isAdmin && (
             <CreateTaskCard variant="row" onClick={() => setCreatingTask(true)} label="Tạo task cho feature" />
           )}
+
+          {isAdmin && (
+            <div className="feat-attach">
+              <button className="feat-attach-toggle" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
+                <span className="feat-attach-caret" aria-hidden>{picking ? '▾' : '▸'}</span>
+                Gắn task có sẵn từ {selectedSprint?.name ?? 'Backlog'}
+              </button>
+              {picking && (
+                <div className="feat-attach-panel">
+                  {unattached.length === 0 && otherFeature.length === 0 && (
+                    <p className="feat-attach-empty muted">Sprint này không còn task nào để gắn.</p>
+                  )}
+                  {unattached.map((t) => (
+                    <button key={t.id} className="feat-attach-row" onClick={() => attach(t)}>
+                      <span className="feat-attach-title">{t.title}</span>
+                      <span className="feat-attach-cta">＋ Gắn</span>
+                    </button>
+                  ))}
+                  {otherFeature.length > 0 && (
+                    <div className="feat-attach-divider">
+                      Đang thuộc feature khác — bấm để chuyển sang “{feature.name}”
+                    </div>
+                  )}
+                  {otherFeature.map((t) => (
+                    <button key={t.id} className="feat-attach-row" onClick={() => attach(t)}>
+                      <span className="feat-attach-title">{t.title}</span>
+                      <span className="feat-attach-cur muted">{featureNameOf(t.featureId)}</span>
+                      <span className="feat-attach-cta">Chuyển</span>
+                    </button>
+                  ))}
+                  {attachError && <p className="error-text" style={{ padding: '0 0.5rem' }}>{attachError}</p>}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="trow-list">
             {featureTasks.map((t) => (
               <TaskListRow
