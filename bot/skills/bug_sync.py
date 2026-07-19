@@ -171,14 +171,21 @@ def _platform_from_title(title: str) -> str | None:
     return None
 
 
-# Mention role o DAU tin dau (vd '@DEV M1' — bot chen luc tao bug tu web, hoac nguoi that
-# go nhu vay). Token '<@&id>' la PING chu khong phai noi dung bug -> loc khoi mo ta khi import.
-_LEADING_ROLE_MENTIONS = re.compile(r"^(?:\s*<@&\d+>)+\s*")
+# Mention o DAU tin dau (vd '@DEV M1' role hoac '@NguoiNhan' user — bot chen luc tao bug tu
+# web, hoac nguoi that go nhu vay). Token '<@&id>' (role) / '<@id>' / '<@!id>' (user) la PING
+# chu khong phai noi dung bug -> loc khoi mo ta khi import.
+_LEADING_PINGS = re.compile(r"^(?:\s*<@[!&]?\d+>)+\s*")
+# Dong 'nguoi bao' bot chen ngay sau ping khi tao bug tu web -> loc khoi mo ta khi import
+# (app da co truong reporter rieng; dong nay chi de HIEN nguoi tao tren bai forum).
+_REPORTER_LABEL = "📝 Người báo:"
+_LEADING_REPORTER = re.compile(r"^" + re.escape(_REPORTER_LABEL) + r".*(?:\n+|$)")
 
 
 def _strip_leading_pings(text: str) -> str:
-    """Bo cac mention role o dau chuoi -> mo ta sach (giu nguyen mention giua noi dung)."""
-    return _LEADING_ROLE_MENTIONS.sub("", text or "")
+    """Bo mention (role/user) VA dong 'Nguoi bao' o dau chuoi -> mo ta sach (giu nguyen
+    mention/chu giua noi dung)."""
+    t = _LEADING_PINGS.sub("", text or "")
+    return _LEADING_REPORTER.sub("", t)
 
 
 async def _get_forum(client, forum_channel_id: int):
@@ -414,7 +421,8 @@ async def push_pending(client, sb) -> int:
     """
     rows = await asyncio.to_thread(
         lambda: sb.table(BUGS)
-        .select("id,project_id,discord_thread_id,label_ids,title,description")
+        .select("id,project_id,discord_thread_id,label_ids,title,description,"
+                "assignee_id,reporter_name")
         .eq("pending_discord_push", True).execute().data
     )
     if not rows:
@@ -501,24 +509,48 @@ async def _push_one(client, sb, ch, avail: dict, label_info: dict, bug: dict) ->
     )
 
 
+async def _starter_ping(sb, guild, bug: dict, notify_role):
+    """(prefix mention, AllowedMentions) cho tin dau khi tao bug tu web.
+
+    Uu tien NGUOI NHAN cu the: bug da giao cho nguoi co link discord_id -> chi ping DUNG
+    nguoi do, BO ping role dev (notify_role). Chua giao / nguoi nhan chua link Discord ->
+    ping role dev nhu cu. Mention nay bi _strip_leading_pings loc khi import lai nen mo ta
+    ben app khong dinh token ping."""
+    assignee_id = bug.get("assignee_id")
+    if assignee_id:
+        res = await asyncio.to_thread(
+            lambda: sb.table(PROFILES).select("discord_id").eq("id", assignee_id).limit(1).execute()
+        )
+        did = ((res.data[0].get("discord_id") if res.data else None) or "").strip()
+        if did.isdigit():
+            target = guild.get_member(int(did)) or discord.Object(id=int(did))
+            return f"<@{did}>\n", discord.AllowedMentions(users=[target])
+    if notify_role:
+        return f"{notify_role.mention}\n", discord.AllowedMentions(roles=[notify_role])
+    return "", discord.AllowedMentions.none()
+
+
 async def _create_thread(client, sb, ch, avail: dict, label_info: dict, bug: dict,
                          notify_role=None) -> None:
     """Bug bao TU WEB (chua co thread) -> tao bai forum moi (title + mo ta + tag khop web),
     luu discord_thread_id/guild_id nguoc ve bug roi xoa co.
 
-    notify_role: Role Discord (vd 'DEV M1') -> mention o DAU tin dau (giong nguoi that post
-    — xem anh nguoi dung gui) de bao nhom dev co bug moi. sync_forum strip mention dau nay
-    khi doc lai nen mo ta ben app khong dinh token '<@&...>'.
+    Ping o DAU tin dau (giong nguoi that post — xem anh nguoi dung gui): NGUOI NHAN cu the
+    neu bug da giao (bo role dev), nguoc lai la role dev (vd 'DEV M1') de bao ca nhom co bug
+    moi. Xem _starter_ping. sync_forum strip mention dau nay khi doc lai nen mo ta ben app
+    khong dinh token ping.
 
     LUU Y idempotency: ghi thread_id nguoc NGAY sau khi tao. Neu buoc ghi that bai, co van
     con true -> lan poll sau tao THREAD TRUNG (rui ro nho; Supabase write hiem khi loi)."""
     tag_objs = await _tag_objs_for_bug(sb, ch, avail, label_info, bug.get("label_ids"))
     name = (bug.get("title") or "").strip()[:MAX_THREAD_NAME] or "(không tiêu đề)"
     body = (bug.get("description") or "").strip() or "(tạo từ web, chưa có mô tả)"
-    prefix = f"{notify_role.mention}\n" if notify_role else ""
-    content = (prefix + body)[:MAX_STARTER_LEN]
-    allowed = (discord.AllowedMentions(roles=[notify_role]) if notify_role
-               else discord.AllowedMentions.none())
+    prefix, allowed = await _starter_ping(sb, ch.guild, bug, notify_role)
+    # Ghi ten nguoi tao (reporter) ngay sau ping. _strip_leading_pings se loc dong nay khi
+    # import lai nen mo ta ben app khong bi dinh.
+    reporter = (bug.get("reporter_name") or "").strip()
+    meta = f"{_REPORTER_LABEL} {reporter}\n\n" if reporter else ""
+    content = (prefix + meta + body)[:MAX_STARTER_LEN]
     created = await ch.create_thread(name=name, content=content, applied_tags=tag_objs,
                                      allowed_mentions=allowed)
     thread = created.thread
