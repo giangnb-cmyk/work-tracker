@@ -166,6 +166,7 @@ export function bugPatchToRow(patch: Partial<Bug>): Row {
 export function rowToTask(r: Row): Task {
   return {
     id: r.id,
+    shortCode: r.short_code ?? null,
     title: r.title,
     description: r.description ?? '',
     sprintId: r.sprint_id ?? null,

@@ -1,5 +1,6 @@
-// Deep link /tasks/<id>: nạp task theo id rồi mở TaskModal đè lên view đang đứng dưới.
-// Task nằm ở dự án khác thì tự nhảy sang dự án đó để context (feature, member…) khớp.
+// Deep link /tasks/<id> (đủ) hoặc /t/<short_code> (rút gọn): nạp task rồi mở TaskModal đè
+// lên view đang đứng dưới. Task nằm ở dự án khác thì tự nhảy sang dự án đó để context
+// (feature, member…) khớp — nên link rút gọn không cần kèm ?p=.
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
@@ -10,12 +11,13 @@ import TaskModal from './TaskModal';
 import type { Task } from '../types';
 
 interface TaskDeepLinkProps {
-  taskId: string;
+  /** Cột + giá trị để tra task: {column:'id'} cho /tasks/<id>, {column:'short_code'} cho /t/<mã>. */
+  match: { column: 'id' | 'short_code'; value: string };
   /** Path quay về khi đóng modal (tab đang đứng dưới). */
   fallbackPath: string;
 }
 
-export default function TaskDeepLink({ taskId, fallbackPath }: TaskDeepLinkProps) {
+export default function TaskDeepLink({ match, fallbackPath }: TaskDeepLinkProps) {
   const { selectedProjectId, selectProject } = useSprintContext();
   const [task, setTask] = useState<Task | null>(null);
   const [missing, setMissing] = useState(false);
@@ -25,7 +27,7 @@ export default function TaskDeepLink({ taskId, fallbackPath }: TaskDeepLinkProps
     supabase
       .from('tasks')
       .select('*')
-      .eq('id', taskId)
+      .eq(match.column, match.value)
       .maybeSingle()
       .then(({ data, error }) => {
         if (!alive) return;
@@ -41,10 +43,10 @@ export default function TaskDeepLink({ taskId, fallbackPath }: TaskDeepLinkProps
     return () => {
       alive = false;
     };
-    // selectedProjectId cố ý không nằm trong deps: chỉ nạp theo taskId, việc đổi dự án
+    // selectedProjectId cố ý không nằm trong deps: chỉ nạp theo match, việc đổi dự án
     // là hệ quả một lần chứ không phải lý do nạp lại.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId]);
+  }, [match.column, match.value]);
 
   const close = () => navigate(fallbackPath);
 

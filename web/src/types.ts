@@ -362,6 +362,8 @@ export interface Sprint {
 
 export interface Task {
   id: string;
+  /** Mã ngắn duy nhất (DB sinh) cho link chia sẻ gọn `/t/<shortCode>`. Xem migration 0039. */
+  shortCode: string | null;
   title: string;
   description: string;
   sprintId: string | null;

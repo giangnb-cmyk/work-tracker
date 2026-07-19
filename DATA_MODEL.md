@@ -203,6 +203,7 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | Field          | Type              | Notes                                                   |
 |----------------|-------------------|---------------------------------------------------------|
 | `id`           | string            | mirror of doc id                                        |
+| `shortCode`    | string            | DB-generated 6-char base62, unique; short share link `/t/<code>` (migration 0039) |
 | `title`        | string            | required, 1–140 chars                                   |
 | `description`  | string            | markdown-ish free text (may be empty)                   |
 | `sprintId`     | string \| null    | which sprint; `null` = backlog                          |

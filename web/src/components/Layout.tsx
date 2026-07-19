@@ -38,6 +38,13 @@ export default function Layout() {
   // của Sidebar nên không thể lệch khi thêm view admin mới.
   const activeView = ADMIN_ONLY_VIEWS.includes(route.view) && !isAdmin ? 'dashboard' : route.view;
 
+  // Deep link task theo id (/tasks/<id>) HOẶC short_code (/t/<mã>) — hai path loại trừ nhau.
+  const taskMatch: { column: 'id' | 'short_code'; value: string } | null = route.taskId
+    ? { column: 'id', value: route.taskId }
+    : route.taskCode
+      ? { column: 'short_code', value: route.taskCode }
+      : null;
+
   return (
     <div className="app-shell">
       <Sidebar active={activeView} onSelect={(v) => navigate(pathFor(v))} />
@@ -65,8 +72,8 @@ export default function Layout() {
             {activeView === 'team' && <Team />}
             {activeView === 'log' && <SystemLog />}
             {activeView === 'settings' && <Settings />}
-            {/* Deep link /tasks/<id>: modal task đè lên view nền (route.view = board). */}
-            {route.taskId && <TaskDeepLink taskId={route.taskId} fallbackPath={pathFor(activeView)} />}
+            {/* Deep link task (đủ /tasks/<id> hoặc rút gọn /t/<mã>): modal đè lên view nền. */}
+            {taskMatch && <TaskDeepLink match={taskMatch} fallbackPath={pathFor(activeView)} />}
           </Suspense>
         </main>
       </div>

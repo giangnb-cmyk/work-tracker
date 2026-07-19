@@ -24,6 +24,8 @@ export interface Route {
   bugNumber: number | null;
   /** /tasks/<id> — mở TaskModal theo id, nền là bảng sprint. */
   taskId: string | null;
+  /** /t/<mã> — link RÚT GỌN: mở TaskModal theo short_code (không kèm ?p=, tự suy dự án). */
+  taskCode: string | null;
   /** ?p=<projectId> — link chéo dự án; SprintContext đọc MỘT lần lúc nạp. */
   projectId: string | null;
 }
@@ -33,21 +35,42 @@ export function pathFor(view: ViewId): string {
   return `/${PRETTY_PATH[view] ?? view}`;
 }
 
+/**
+ * Deep link tới 1 task: `/tasks/<id>` (+ `?p=<projectId>` để `parse()`/SprintContext mở
+ * ĐÚNG dự án khi click từ ngoài — vd link dán vào Discord). Ghép với `window.location.origin`
+ * để thành URL tuyệt đối chia sẻ được. Cùng nguồn sự thật với `parse()` ở trên.
+ */
+export function taskPath(taskId: string, projectId?: string | null): string {
+  return `/tasks/${taskId}${projectId ? `?p=${projectId}` : ''}`;
+}
+
+/**
+ * Link RÚT GỌN tới 1 task: `/t/<short_code>` (~6 ký tự) — thay cho `/tasks/<uuid>?p=<uuid>`
+ * dài ~80 ký tự. Không kèm `?p=`: handler tra task theo short_code rồi tự chuyển dự án.
+ * Dùng cho note họp (masked link ẩn URL nhưng URL vẫn ăn vào trần 2000 ký tự của Discord).
+ */
+export function taskShortPath(shortCode: string): string {
+  return `/t/${shortCode}`;
+}
+
 function parse(): Route {
   const [head, tail] = window.location.pathname.split('/').filter(Boolean);
   const projectId = new URLSearchParams(window.location.search).get('p');
   if (head === 'tasks' && tail) {
-    return { view: 'board', bugNumber: null, taskId: tail, projectId };
+    return { view: 'board', bugNumber: null, taskId: tail, taskCode: null, projectId };
+  }
+  if (head === 't' && tail) {
+    return { view: 'board', bugNumber: null, taskId: null, taskCode: tail, projectId };
   }
   if (head === 'bugs' && tail) {
     const n = Number(tail.replace(/^#/, ''));
-    return { view: 'bugs', bugNumber: Number.isFinite(n) ? n : null, taskId: null, projectId };
+    return { view: 'bugs', bugNumber: Number.isFinite(n) ? n : null, taskId: null, taskCode: null, projectId };
   }
   const view = head
     ? PATH_ALIASES[head] ?? (ALL_VIEWS.includes(head as ViewId) ? (head as ViewId) : null)
     : null;
   // Path lạ → về trang tổng quan (URL giữ nguyên, vô hại).
-  return { view: view ?? 'dashboard', bugNumber: null, taskId: null, projectId };
+  return { view: view ?? 'dashboard', bugNumber: null, taskId: null, taskCode: null, projectId };
 }
 
 // useSyncExternalStore yêu cầu snapshot TRẢ VỀ CÙNG THAM CHIẾU khi không có gì đổi —
