@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSprintContext } from '../contexts/SprintContext';
 import ConfirmDialog from './ConfirmDialog';
+import SprintEditModal from './SprintEditModal';
 import { formatDate } from '../lib/format';
 import type { Sprint, SprintStatus } from '../types';
 
@@ -13,12 +14,13 @@ const SPRINT_STATUS_LABEL: Record<SprintStatus, string> = {
 
 /** Admin-only: create sprints and manage their lifecycle. */
 export default function SprintManager() {
-  const { sprints, createSprint, setSprintStatus, deleteSprint } = useSprintContext();
+  const { sprints, createSprint, updateSprint, setSprintStatus, deleteSprint } = useSprintContext();
   const [name, setName] = useState('');
   const [goal, setGoal] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<Sprint | null>(null);
   const [removing, setRemoving] = useState<Sprint | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +49,10 @@ export default function SprintManager() {
       setGoal('');
       setStart('');
       setEnd('');
+      setError(null);
+    } catch (err) {
+      console.error('Tạo sprint thất bại', err);
+      setError('Tạo sprint thất bại (cần quyền admin).');
     } finally {
       setSaving(false);
     }
@@ -116,9 +122,10 @@ export default function SprintManager() {
                   </select>
                 </td>
                 <td>
-                  <button className="btn-sm btn-danger" onClick={() => setRemoving(s)}>
-                    Xoá
-                  </button>
+                  <div className="row-actions">
+                    <button className="btn-sm" onClick={() => setEditing(s)}>Sửa</button>
+                    <button className="btn-sm btn-danger" onClick={() => setRemoving(s)}>Xoá</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -132,6 +139,14 @@ export default function SprintManager() {
       </div>
 
       {error && <p className="error-text">{error}</p>}
+
+      {editing && (
+        <SprintEditModal
+          sprint={editing}
+          onSave={(patch) => updateSprint(editing.id, patch)}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       {removing && (
         <ConfirmDialog

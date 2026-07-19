@@ -1294,6 +1294,9 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .note-dept.over .note-dept-meta { color: var(--red); }
 .note-dept-cta { min-width: 4.2rem; text-align: right; font-size: 0.78rem; font-weight: 600; color: var(--primary); }
 
+/* Cụm nút thao tác trong 1 ô bảng (vd Sửa + Xoá ở Quản lý Sprint). */
+.row-actions { display: flex; gap: 0.4rem; }
+
 .caveat { margin: 0 0 2rem; padding-left: 1.1rem; color: var(--muted); font-size: 0.78rem; line-height: 1.6; }
 .caveat li { margin-bottom: 0.3rem; }
 

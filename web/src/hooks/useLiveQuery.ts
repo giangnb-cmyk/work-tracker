@@ -2,7 +2,7 @@
 // the table emits a realtime change (RLS-filtered). Simple and correct for the modest
 // row counts here — no manual cache patching to get subtly wrong.
 
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { supabase } from '../supabase';
 
 /**
@@ -46,11 +46,18 @@ export function useLiveQuery<T>({ table, fetcher, filter, deps, enabled = true }
    * vẫn dẫm phải. Tên duy nhất biến chuyện đó thành vô hại ngay từ trong hook.
    */
   const instanceId = useId();
+  /**
+   * Cho phép caller refetch NGAY sau khi ghi (create/update/delete) thay vì đợi realtime
+   * dội về + debounce 300ms — UI cập nhật tức thì, mà realtime vẫn lo thay đổi từ client
+   * khác. Giữ trong ref vì `run` sống trong effect (đổi theo deps); cleanup trỏ về no-op.
+   */
+  const runRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (!enabled) {
       setData([]);
       setLoading(false);
+      runRef.current = async () => {};
       return;
     }
     let alive = true;
@@ -73,6 +80,7 @@ export function useLiveQuery<T>({ table, fetcher, filter, deps, enabled = true }
           if (alive && seq === runSeq) setLoading(false);
         });
     };
+    runRef.current = run;
 
     void run();
 
@@ -102,10 +110,14 @@ export function useLiveQuery<T>({ table, fetcher, filter, deps, enabled = true }
     return () => {
       alive = false;
       clearTimeout(timer);
+      runRef.current = async () => {};
       void supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { data, loading };
+  /** Refetch ngay (dùng sau khi ghi). Ổn định — luôn gọi `run` mới nhất qua ref. */
+  const refetch = useCallback(() => runRef.current(), []);
+
+  return { data, loading, refetch };
 }

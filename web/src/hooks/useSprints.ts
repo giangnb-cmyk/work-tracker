@@ -35,7 +35,7 @@ export function useSprints(currentUid: string) {
     return (data ?? []).map(rowToSprint);
   }, []);
 
-  const { data: sprints, loading } = useLiveQuery<Sprint>({ table: 'sprints', fetcher, deps: [] });
+  const { data: sprints, loading, refetch } = useLiveQuery<Sprint>({ table: 'sprints', fetcher, deps: [] });
 
   const activeSprint = useMemo(
     () => sprints.find((s) => s.status === 'active') ?? null,
@@ -57,25 +57,29 @@ export function useSprints(currentUid: string) {
         .select('id')
         .single();
       if (error) throw error;
+      await refetch(); // hiện sprint mới NGAY, không đợi realtime dội về
       return data.id as string;
     },
-    [currentUid],
+    [currentUid, refetch],
   );
 
   const updateSprint = useCallback(async (id: string, patch: Partial<Sprint>) => {
     const { error } = await supabase.from('sprints').update(sprintPatchToRow(patch)).eq('id', id);
     if (error) throw error;
-  }, []);
+    await refetch();
+  }, [refetch]);
 
   const setSprintStatus = useCallback(async (id: string, status: SprintStatus) => {
     const { error } = await supabase.from('sprints').update({ status }).eq('id', id);
     if (error) throw error;
-  }, []);
+    await refetch();
+  }, [refetch]);
 
   const deleteSprint = useCallback(async (id: string) => {
     const { error } = await supabase.from('sprints').delete().eq('id', id);
     if (error) throw error;
-  }, []);
+    await refetch();
+  }, [refetch]);
 
   return { sprints, activeSprint, loading, createSprint, updateSprint, setSprintStatus, deleteSprint };
 }
