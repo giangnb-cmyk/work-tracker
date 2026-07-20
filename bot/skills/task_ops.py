@@ -41,8 +41,10 @@ from constants import (
 from errors import PermissionDenied, ResolveError
 from task_title import MAX_TITLE, clean_title, merge_desc
 
-# Truong update lam thay doi Notion (status/assignee/priority/due) -> can day sang gateway.
-_NOTION_TRIGGER_FIELDS = ("status", "assigneeId", "priority", "dueDate")
+# Truong update lam thay doi Notion -> can day sang gateway. Co ca title/description:
+# doi ten hay sua mo ta task thi trang Notion cung phai theo (mo ta chi len Notion khi
+# NOTION_PROP_DESCRIPTION duoc khai o server; khong thi gateway lang le bo qua field do).
+_NOTION_TRIGGER_FIELDS = ("title", "status", "assigneeId", "priority", "dueDate", "description")
 
 
 def die(message: str):
@@ -231,7 +233,7 @@ def _sync_create(client, task_id, task_doc, assignee_id, notion_project_id) -> s
     # notion_project_id lay san tu row project -> khoi query lan hai.
     result = notion_gateway.create_page(task_doc, notion_uid, notion_project_id)
     if not result.get("synced"):
-        return "Notion: bỏ qua (gọi gateway thất bại)"
+        return f"Notion: KHÔNG tạo được — {result.get('reason', 'gọi gateway thất bại')}"
     page_id = result.get("notionPageId")
     url = result.get("notionUrl") or ""
     repo.set_notion_link(client, task_id, page_id, url)
@@ -312,7 +314,9 @@ def _sync_update(client, task, updates) -> str:
     merged = {**task, **updates}  # gop truong moi len task cu de gui du du lieu
     notion_uid = repo.notion_user_id(client, merged.get("assigneeId"))
     result = notion_gateway.update_page(page_id, merged, notion_uid)
-    return "Notion: đã đồng bộ" if result.get("synced") else "Notion: bỏ qua (gọi gateway thất bại)"
+    if result.get("synced"):
+        return "Notion: đã đồng bộ"
+    return f"Notion: KHÔNG cập nhật được — {result.get('reason', 'gọi gateway thất bại')}"
 
 
 def _build_updates(client, args) -> dict:

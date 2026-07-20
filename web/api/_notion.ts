@@ -28,6 +28,10 @@ const PROP = {
   priority: env.NOTION_PROP_PRIORITY || 'Priority',
   due: env.NOTION_PROP_DUE || 'Due',
   project: env.NOTION_PROP_PROJECT || 'Project',
+  // Mô tả: TẮT mặc định (khác các prop trên). Notion DB nào cũng có sẵn cột Name/Status,
+  // nhưng cột mô tả thì không — bật bừa mà DB thiếu cột là Notion trả 502 cho MỌI lần
+  // sync. Đặt NOTION_PROP_DESCRIPTION = tên cột (rich_text) để bật.
+  description: env.NOTION_PROP_DESCRIPTION || '',
 };
 
 // Notion column kinds vary per database; make them configurable.
@@ -36,6 +40,10 @@ const ASSIGNEE_TYPE = (env.NOTION_ASSIGNEE_TYPE || 'rich_text') as 'people' | 'r
 const PRIORITY_ENABLED = env.NOTION_PROP_PRIORITY !== '';
 const DUE_ENABLED = env.NOTION_PROP_DUE !== '';
 const PROJECT_ENABLED = env.NOTION_PROP_PROJECT !== '';
+// Ngược với các prop khác: description PHẢI được khai tên cột mới bật (mặc định rỗng).
+const DESC_ENABLED = Boolean(PROP.description);
+// Notion rich_text mỗi ô tối đa 2000 ký tự — cắt để không bị API từ chối cả lần sync.
+const NOTION_TEXT_LIMIT = 2000;
 
 function parseMap(raw: string | undefined, fallback: Record<string, string>) {
   if (!raw) return fallback;
@@ -76,11 +84,22 @@ function assigneeProp(input: NotionTaskInput) {
 }
 
 /** Build the Notion `properties` object for create/update from our task shape. */
-export function buildProperties(input: NotionTaskInput, forCreate: boolean) {
+export function buildProperties(input: NotionTaskInput) {
   const props: Record<string, unknown> = {};
 
-  if (forCreate) props[PROP.title] = { title: [{ text: { content: input.title } }] };
+  // Tên task đồng bộ ở CẢ create LẪN update (không còn phân biệt forCreate) — trước đây
+  // chỉ set khi create nên đổi tên task xong thì trang Notion vẫn giữ tên cũ. Chỉ ghi khi
+  // có tên: update lỡ gửi tên rỗng thì giữ nguyên tiêu đề cũ chứ không xoá trắng.
+  if (input.title) props[PROP.title] = { title: [{ text: { content: input.title } }] };
   props[PROP.status] = statusProp(input.status);
+
+  if (DESC_ENABLED && input.description !== undefined) {
+    props[PROP.description] = {
+      rich_text: input.description
+        ? [{ text: { content: input.description.slice(0, NOTION_TEXT_LIMIT) } }]
+        : [],
+    };
+  }
 
   if (input.assigneeName !== undefined || input.assigneeNotionUserId !== undefined) {
     props[PROP.assignee] = assigneeProp(input);

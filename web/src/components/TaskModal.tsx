@@ -356,8 +356,11 @@ export default function TaskModal({
                 <a className="notion-row" href={task.notionUrl} target="_blank" rel="noreferrer">📝 Mở task trên Notion →</a>
               )}
               {/* Chưa có trang Notion -> cho tạo lại bằng tay. Sync lúc tạo task là
-                  fire-and-forget nên hỏng thì im lặng; đây là đường bù duy nhất. */}
-              {isEdit && task && !task.notionPageId && canEditFields && (
+                  fire-and-forget nên hỏng thì im lặng; đây là đường bù duy nhất.
+                  canEditOwn (admin HOẶC người tạo task) chứ không phải canEditFields:
+                  member tạo task mà sync tự động lỗi thì phải tự tạo lại được — RLS
+                  tasks_update vốn cho reporter ghi notion_page_id. */}
+              {isEdit && task && !task.notionPageId && canEditOwn && (
                 <div className="notion-sync-row">
                   <button className="btn-sm" onClick={handleSyncNotion} disabled={notionSyncing}>
                     {notionSyncing ? '⏳ Đang tạo trên Notion…' : '📝 Tạo task trên Notion'}

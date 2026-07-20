@@ -78,7 +78,7 @@ async function route(req: VercelRequest, res: VercelResponse) {
       if (!task?.title) return res.status(400).json({ error: 'task.title required' });
       const page = await notion.pages.create({
         parent: { database_id: DATABASE_ID },
-        properties: buildProperties(task, true) as never,
+        properties: buildProperties(task) as never,
       });
       const url = 'url' in page ? (page as { url: string }).url : '';
       return res.status(200).json({ synced: true, notionPageId: page.id, notionUrl: url });
@@ -89,7 +89,7 @@ async function route(req: VercelRequest, res: VercelResponse) {
       if (!task) return res.status(400).json({ error: 'task required' });
       await notion.pages.update({
         page_id: notionPageId,
-        properties: buildProperties(task, false) as never,
+        properties: buildProperties(task) as never,
       });
       return res.status(200).json({ synced: true, notionPageId });
     }

@@ -95,20 +95,24 @@ def update_page(notion_page_id: str, task: dict, assignee_notion_user_id=None) -
 
 
 def _post(body: dict) -> dict:
-    """Gui POST toi gateway. Nuot moi loi -> {'synced': False} + log canh bao."""
+    """Gui POST toi gateway. Nuot moi loi -> {'synced': False, 'reason': ...} + log.
+
+    Luon kem 'reason' NGAN GON de caller (task_ops) thuat lai duoc "vi sao khong sync",
+    thay vi mot cau "bo qua" tron troi buoc phai mo log may chay bot moi biet.
+    """
     url = os.getenv(_GATEWAY_URL_ENV)
     secret = os.getenv(_SECRET_ENV)
     if not url or not secret:
         log.warning("Notion gateway chưa cấu hình (thiếu %s/%s), bỏ qua sync.",
                     _GATEWAY_URL_ENV, _SECRET_ENV)
-        return {"synced": False}
+        return {"synced": False, "reason": f"thiếu {_GATEWAY_URL_ENV}/{_SECRET_ENV} trong bot/.env"}
 
     # Import lazy: neu chua cai 'requests' thi cung degrade nhe, khong vo import task_ops.
     try:
         import requests
     except ImportError:
         log.warning("Chưa cài 'requests' (pip install requests), bỏ qua sync Notion.")
-        return {"synced": False}
+        return {"synced": False, "reason": "chưa cài 'requests'"}
 
     try:
         resp = requests.post(
@@ -117,9 +121,23 @@ def _post(body: dict) -> dict:
             headers={"x-sync-secret": secret},
             timeout=_TIMEOUT,
         )
+    except Exception as e:  # timeout, DNS... -> khong lam hong Postgres
+        log.warning("Notion gateway lỗi mạng: %s", str(e)[:200])
+        return {"synced": False, "reason": f"gọi gateway lỗi mạng: {str(e)[:120]}"}
+
+    # HTTP loi (401/500/502...): body co the la JSON cua ta (co 'detail') hoac trang loi
+    # cua Vercel. Doc detail neu co, khong thi kem status + dau doan body.
+    try:
         payload = resp.json()
-        # Gateway luon tra JSON co 'synced'; chuan hoa ve dict an toan.
-        return payload if isinstance(payload, dict) else {"synced": False}
-    except Exception as e:  # timeout, DNS, HTTP loi, JSON hong... -> khong lam hong Firestore
-        log.warning("Notion gateway lỗi: %s", str(e)[:200])
-        return {"synced": False}
+    except ValueError:
+        payload = None
+    if not resp.ok:
+        detail = (payload or {}).get("detail") or (payload or {}).get("error") or resp.text[:120]
+        log.warning("Notion gateway HTTP %s: %s", resp.status_code, detail)
+        return {"synced": False, "reason": f"gateway HTTP {resp.status_code} — {detail}"}
+    if not isinstance(payload, dict):
+        return {"synced": False, "reason": "gateway trả về không phải JSON"}
+    # Gateway 200 nhung synced=False (vd notion_not_configured) -> giu nguyen reason cua no.
+    if not payload.get("synced") and "reason" not in payload:
+        payload["reason"] = payload.get("error") or "gateway báo chưa đồng bộ"
+    return payload
