@@ -483,9 +483,17 @@ Trả `{ member, statusFilter, count, tasks[] }` — camelCase; mỗi task kèm
 để app ngoài tự ghép link web `/t/<shortCode>`. Sắp theo trạng thái
 (in_progress → review → todo → done) rồi hạn chót.
 
-> ⚠️ Embed PostgREST phải hint FK (`sprints!tasks_sprint_id_fkey`): tasks→sprints có
-> đường thứ hai qua `task_sprints`, thiếu hint là lỗi nhập nhằng quan hệ.
-> Key thô đưa cho app ngoài; hash sinh bằng `sha256(key)` rồi insert vào `api_keys`.
+**Vì tốc độ, toàn bộ logic nằm trong RPC `api_member_tasks`** (migration `0044`,
+SECURITY DEFINER, revoke anon/authenticated — chỉ service_role gọi): check key → tìm
+nhân sự → lấy task + join project/feature/sprint, MỘT round-trip DB. Edge Function chỉ
+validate input, hash key rồi `fetch` RPC — cố ý KHÔNG import supabase-js (nạp npm làm
+cold start chậm gấp rưỡi). Đo thực tế: xử lý server ~0.3–0.65s, cold start ~2s.
+
+> ⚠️ RPC nhận **hash** của key (tính ở Edge Function), không nhận key thô — tránh key
+> lọt vào log SQL. Key thô đưa cho app ngoài; thêm app mới = sinh key, insert
+> `sha256(key)` vào `api_keys` với `name` riêng.
+> ⚠️ Nếu quay lại query PostgREST trực tiếp: embed từ `tasks` sang `sprints` phải hint
+> FK (`sprints!tasks_sprint_id_fkey`) vì còn đường thứ hai qua `task_sprints`.
 
 ---
 
