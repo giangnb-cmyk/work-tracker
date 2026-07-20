@@ -2,7 +2,15 @@
 // Tách khỏi lib/sprint.ts vì file đó đã vượt giới hạn ~200 dòng.
 
 import { STATUS_ORDER } from './sprint';
-import { JOB_ROLES, JOB_ROLE_ICON, JOB_ROLE_LABEL, type JobRole, type Task, type TeamMember } from '../types';
+import {
+  JOB_ROLES,
+  JOB_ROLE_ICON,
+  JOB_ROLE_LABEL,
+  type Feature,
+  type JobRole,
+  type Task,
+  type TeamMember,
+} from '../types';
 
 /** Bộ phận, hoặc 'unassigned' cho task chưa giao / người nhận chưa chọn chuyên môn. */
 export type DeptBucket = JobRole | 'unassigned';
@@ -58,4 +66,42 @@ export function groupTasksByDept(tasks: Task[], members: TeamMember[]): DeptTask
         done: list.filter((t) => t.status === 'done').length,
       };
     });
+}
+
+/** Mục "theo feature": `feature` null = rổ task chưa gắn feature. */
+export interface FeatureTaskGroup {
+  key: string;
+  feature: Feature | null;
+  tasks: Task[];
+  done: number;
+}
+
+/** Rổ cho task chưa gắn feature — đứng cuối, và chỉ hiện khi thật sự có task. */
+export const NO_FEATURE_KEY = '__none__';
+
+/**
+ * Gom task theo feature, giữ nguyên thứ tự `features` truyền vào.
+ *
+ * Trả về CẢ feature chưa có task nào: mục theo feature vừa là bảng tiến độ vừa là chỗ
+ * thêm task nhanh — bỏ mục rỗng đi thì feature mới lập không có lối tạo task đầu tiên.
+ * Bên gọi tự lọc mục rỗng khi đang lọc (lúc đó rỗng nghĩa là "không khớp", không phải
+ * "chưa có việc").
+ */
+export function groupTasksByFeature(tasks: Task[], features: Feature[]): FeatureTaskGroup[] {
+  const buckets = new Map<string, Task[]>();
+  for (const task of tasks) {
+    const key = task.featureId ?? NO_FEATURE_KEY;
+    const list = buckets.get(key);
+    if (list) list.push(task);
+    else buckets.set(key, [task]);
+  }
+
+  const toGroup = (key: string, feature: Feature | null): FeatureTaskGroup => {
+    const list = [...(buckets.get(key) ?? [])].sort(byProgressThenOrder);
+    return { key, feature, tasks: list, done: list.filter((t) => t.status === 'done').length };
+  };
+
+  const groups = features.map((f) => toGroup(f.id, f));
+  if ((buckets.get(NO_FEATURE_KEY)?.length ?? 0) > 0) groups.push(toGroup(NO_FEATURE_KEY, null));
+  return groups;
 }

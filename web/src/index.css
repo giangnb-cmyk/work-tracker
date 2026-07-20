@@ -1916,6 +1916,33 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .feat-group-done { font-size: 0.78rem; color: var(--muted); }
 .feat-group-grid { margin: 0.75rem 0 1.25rem; animation: fadeIn 0.2s ease; }
 
+/* Bảng sprint gom theo feature: tên feature + thanh tiến độ ngay trên đầu mục đã thu,
+   để đọc được nhịp của cả sprint mà không phải xổ từng cái ra. */
+.sfeat-name { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+.sfeat-bar { width: 96px; flex-shrink: 0; height: 7px; }
+
+/* Ô thêm task nhanh cuối mỗi mục feature — viền đứt như .trow-add để đọc ra là "chỗ thêm",
+   không phải một dòng task nữa. */
+.quick-add {
+  display: flex; align-items: center; gap: 0.5rem; margin-top: 0.45rem;
+  padding: 0.35rem 0.6rem; border: 1px dashed var(--border); border-radius: 10px;
+  background: transparent; transition: border-color 0.15s ease, background 0.15s ease;
+}
+.quick-add:focus-within { border-color: rgba(99, 102, 241, 0.5); background: rgba(99, 102, 241, 0.06); }
+.quick-add-plus { color: var(--muted); flex-shrink: 0; }
+.quick-add-input {
+  flex: 1; min-width: 0; background: none; border: none; outline: none;
+  color: var(--text); font: inherit; font-size: 0.85rem; padding: 0.25rem 0;
+}
+.quick-add-input::placeholder { color: var(--muted); }
+.quick-add-error { font-size: 0.75rem; color: var(--danger, #f87171); }
+
+/* Cột tiến độ ở bảng "Khối lượng theo người": thanh co theo cột, % ghim bên phải để các
+   dòng đọc thẳng hàng thay vì nhảy theo độ dài số. */
+.wl-prog { display: flex; align-items: center; gap: 0.6rem; min-width: 140px; }
+.wl-prog .progress { flex: 1; height: 8px; }
+.wl-prog-pct { font-size: 0.78rem; color: var(--muted); min-width: 34px; text-align: right; }
+
 /* Feature: nhãn + loại (delivery/ongoing) + thanh lọc */
 /* Bám TRÁI như mọi thứ khác trong .project-card (align-items:flex-start). center làm
    hàng chip xuống dòng (vd IAP+Feature rồi 1.2.x rớt xuống) bị căn giữa, lệch hẳn với

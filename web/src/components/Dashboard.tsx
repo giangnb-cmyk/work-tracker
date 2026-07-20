@@ -211,18 +211,32 @@ export default function Dashboard() {
                   <th>Đang làm</th>
                   <th>Xong</th>
                   <th>Points</th>
+                  <th>Tiến độ</th>
                 </tr>
               </thead>
               <tbody>
-                {perAssignee.map(([name, list]) => (
-                  <tr key={name}>
-                    <td>{name}</td>
-                    <td className="mono">{list.length}</td>
-                    <td className="mono">{list.filter((t) => t.status !== 'done').length}</td>
-                    <td className="mono">{list.filter((t) => t.status === 'done').length}</td>
-                    <td className="mono">{list.reduce((sum, t) => sum + (t.points ?? 0), 0)}</td>
-                  </tr>
-                ))}
+                {perAssignee.map(([name, list]) => {
+                  const done = list.filter((t) => t.status === 'done').length;
+                  // Làm tròn xuống: 9/10 mà hiện 100% thì người đọc tưởng đã xong hết.
+                  const pct = list.length === 0 ? 0 : Math.floor((done / list.length) * 100);
+                  return (
+                    <tr key={name}>
+                      <td>{name}</td>
+                      <td className="mono">{list.length}</td>
+                      <td className="mono">{list.length - done}</td>
+                      <td className="mono">{done}</td>
+                      <td className="mono">{list.reduce((sum, t) => sum + (t.points ?? 0), 0)}</td>
+                      <td>
+                        <div className="wl-prog">
+                          <span className="progress" aria-hidden>
+                            <span style={{ width: `${pct}%` }} />
+                          </span>
+                          <span className="wl-prog-pct mono">{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

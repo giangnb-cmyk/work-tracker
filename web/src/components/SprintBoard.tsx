@@ -5,7 +5,9 @@ import { useTasks } from '../hooks/useTasks';
 import { useSprintHistory } from '../hooks/useSprintHistory';
 import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
-import { groupTasksByDept } from '../lib/taskGrouping';
+import { groupTasksByDept, groupTasksByFeature } from '../lib/taskGrouping';
+import { useStoredView } from '../hooks/useStoredView';
+import SprintFeatureList from './SprintFeatureList';
 import TaskListRow from './TaskListRow';
 import TaskModal from './TaskModal';
 import MeetingNoteModal from './MeetingNoteModal';
@@ -22,6 +24,11 @@ import type { Task, TaskStatus } from '../types';
  * sprint. Bộ lọc chỉ THU HẸP tập task rồi mới chia nhóm — hai thứ bù nhau chứ không thay
  * nhau, nên sprint đông task vẫn soi được mà cái nhìn tổng vẫn còn.
  */
+/** Hai cách nhìn cùng một sprint: ai đang làm gì (bộ phận) vs việc đang chạy cho cái gì (feature). */
+type GroupMode = 'dept' | 'feature';
+const GROUP_MODES: readonly GroupMode[] = ['dept', 'feature'];
+const GROUP_MODE_KEY = 'sprintBoardGroup';
+
 export default function SprintBoard() {
   const { user, isAdmin } = useAuth();
   const { selectedSprintId, selectedSprint, selectedProjectId, members, sprints, features } =
@@ -35,6 +42,7 @@ export default function SprintBoard() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [tokens, setTokens] = useState<TaskFilterToken[]>([]);
   const [query, setQuery] = useState('');
+  const [groupMode, setGroupMode] = useStoredView<GroupMode>(GROUP_MODE_KEY, GROUP_MODES, 'dept');
 
   // Task từng thuộc sprint này nhưng đã được chuyển đi làm tiếp ở sprint khác.
   const carriedAway = useMemo(
@@ -70,6 +78,10 @@ export default function SprintBoard() {
   }, [projectTasks, query, tokens, meId]);
   // Chia nhóm SAU khi lọc: nhóm nào lọc hết task thì tự biến mất, khỏi để lại mục rỗng.
   const groups = useMemo(() => groupTasksByDept(shown, members), [shown, members]);
+  const featureGroups = useMemo(
+    () => groupTasksByFeature(shown, projectFeatures),
+    [shown, projectFeatures],
+  );
   const filtering = tokens.length > 0 || query.trim() !== '';
 
   const canChangeStatus = (t: Task) =>
@@ -89,11 +101,27 @@ export default function SprintBoard() {
           <h1>{selectedSprint ? selectedSprint.name : 'Backlog'}</h1>
           <p>{selectedSprint?.goal || 'Danh sách công việc và tiến độ. Đổi trạng thái ngay ở cột phải.'}</p>
         </div>
-        {groups.length > 0 && (
-          <button className="btn-sm" onClick={() => setNoteOpen(true)} title="Xuất danh sách theo bộ phận để dán vào note họp">
-            📋 Note họp
-          </button>
-        )}
+        <div className="row" style={{ gap: '0.6rem' }}>
+          <div className="seg-toggle" role="group" aria-label="Cách gom task">
+            <button
+              className={`seg${groupMode === 'dept' ? ' on' : ''}`}
+              onClick={() => setGroupMode('dept')}
+            >
+              Bộ phận
+            </button>
+            <button
+              className={`seg${groupMode === 'feature' ? ' on' : ''}`}
+              onClick={() => setGroupMode('feature')}
+            >
+              Feature
+            </button>
+          </div>
+          {groups.length > 0 && (
+            <button className="btn-sm" onClick={() => setNoteOpen(true)} title="Xuất danh sách theo bộ phận để dán vào note họp">
+              📋 Note họp
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -110,6 +138,20 @@ export default function SprintBoard() {
               onQuery={setQuery}
             />
           )}
+          {groupMode === 'feature' ? (
+            <SprintFeatureList
+              groups={featureGroups}
+              sprintId={selectedSprintId}
+              projectId={selectedProjectId}
+              filtering={filtering}
+              jobRoleOf={jobRoleOf}
+              canChangeStatus={canChangeStatus}
+              onOpen={setEditing}
+              onQuickStatus={quickStatus}
+              onMoveSprint={selectedSprintId ? setMoving : undefined}
+            />
+          ) : (
+          <>
           {isAdmin && <CreateTaskCard variant="row" onClick={() => setCreating(true)} />}
 
           {groups.map((g) => (
@@ -142,6 +184,8 @@ export default function SprintBoard() {
             <div className="glass empty">
               {filtering ? 'Không có task nào khớp bộ lọc.' : 'Sprint này chưa có task nào.'}
             </div>
+          )}
+          </>
           )}
         </>
       )}
