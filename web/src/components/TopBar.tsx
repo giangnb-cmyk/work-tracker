@@ -1,4 +1,7 @@
+import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
+import { useRoute } from '../lib/router';
+import { BACKLOG_COUNT_KEY, useMyOpenTaskCounts } from '../hooks/useMyOpenTaskCounts';
 import NotificationBell from './NotificationBell';
 import { sprintPhase, type SprintPhase } from '../lib/sprintRange';
 
@@ -21,7 +24,18 @@ const PHASE_STATUS_CLASS: Record<SprintPhase, string> = {
 /** Sticky top bar: sprint context selector + notifications. Task creation now
  *  lives on the "+" card at the top of each task list. */
 export default function TopBar() {
+  const { user } = useAuth();
   const { sprints, selectedSprintId, selectedSprint, selectSprint } = useSprintContext();
+  // Badge số chỉ có nghĩa ở "Task của tôi" — dropdown này dùng chung mọi view, ở tab khác
+  // con số task cá nhân sẽ lạc chỗ. `enabled` cũng tắt luôn subscription ở view khác.
+  const onMyTasks = useRoute().view === 'mytasks';
+  const openCounts = useMyOpenTaskCounts(user?.uid ?? '', onMyTasks);
+  // <option> gốc chỉ nhận text thường (không gắn được badge màu) → chèn " (n)".
+  const suffix = (key: string) => {
+    if (!onMyTasks) return '';
+    const n = openCounts.get(key) ?? 0;
+    return n > 0 ? ` (${n})` : '';
+  };
 
   return (
     <header className="topbar">
@@ -32,10 +46,10 @@ export default function TopBar() {
           value={selectedSprintId ?? 'backlog'}
           onChange={(e) => selectSprint(e.target.value === 'backlog' ? null : e.target.value)}
         >
-          <option value="backlog">📥 Backlog (chưa vào sprint)</option>
+          <option value="backlog">📥 Backlog (chưa vào sprint){suffix(BACKLOG_COUNT_KEY)}</option>
           {sprints.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name}
+              {s.name}{suffix(s.id)}
             </option>
           ))}
         </select>

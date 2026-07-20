@@ -467,8 +467,27 @@ Khoá truy cập cho **app ngoài** gọi API đọc dữ liệu. Lưu **SHA-256
 bao giờ lưu key thô. RLS bật nhưng **không có policy nào** → anon/authenticated bị chặn
 toàn bộ, chỉ service-role (Edge Function, bot) đọc/ghi. Thu hồi = `enabled=false`.
 
-**Edge Function `member-tasks`** (`supabase/functions/member-tasks/index.ts`, deploy với
-`verify_jwt=false` — cổng là API key, không phải JWT):
+**Hai đường vào, cùng một gate key, cùng format trả về:**
+
+1. **RPC PostgREST trực tiếp — KHUYÊN DÙNG** (migration `0045`, nhanh nhất: ~0.3s,
+   không bao giờ cold start). `public.member_tasks` cố ý cho `anon` execute — gate
+   nằm ở `p_key`; advisor than SECURITY DEFINER public là chủ đích, đừng "sửa":
+
+```
+POST https://<project-ref>.supabase.co/rest/v1/rpc/member_tasks
+Headers: apikey: <anon/publishable key>, Content-Type: application/json
+Body:    { "p_key": "<key thô>",
+           "p_email" | "p_user_id" | "p_discord_id": ...,   (đúng MỘT định danh)
+           "p_status": "active" (mặc định) | "all" | "todo,review",
+           "p_project_id": "<uuid>" (tuỳ chọn) }
+```
+
+   Luôn trả HTTP 200; lỗi nằm trong body: `{"error": "unauthorized" |
+   "member_not_found" | "bad_status" | "need_one_identifier"}`.
+
+2. **Edge Function `member-tasks`** (`supabase/functions/member-tasks/index.ts`,
+   `verify_jwt=false`) — chậm hơn (cold start ~2s) nhưng RESTful hơn: GET, mã lỗi
+   HTTP thật (401/404/400), có CORS cho browser:
 
 ```
 GET https://<project-ref>.supabase.co/functions/v1/member-tasks

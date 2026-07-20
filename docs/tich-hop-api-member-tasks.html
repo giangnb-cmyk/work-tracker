@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tích hợp API member-tasks — Bot Work Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --glass: rgba(30, 41, 59, 0.7);
+        --primary: #6366f1;
+        --sky: #38bdf8;
+        --gold: #fbbf24;
+        --green: #22c55e;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.1);
+        --radius: 16px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+        font-size: 1rem;
+      }
+      .bg-premium {
+        position: fixed; inset: 0; z-index: -1;
+        background:
+          radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+          radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.06) 0%, transparent 40%),
+          var(--bg);
+      }
+      .layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1200px; margin: 0 auto; gap: 2rem; padding: 2rem; }
+      .toc { position: sticky; top: 2rem; align-self: start; font-size: 0.9rem; }
+      .toc h2 { font-family: 'Outfit'; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.75rem; }
+      .toc a { display: block; color: var(--muted); text-decoration: none; padding: 0.35rem 0.6rem; border-radius: 8px; border-left: 2px solid transparent; }
+      .toc a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+      article { min-width: 0; }
+      .doc-header { margin-bottom: 2.5rem; }
+      .doc-header .eyebrow { color: var(--sky); font-weight: 600; font-size: 0.85rem; letter-spacing: 0.04em; }
+      h1 { font-family: 'Outfit'; font-weight: 800; font-size: 2.4rem; line-height: 1.15; margin: 0.4rem 0; }
+      .doc-header .meta { color: var(--muted); font-size: 0.9rem; }
+      h2 { font-family: 'Outfit'; font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1rem; padding-top: 0.5rem; scroll-margin-top: 1.5rem; }
+      h3 { font-family: 'Outfit'; font-weight: 600; font-size: 1.15rem; margin: 1.75rem 0 0.75rem; }
+      p, ul, ol { margin-bottom: 1rem; }
+      ul, ol { padding-left: 1.4rem; }
+      li { margin-bottom: 0.35rem; }
+      a { color: var(--sky); }
+      strong { color: #fff; }
+      code {
+        font-family: 'JetBrains Mono', monospace; font-size: 0.85em;
+        background: rgba(255, 255, 255, 0.08); padding: 0.15em 0.4em; border-radius: 5px;
+      }
+      pre {
+        background: rgba(2, 6, 23, 0.6); border: 1px solid var(--border);
+        border-radius: 12px; padding: 1rem 1.25rem; overflow-x: auto; margin-bottom: 1.25rem;
+      }
+      pre code { background: none; padding: 0; font-size: 0.85rem; line-height: 1.6; }
+      .card {
+        background: var(--glass); backdrop-filter: blur(10px);
+        border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem;
+      }
+      .callout { border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; background: rgba(0, 0, 0, 0.2); }
+      .callout.info { border-left: 3px solid var(--sky); }
+      .callout.success { border-left: 3px solid var(--green); }
+      .callout.warning { border-left: 3px solid var(--amber); }
+      .callout.danger { border-left: 3px solid var(--red); }
+      .callout .label { font-weight: 700; font-family: 'Outfit'; display: block; margin-bottom: 0.25rem; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.92rem; }
+      th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0.75rem; border-bottom: 1px solid var(--border); }
+      td { padding: 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+      tr:hover td { background: rgba(255, 255, 255, 0.02); }
+      .table-wrap { overflow-x: auto; }
+      .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+      .badge.new { background: rgba(34, 197, 94, 0.14); color: var(--green); }
+      .badge.rec { background: rgba(99, 102, 241, 0.18); color: #a5b4fc; }
+      .badge.alt { background: rgba(148, 163, 184, 0.15); color: var(--muted); }
+      footer { color: var(--muted); font-size: 0.82rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+      @media (max-width: 860px) {
+        .layout { grid-template-columns: 1fr; padding: 1.25rem; }
+        .toc { position: static; }
+        h1 { font-size: 1.9rem; }
+      }
+      @media print {
+        .bg-premium, .toc { display: none; }
+        body { background: #fff; color: #000; }
+        .layout { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-premium"></div>
+    <div class="layout">
+      <nav class="toc">
+        <h2>Mục lục</h2>
+        <a href="#gioi-thieu">Giới thiệu</a>
+        <a href="#xac-thuc">Địa chỉ &amp; xác thực</a>
+        <a href="#rpc-postgrest">Cách 1 — RPC (khuyên dùng)</a>
+        <a href="#edge-function">Cách 2 — Edge Function</a>
+        <a href="#tham-so">Bảng tham số</a>
+        <a href="#du-lieu-tra-ve">Dữ liệu trả về</a>
+        <a href="#ma-loi">Mã lỗi</a>
+        <a href="#luu-y">Lưu ý tích hợp</a>
+      </nav>
+
+      <article>
+        <header class="doc-header">
+          <span class="eyebrow">TÀI LIỆU TÍCH HỢP</span>
+          <h1>API member-tasks — tra cứu task của một nhân sự</h1>
+          <p class="meta">Cập nhật: 20/07/2026 · Người viết: Giang (Easygoing) · Phiên bản: 1.0</p>
+        </header>
+
+        <section id="gioi-thieu">
+          <h2>Giới thiệu</h2>
+          <p>
+            API này trả về <strong>danh sách task mà một nhân sự cụ thể đang được giao</strong>
+            trong hệ thống Bot Work Tracker của Easygoing: tiêu đề, trạng thái, độ ưu tiên,
+            dự án / tính năng / sprint mà task thuộc về, hạn chót và tiến độ checklist.
+            Tài liệu dành cho đội kỹ thuật bên thứ ba cần đọc dữ liệu này từ hệ thống khác.
+          </p>
+          <ul>
+            <li>API <strong>chỉ đọc</strong> (read-only) — không có thao tác ghi.</li>
+            <li>Tra cứu <strong>một người mỗi lượt gọi</strong>, định danh bằng email, id nội bộ hoặc Discord id.</li>
+            <li>Có <strong>hai đường gọi</strong> tương đương nhau về dữ liệu — chọn một trong hai (xem bảng dưới).</li>
+          </ul>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Đường gọi</th><th>Giao thức</th><th>Độ trễ đo thực tế</th><th>Nên dùng khi</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge rec">KHUYÊN DÙNG</span> RPC PostgREST</td>
+                  <td>POST + JSON body</td>
+                  <td>~0,3 giây, ổn định (không cold start)</td>
+                  <td>Mọi tích hợp server-to-server, cần phản hồi nhanh</td>
+                </tr>
+                <tr>
+                  <td><span class="badge alt">THAY THẾ</span> Edge Function</td>
+                  <td>GET + query string</td>
+                  <td>~0,5–0,8 giây; phát đầu sau khi ngủ ~2 giây</td>
+                  <td>Cần REST thuần (mã lỗi HTTP 401/404) hoặc gọi từ trình duyệt (có CORS)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="xac-thuc">
+          <h2>Địa chỉ &amp; xác thực</h2>
+          <p>Địa chỉ gốc (base URL):</p>
+          <pre><code>https://vlsskdwcfcmyubyrtwhn.supabase.co</code></pre>
+          <p>Cần <strong>hai loại khoá</strong>, vai trò khác nhau:</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Khoá</th><th>Tính chất</th><th>Dùng ở đâu</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>API key</strong> (dạng <code>wt_…</code>)</td>
+                  <td><strong>BÍ MẬT</strong> — được gửi riêng qua kênh an toàn, không nằm trong tài liệu này</td>
+                  <td>RPC: trường <code>p_key</code> trong body · Edge Function: header <code>x-api-key</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Publishable key</strong><br /><code>sb_publishable_Bf6XLnvqxVvPP4lVao-Q5A_PDJTJRdG</code></td>
+                  <td>Công khai (chỉ để định danh project Supabase, không phải bí mật)</td>
+                  <td>Chỉ đường RPC: header <code>apikey</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout danger">
+            <span class="label">Giữ API key phía server</span>
+            API key <code>wt_…</code> là thứ duy nhất mở được dữ liệu. Không nhúng vào ứng dụng
+            client (web/mobile) phân phối ra ngoài, không commit vào mã nguồn công khai.
+            Nếu nghi ngờ lộ key, báo cho Easygoing để thu hồi và cấp key mới (thu hồi có
+            hiệu lực ngay, không cần bên tích hợp đổi code gì ngoài thay giá trị key).
+          </div>
+        </section>
+
+        <section id="rpc-postgrest">
+          <h2>Cách 1 — RPC PostgREST <span class="badge rec">KHUYÊN DÙNG</span></h2>
+          <pre><code>POST https://vlsskdwcfcmyubyrtwhn.supabase.co/rest/v1/rpc/member_tasks</code></pre>
+          <p>Header bắt buộc:</p>
+          <pre><code>apikey: sb_publishable_Bf6XLnvqxVvPP4lVao-Q5A_PDJTJRdG
+Content-Type: application/json</code></pre>
+          <p>Body là JSON — tối thiểu gồm <code>p_key</code> và đúng <strong>một</strong> định danh nhân sự:</p>
+          <pre><code>{
+  "p_key": "&lt;API_KEY&gt;",
+  "p_email": "nhansu@easygoing.vn"
+}</code></pre>
+          <div class="callout warning">
+            <span class="label">Khác REST thường</span>
+            Đường RPC <strong>luôn trả HTTP 200</strong>, kể cả khi sai key hay không tìm thấy
+            người. Ứng dụng phải kiểm tra trường <code>error</code> trong body trước khi đọc
+            dữ liệu (xem mục <a href="#ma-loi">Mã lỗi</a>).
+          </div>
+
+          <h3>Ví dụ curl</h3>
+          <pre><code>curl -X POST "https://vlsskdwcfcmyubyrtwhn.supabase.co/rest/v1/rpc/member_tasks" \
+  -H "apikey: sb_publishable_Bf6XLnvqxVvPP4lVao-Q5A_PDJTJRdG" \
+  -H "Content-Type: application/json" \
+  -d '{"p_key": "&lt;API_KEY&gt;", "p_email": "nhansu@easygoing.vn", "p_status": "all"}'</code></pre>
+
+          <h3>Ví dụ JavaScript (fetch)</h3>
+          <pre><code>const res = await fetch(
+  'https://vlsskdwcfcmyubyrtwhn.supabase.co/rest/v1/rpc/member_tasks',
+  {
+    method: 'POST',
+    headers: {
+      apikey: 'sb_publishable_Bf6XLnvqxVvPP4lVao-Q5A_PDJTJRdG',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ p_key: API_KEY, p_email: 'nhansu@easygoing.vn' }),
+  },
+);
+const data = await res.json();
+if (data.error) throw new Error(data.error);  // unauthorized / member_not_found / …
+console.log(data.member.displayName, data.count, data.tasks);</code></pre>
+
+          <h3>Cấu hình Postman</h3>
+          <ol>
+            <li>Method <strong>POST</strong>, dán URL ở trên.</li>
+            <li>Tab <strong>Headers</strong>: thêm <code>apikey</code> (publishable key) và <code>Content-Type: application/json</code>.</li>
+            <li>Tab <strong>Body</strong> → chọn <strong>raw / JSON</strong> → dán body ví dụ, thay <code>&lt;API_KEY&gt;</code> bằng key được cấp.</li>
+            <li>Bấm Send — phản hồi ~0,3 giây.</li>
+          </ol>
+        </section>
+
+        <section id="edge-function">
+          <h2>Cách 2 — Edge Function <span class="badge alt">THAY THẾ</span></h2>
+          <pre><code>GET https://vlsskdwcfcmyubyrtwhn.supabase.co/functions/v1/member-tasks</code></pre>
+          <p>Header bắt buộc (không cần <code>apikey</code> ở đường này):</p>
+          <pre><code>x-api-key: &lt;API_KEY&gt;</code></pre>
+          <p>Tham số truyền qua <strong>query string</strong>, ví dụ:</p>
+          <pre><code>curl "https://vlsskdwcfcmyubyrtwhn.supabase.co/functions/v1/member-tasks?email=nhansu@easygoing.vn&amp;status=all" \
+  -H "x-api-key: &lt;API_KEY&gt;"</code></pre>
+          <p>
+            Đường này trả <strong>mã lỗi HTTP thật</strong> (401 sai key, 404 không tìm thấy
+            người, 400 tham số sai, 405 sai method) và bật CORS (<code>Access-Control-Allow-Origin: *</code>)
+            nên gọi được từ trình duyệt. Đổi lại, độ trễ cao hơn đường RPC và phát gọi đầu
+            tiên sau một lúc không ai gọi sẽ mất ~2 giây (cold start).
+          </p>
+          <div class="callout info">
+            <span class="label">Mẹo Postman</span>
+            Dán URL cẩn thận — thừa một dấu cách giữa đường dẫn và <code>?</code> là path đổi
+            và server báo <code>NOT_FOUND</code>. Nếu gặp lỗi này, xoá ô URL và dán lại thành một dòng liền.
+          </div>
+        </section>
+
+        <section id="tham-so">
+          <h2>Bảng tham số</h2>
+          <p>
+            Hai đường gọi dùng chung một bộ tham số — đường RPC thêm tiền tố <code>p_</code>
+            và nhận qua JSON body; Edge Function nhận qua query string.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>RPC (body)</th><th>Edge Function (query)</th><th>Bắt buộc</th><th>Ý nghĩa</th></tr></thead>
+              <tbody>
+                <tr><td><code>p_key</code></td><td>header <code>x-api-key</code></td><td>Có</td><td>API key được cấp.</td></tr>
+                <tr>
+                  <td><code>p_email</code></td><td><code>email</code></td>
+                  <td rowspan="3">Đúng <strong>một</strong> trong ba</td>
+                  <td>Email nhân sự (không phân biệt hoa thường).</td>
+                </tr>
+                <tr><td><code>p_user_id</code></td><td><code>user_id</code></td><td>Id nội bộ của nhân sự (uuid).</td></tr>
+                <tr><td><code>p_discord_id</code></td><td><code>discord_id</code></td><td>Discord user id của nhân sự.</td></tr>
+                <tr>
+                  <td><code>p_status</code></td><td><code>status</code></td><td>Không</td>
+                  <td>
+                    <code>active</code> (mặc định — gồm <code>todo</code>, <code>in_progress</code>, <code>review</code>,
+                    tức "đang làm") · <code>all</code> (kèm cả <code>done</code>) · hoặc danh sách tự chọn
+                    phân tách bằng dấu phẩy, ví dụ <code>todo,review</code>.
+                  </td>
+                </tr>
+                <tr><td><code>p_project_id</code></td><td><code>project_id</code></td><td>Không</td><td>Chỉ lấy task thuộc một dự án (uuid do Easygoing cung cấp).</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="du-lieu-tra-ve">
+          <h2>Dữ liệu trả về</h2>
+          <p>Cả hai đường trả cùng một cấu trúc JSON (camelCase). Ví dụ rút gọn:</p>
+          <pre><code>{
+  "member": {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "email": "nhansu@easygoing.vn",
+    "displayName": "Nguyễn Văn A",
+    "photoUrl": "",
+    "jobRole": "animator",
+    "discordId": "123456789012345678"
+  },
+  "statusFilter": ["todo", "in_progress", "review"],
+  "count": 2,
+  "tasks": [
+    {
+      "id": "8895d08a-f2b2-4e6e-8700-c92eceb2c041",
+      "shortCode": "i1KI7x",
+      "title": "Anim sự kiện mở khoá nhân vật",
+      "description": "",
+      "status": "in_progress",
+      "priority": "high",
+      "points": 3,
+      "tags": [],
+      "project": { "id": "620a1a7d-…", "name": "M1 - Tasty Merge" },
+      "feature": null,
+      "sprint": { "id": "fbd35a59-…", "name": "Sprint 2", "status": "active" },
+      "dueStart": "2026-07-20T06:35:48.07495+00:00",
+      "dueDate": "2026-07-26T00:00:00+00:00",
+      "overdue": false,
+      "subtasks": { "done": 1, "total": 4 },
+      "createdAt": "2026-07-20T06:35:48.849282+00:00",
+      "updatedAt": "2026-07-20T06:35:50.293152+00:00"
+    }
+  ]
+}</code></pre>
+
+          <h3>Trường của <code>member</code></h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Trường</th><th>Kiểu</th><th>Ý nghĩa</th></tr></thead>
+              <tbody>
+                <tr><td><code>id</code></td><td>uuid</td><td>Id nội bộ — dùng lại được cho <code>p_user_id</code>.</td></tr>
+                <tr><td><code>email</code> / <code>displayName</code> / <code>photoUrl</code></td><td>string</td><td>Thông tin hiển thị.</td></tr>
+                <tr><td><code>jobRole</code></td><td>string | null</td><td>Vị trí chuyên môn: <code>developer</code>, <code>2d_artist</code>, <code>game_designer</code>, <code>sound_designer</code>, <code>ui_artist</code>, <code>animator</code>, <code>vfx_artist</code>, <code>qa</code>.</td></tr>
+                <tr><td><code>discordId</code></td><td>string | null</td><td>Discord user id (nếu đã liên kết).</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Trường của mỗi phần tử <code>tasks[]</code></h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Trường</th><th>Kiểu</th><th>Ý nghĩa</th></tr></thead>
+              <tbody>
+                <tr><td><code>id</code></td><td>uuid</td><td>Id task.</td></tr>
+                <tr><td><code>shortCode</code></td><td>string | null</td><td>Mã rút gọn ~6 ký tự — ghép link mở task trên web: <code>&lt;địa chỉ web app&gt;/t/&lt;shortCode&gt;</code> (địa chỉ web được cung cấp kèm API key).</td></tr>
+                <tr><td><code>title</code> / <code>description</code></td><td>string</td><td>Tiêu đề và mô tả (mô tả có thể rỗng).</td></tr>
+                <tr><td><code>status</code></td><td>enum</td><td><code>todo</code> → <code>in_progress</code> → <code>review</code> → <code>done</code>.</td></tr>
+                <tr><td><code>priority</code></td><td>enum</td><td><code>low</code> · <code>medium</code> · <code>high</code> · <code>urgent</code>.</td></tr>
+                <tr><td><code>points</code></td><td>number</td><td>Story points (0 = chưa ước lượng).</td></tr>
+                <tr><td><code>tags</code></td><td>string[]</td><td>Nhãn tự do.</td></tr>
+                <tr><td><code>project</code> / <code>feature</code> / <code>sprint</code></td><td>object | null</td><td><code>{ id, name }</code> (sprint thêm <code>status</code>: <code>planning</code> · <code>active</code> · <code>completed</code>). <code>null</code> = task chưa gắn.</td></tr>
+                <tr><td><code>dueStart</code> / <code>dueDate</code></td><td>ISO 8601 | null</td><td>Khoảng thời gian làm việc; <code>dueDate</code> là hạn chót.</td></tr>
+                <tr><td><code>overdue</code></td><td>boolean</td><td><code>true</code> khi task chưa xong và đã quá <code>dueDate</code> (tính tại thời điểm gọi).</td></tr>
+                <tr><td><code>subtasks</code></td><td>object</td><td><code>{ done, total }</code> — tiến độ checklist; <code>total</code> = 0 nghĩa là task không có checklist.</td></tr>
+                <tr><td><code>createdAt</code> / <code>updatedAt</code></td><td>ISO 8601</td><td>Thời điểm tạo / sửa gần nhất.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout info">
+            <span class="label">Thứ tự sắp xếp</span>
+            <code>tasks</code> được sắp sẵn: việc đang chạy trước
+            (<code>in_progress</code> → <code>review</code> → <code>todo</code> → <code>done</code>),
+            trong cùng trạng thái thì hạn chót gần nhất lên đầu (task không có hạn xếp cuối).
+            Mọi mốc thời gian là ISO 8601 múi giờ UTC (<code>+00:00</code>) — bên tích hợp tự
+            quy đổi sang giờ Việt Nam (UTC+7) khi hiển thị.
+          </div>
+        </section>
+
+        <section id="ma-loi">
+          <h2>Mã lỗi</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Mã (<code>error</code>)</th><th>HTTP — RPC</th><th>HTTP — Edge Function</th><th>Nguyên nhân</th></tr></thead>
+              <tbody>
+                <tr><td><code>unauthorized</code></td><td>200</td><td>401</td><td>Thiếu hoặc sai API key (key cũng có thể đã bị thu hồi).</td></tr>
+                <tr><td><code>member_not_found</code></td><td>200</td><td>404</td><td>Không có nhân sự khớp định danh đã gửi.</td></tr>
+                <tr><td><code>bad_status</code></td><td>200</td><td>400</td><td>Giá trị <code>status</code> không hợp lệ.</td></tr>
+                <tr><td><code>need_one_identifier</code></td><td>200</td><td>400</td><td>Gửi 0 hoặc ≥2 định danh — phải đúng một trong email / user_id / discord_id.</td></tr>
+                <tr><td><code>bad_user_id</code> / <code>bad_project_id</code></td><td>400 (lỗi kiểu uuid của Postgres)</td><td>400</td><td>Giá trị không phải uuid hợp lệ.</td></tr>
+                <tr><td><code>method_not_allowed</code></td><td>—</td><td>405</td><td>Edge Function chỉ nhận GET (và OPTIONS cho CORS).</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Với đường RPC, quy tắc an toàn là: <strong>nếu body có trường <code>error</code> thì
+            coi là thất bại</strong>, ngược lại đọc <code>member</code> / <code>tasks</code>.
+          </p>
+        </section>
+
+        <section id="luu-y">
+          <h2>Lưu ý tích hợp</h2>
+          <ul>
+            <li>
+              <strong>Hiệu năng:</strong> đường RPC phản hồi ~0,3 giây từ Việt Nam. Nếu gọi
+              nhiều lần liên tiếp, giữ kết nối HTTP keep-alive (mặc định của đa số HTTP client)
+              để tiết kiệm thêm ~0,15 giây bắt tay TLS mỗi request.
+            </li>
+            <li>
+              <strong>Tần suất:</strong> API phục vụ tra cứu, không có rate limit riêng —
+              nhưng vui lòng không polling dày hơn <strong>1 lần/phút cho mỗi nhân sự</strong>;
+              dữ liệu task không đổi nhanh hơn thế.
+            </li>
+            <li>
+              <strong>Cache:</strong> nếu hiển thị dashboard, cache kết quả 30–60 giây là hợp lý.
+            </li>
+            <li>
+              <strong>Danh sách nhân sự:</strong> API không có endpoint liệt kê toàn bộ nhân sự —
+              danh sách email cần theo dõi do hai bên thống nhất trước.
+            </li>
+            <li>
+              <strong>Thay đổi format:</strong> các trường hiện có sẽ không bị đổi tên/xoá mà
+              không báo trước; trường <em>mới</em> có thể được thêm — parser nên bỏ qua trường lạ
+              thay vì báo lỗi.
+            </li>
+            <li>
+              <strong>Đầu mối hỗ trợ:</strong> mọi vấn đề về key (cấp lại, thu hồi), thêm nhân sự,
+              hoặc lỗi API — liên hệ Easygoing (Giang).
+            </li>
+          </ul>
+          <div class="callout success">
+            <span class="label">Checklist tích hợp nhanh</span>
+            ① Nhận API key qua kênh riêng → ② Gọi thử RPC với email được cấp → ③ Kiểm tra
+            trường <code>error</code> trong body → ④ Map <code>tasks[]</code> vào hệ thống của bạn
+            → ⑤ Đặt cache/polling hợp lý. Xong.
+          </div>
+        </section>
+
+        <footer>
+          Tài liệu tích hợp API member-tasks · Bot Work Tracker — Easygoing · 20/07/2026.
+        </footer>
+      </article>
+    </div>
+  </body>
+</html>

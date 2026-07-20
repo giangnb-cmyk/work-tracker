@@ -46,12 +46,20 @@ export default function MyTasks() {
     return (id: string | null) => (id ? map.get(id) ?? '—' : 'Backlog');
   }, [sprints]);
 
+  // Chỉ hiện task của SPRINT ĐANG CHỌN (Backlog = sprintId null). Task ở sprint khác
+  // không mất — số của chúng hiện cạnh tên sprint trong dropdown (TopBar) để user biết
+  // sang đó xem tiếp.
+  const scoped = useMemo(
+    () => tasks.filter((t) => (t.sprintId ?? null) === (selectedSprintId ?? null)),
+    [tasks, selectedSprintId],
+  );
+
   // Open first, then done.
   const ordered = useMemo(
-    () => [...tasks].sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done')),
-    [tasks],
+    () => [...scoped].sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done')),
+    [scoped],
   );
-  const open = tasks.filter((t) => t.status !== 'done').length;
+  const open = scoped.filter((t) => t.status !== 'done').length;
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const openBugs = bugs.filter((b) => b.status !== 'done').length;
@@ -78,7 +86,7 @@ export default function MyTasks() {
       <div className="view-header row between">
         <div>
           <h1>Task của tôi</h1>
-          <p>{open} task đang mở · {tasks.length - open} đã xong.</p>
+          <p>{open} task đang mở · {scoped.length - open} đã xong · {sprintName(selectedSprintId)}</p>
         </div>
         <div className="seg-toggle" role="group" aria-label="Kiểu hiển thị">
           <button className={`seg${mode === 'list' ? ' on' : ''}`} onClick={() => selectMode('list')}>
@@ -121,7 +129,9 @@ export default function MyTasks() {
               />
             ))}
           </div>
-          {ordered.length === 0 && <div className="glass empty">Bạn chưa có task nào.</div>}
+          {ordered.length === 0 && (
+            <div className="glass empty">Không có task nào trong {sprintName(selectedSprintId)}.</div>
+          )}
         </>
       )}
 
