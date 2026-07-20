@@ -21,7 +21,7 @@ from constants import ADMIN_ROLES
 from errors import PermissionDenied
 
 # Hanh dong member duoc phep (de o day cho ro luat, tranh rai rac trong tung skill).
-MEMBER_ACTIONS = ("tạo task", "cập nhật task", "tra cứu tài liệu")
+MEMBER_ACTIONS = ("tạo task", "cập nhật task", "xoá task mình tạo", "tra cứu tài liệu")
 
 
 def current_user(client):

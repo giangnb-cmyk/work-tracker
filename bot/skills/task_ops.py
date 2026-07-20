@@ -361,6 +361,48 @@ def _build_updates(client, args) -> dict:
     return updates
 
 
+# --- Subcommand: delete ------------------------------------------------------
+
+def cmd_delete(args):
+    """Xoa task. Duoc phep neu: admin/owner HOAC chinh nguoi TAO task (reporter).
+
+    Rong hon cac lenh admin-only khac (feature/sprint/project) — co chu y cho nguoi tao tu
+    don task minh lo tao. Bot dung service_role (bo qua RLS) nen day la lop chan duy nhat;
+    RLS web (tasks_delete, 0034) cung chi cho admin/reporter xoa.
+    """
+    client = repo.db()
+    task = repo.get_task(client, args.id)
+    if not task:
+        die(f"không tìm thấy task id '{args.id}'")
+
+    user = permissions.current_user(client)
+    is_reporter = bool(user and user.get("_id") == task.get("reporterId"))
+    if not (permissions.is_admin(client) or is_reporter):
+        if not user:
+            raise PermissionDenied(
+                "không xác định được bạn là ai nên không thể xoá task. Nhờ admin điền "
+                "Discord ID cho tài khoản của bạn ở web > Thành viên."
+            )
+        raise PermissionDenied(
+            f"chỉ admin hoặc người TẠO task mới xoá được — {user.get('displayName') or 'bạn'} "
+            "không phải người tạo task này."
+        )
+
+    title = task.get("title", "")
+    repo.delete_task(client, task["_id"])
+    print(f'Đã xoá task [{repo.short_id(task["_id"])}] "{title}".')
+
+    # Don luon trang Notion da lien ket (best-effort, khong lam hong lenh xoa).
+    page_id = task.get("notionPageId")
+    if page_id and notion_gateway.is_configured():
+        result = notion_gateway.archive_page(page_id)
+        print(
+            "Notion: đã đưa trang vào Trash"
+            if result.get("synced")
+            else f"Notion: KHÔNG dọn được trang — {result.get('reason', 'gọi gateway thất bại')}"
+        )
+
+
 # --- Subcommand: show --------------------------------------------------------
 
 def cmd_show(args):
@@ -526,6 +568,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("show", help="Xem chi tiet 1 task (mo ta, tai lieu)")
     s.add_argument("--id", required=True, help="Task id (day du hoac 8 ky tu dau)")
     s.set_defaults(func=cmd_show)
+
+    d = sub.add_parser("delete", help="Xoa task (admin HOAC nguoi tao task)")
+    d.add_argument("--id", required=True, help="id task can xoa")
+    d.set_defaults(func=cmd_delete)
 
     l = sub.add_parser("list", help="Liet ke task")
     l.add_argument("--assignee", help="Ten nguoi | 'me'")

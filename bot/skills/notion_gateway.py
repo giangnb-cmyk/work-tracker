@@ -94,6 +94,17 @@ def update_page(notion_page_id: str, task: dict, assignee_notion_user_id=None) -
     return _post(body)
 
 
+def archive_page(notion_page_id: str) -> dict:
+    """Dua page Notion vao Trash (archived) khi xoa task. Tra ve {synced, ...}.
+
+    Giong duong web (deleteTask -> archiveNotionPage): Notion khong xoa vinh vien duoc,
+    archived=true giu 30 ngay de con khoi phuc neu lo tay.
+    """
+    if not notion_page_id:
+        return {"synced": False}
+    return _post({"action": "archive", "notionPageId": notion_page_id})
+
+
 def _post(body: dict) -> dict:
     """Gui POST toi gateway. Nuot moi loi -> {'synced': False, 'reason': ...} + log.
 

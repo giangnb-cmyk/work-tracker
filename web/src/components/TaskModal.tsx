@@ -58,8 +58,10 @@ export default function TaskModal({
   const canEditOwn = isAdmin || isOwner;
   const canChangeStatus = isAdmin || task?.assigneeId === user?.uid || task?.reporterId === user?.uid;
   const canSave = canEditFields || canEditOwn || canChangeStatus;
-  // Xoá: admin hoặc member được cấp quyền lẻ 'task.delete' (RLS tasks_delete, 0034).
-  const canDelete = can('task.delete');
+  // Xoá được khi: admin, HOẶC được cấp quyền lẻ 'task.delete' (xoá task bất kỳ), HOẶC là
+  // NGƯỜI TẠO task này (reporter — xoá task của chính mình). RLS tasks_delete (0034) đã
+  // cho reporter xoá; đây chỉ mở đúng cái nút.
+  const canDelete = can('task.delete') || (isEdit && task?.reporterId === user?.uid);
 
   const [title, setTitle] = useState(task?.title ?? '');
   // Task cũ tên dài + mô tả trống: mở ra là ô Mô tả hiện luôn nguyên tiêu đề để đọc trọn

@@ -389,6 +389,11 @@ def update_task(client, task_id: str, fields: dict) -> None:
     client.table(TASKS).update(_to_row(fields)).eq("id", task_id).execute()
 
 
+def delete_task(client, task_id: str) -> None:
+    """Xoa task theo id (uuid day du). Quyen da gate o task_ops.cmd_delete."""
+    client.table(TASKS).delete().eq("id", task_id).execute()
+
+
 def set_notion_link(client, task_id: str, page_id, url) -> None:
     """Ghi nguoc notionPageId/Url sau khi sync tao page."""
     client.table(TASKS).update({"notion_page_id": page_id, "notion_url": url}).eq("id", task_id).execute()
