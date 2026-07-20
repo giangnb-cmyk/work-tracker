@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { createMember, MemberConflictError, updateMember, type MemberInput } from '../lib/memberWrites';
+import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
 import {
   JOB_ROLES,
   MEMBER_PERMS,
@@ -58,9 +58,9 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
       onClose();
     } catch (err) {
       console.error('Lưu thành viên thất bại', err);
-      // Trùng email/Discord là lỗi NHẬP LIỆU, admin có thừa quyền — đổ hết vào câu "cần
-      // quyền admin" thì người sửa đi soi nhầm phân quyền trong khi chỉ cần đổi email.
-      setError(err instanceof MemberConflictError ? err.message : 'Lưu thất bại. Cần quyền admin.');
+      // Hiện lý do THẬT (memberWrites đã dịch sang câu đọc được) thay vì luôn "cần quyền
+      // admin" — câu đó từng che một lỗi enum (thiếu 'qa') làm tưởng là lỗi phân quyền.
+      setError(err instanceof Error ? err.message : 'Lưu thất bại.');
       setSaving(false);
     }
   }

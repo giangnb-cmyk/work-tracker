@@ -65,9 +65,12 @@ Created/merged on first Google sign-in.
 > `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`
 > · `vfx_artist` · `qa`.
 >
-> Cột `job_role` là **text tự do, KHÔNG có CHECK** — thêm vị trí mới chỉ cần sửa
-> `JOB_ROLES` trong `web/src/types.ts` (nhãn + icon + danh sách chọn đều suy ra từ đó),
-> không cần migration.
+> Cột `job_role` là một **Postgres ENUM** (`job_role`), KHÔNG phải text tự do. Thêm vị
+> trí mới cần HAI bước, thiếu bước nào cũng hỏng:
+> 1. Thêm vào `JOB_ROLES` trong `web/src/types.ts` (nhãn + icon + ô chọn suy từ đó).
+> 2. Migration `alter type public.job_role add value if not exists '<id>'` — nếu không,
+>    lưu member với vị trí mới sẽ ném `22P02 invalid input value for enum` (xem 0040).
+>
 > It does not affect permissions.
 
 ---
