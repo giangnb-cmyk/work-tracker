@@ -119,7 +119,7 @@ token - bot chi xac thuc bang secret dung chung.
 
 Dat 2 bien trong `.env` cho khop voi deployment web:
 ```
-NOTION_GATEWAY_URL=https://<ten-app>.vercel.app/api/notion
+NOTION_GATEWAY_URL=https://m-plan.easygoing.vn/api/notion
 NOTION_SYNC_SECRET=<secret>
 ```
 - `NOTION_SYNC_SECRET` PHAI **trung** voi bien `NOTION_SYNC_SECRET` da dat tren

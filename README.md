@@ -59,8 +59,10 @@ Build production: `npm run build` → `web/dist/`.
 3. Framework preset: **Vite**. Build command `npm run build`, output `dist` (đã có `vercel.json`).
 4. Thêm **Environment Variables**: tất cả `VITE_FIREBASE_*` (+ tuỳ chọn `VITE_ALLOWED_EMAIL_DOMAIN`),
    và các biến Notion ở mục 4 nếu dùng đồng bộ Notion.
-5. Trong Firebase → Authentication → Settings → **Authorized domains**, thêm domain Vercel
-   (`your-app.vercel.app`) để Google sign-in hoạt động.
+5. Trong Supabase → Authentication → **URL Configuration**, đặt **Site URL** =
+   `https://m-plan.easygoing.vn` và thêm `https://m-plan.easygoing.vn/**` vào **Redirect URLs**
+   để Google sign-in quay lại đúng domain (app gửi `redirectTo = window.location.origin`,
+   origin nào không nằm trong allowlist sẽ bị đá về Site URL).
 
 ### Phân quyền, allowlist đăng nhập & vai trò
 
@@ -124,7 +126,7 @@ chỉ ở phía server, **không** lọt vào bundle trình duyệt.
 | `NOTION_STATUS_MAP` | JSON map enum→tên Notion, mặc định `{"todo":"Todo","in_progress":"In progress","review":"Review","done":"Done"}` |
 
 Chi tiết mapping xem phần "Notion sync" trong [DATA_MODEL.md](DATA_MODEL.md). Ở phía **bot**, đặt
-`NOTION_GATEWAY_URL=https://your-app.vercel.app/api/notion` và `NOTION_SYNC_SECRET` (trùng với Vercel).
+`NOTION_GATEWAY_URL=https://m-plan.easygoing.vn/api/notion` và `NOTION_SYNC_SECRET` (trùng với Vercel).
 Nếu chưa cấu hình Notion, mọi thứ vẫn chạy bình thường — chỉ là task không đồng bộ sang Notion.
 
 ---

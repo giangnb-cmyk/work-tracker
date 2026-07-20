@@ -18,7 +18,7 @@ const DISCORD_LIMIT = 2000;
  * nếu có (đặt được cho preview/đổi domain), mặc định domain production NGẮN. Bỏ dấu '/' cuối
  * để khỏi ghép thành '//tasks'.
  */
-const APP_BASE_URL = (import.meta.env.VITE_APP_URL || 'https://bwtracker.vercel.app').replace(/\/+$/, '');
+const APP_BASE_URL = (import.meta.env.VITE_APP_URL || 'https://m-plan.easygoing.vn').replace(/\/+$/, '');
 
 /** Sentinel cho nút "Copy tất cả" (phân biệt với key của các bộ phận). */
 const ALL_KEY = '__all__';
