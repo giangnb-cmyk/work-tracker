@@ -121,18 +121,25 @@ def build_done_message(client, task: dict) -> str:
 
     title = task.get("title", "(không tên)")
     sprint = _sprint_name(client, task.get("sprintId"))
-    parts = [f'✅ Task đã hoàn thành: "{title}" (sprint {sprint}).']
-    if assignee_did:
-        parts.append(f"<@{assignee_did}> làm tốt lắm!")
+    # Tieu de task lam header '##' cho noi bat; sprint trong ngoac neu co that.
+    header = f"## {title}"
+    if sprint and sprint not in ("backlog", "?"):
+        header += f" (sprint {sprint})"
+    lines = ["✅ Task đã hoàn thành:", header]
 
-    cc_ids = _cc_discord_ids(client, task, cache, exclude=assignee_did)
-    if cc_ids:
-        parts.append("cc " + " ".join(f"<@{d}>" for d in cc_ids))
-    # Link cuoi cau: bam thang vao task khoi phai tu mo web di tim.
+    # Gom TAT CA nguoi can ping vao MOT dong: assignee truoc, roi cc (reporter + watchers),
+    # da bo trung. Thay cho kieu cu "assignee lam tot lam ... cc ...".
+    ping_ids = ([assignee_did] if assignee_did else []) + _cc_discord_ids(
+        client, task, cache, exclude=assignee_did
+    )
+    if ping_ids:
+        lines.append("Mọi người nắm thông tin nhé " + " ".join(f"<@{d}>" for d in ping_ids))
+
+    # Link task o dong rieng: bam thang vao task khoi phai tu mo web di tim.
     url = web_link.task_url(task.get("id") or task.get("_id"))
     if url:
-        parts.append(url)
-    return " ".join(parts)
+        lines.append(url)
+    return "\n".join(lines)
 
 
 def _cc_discord_ids(client, task, cache, exclude) -> list:

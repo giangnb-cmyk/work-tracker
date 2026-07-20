@@ -13,16 +13,19 @@ export interface DonePayload {
   mentionIds?: string[]; // Discord user ids to ping
 }
 
-/** Build the "task done" message; only ping ids that are present. */
+/**
+ * Build the "task done" message; only ping ids that are present.
+ *
+ * Ba dòng: tiêu đề nhắc việc · task làm header '##' (kèm sprint) · dòng ping mọi người.
+ * Cùng format với bot (reminder.build_done_message) để web và bot báo giống nhau.
+ */
 function buildContent(p: DonePayload): { content: string; users: string[] } {
   const users = (p.mentionIds ?? []).filter(Boolean);
   const mentions = users.map((id) => `<@${id}>`).join(' ');
   const sprint = p.sprintName ? ` (sprint ${p.sprintName})` : '';
-  const praise = users.length > 0 ? ` ${mentions} làm tốt lắm! 🎉` : '';
-  return {
-    content: `✅ Task đã hoàn thành: "${p.title}"${sprint}.${praise}`,
-    users,
-  };
+  const lines = ['✅ Task đã hoàn thành:', `## ${p.title}${sprint}`];
+  if (users.length > 0) lines.push(`Mọi người nắm thông tin nhé ${mentions}`);
+  return { content: lines.join('\n'), users };
 }
 
 /** Send a completion message. Returns true on 2xx. Never throws to the caller. */
