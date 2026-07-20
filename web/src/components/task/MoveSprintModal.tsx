@@ -28,10 +28,12 @@ export default function MoveSprintModal({ task, onClose }: MoveSprintModalProps)
 
   async function handleMove() {
     if (!target) return;
+    const targetSprint = sprints.find((s) => s.id === target);
+    if (!targetSprint) return;
     setSaving(true);
     setError(null);
     try {
-      await moveTaskToSprint(task, target);
+      await moveTaskToSprint(task, targetSprint);
       onClose();
     } catch (err) {
       console.error('Chuyển sprint thất bại', err);

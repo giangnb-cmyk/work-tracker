@@ -6,9 +6,9 @@ import { supabase } from '../supabase';
 import { reportError } from './errorBus';
 import { archiveNotionPage, createNotionPage, updateNotionPage } from './notionSync';
 import { taskPatchToRow } from './mappers';
-import { endOfWorkWeek } from './format';
+import { endOfWorkWeek, sundayOfWeek } from './format';
 import { Timestamp } from './time';
-import type { NewTaskInput, Task, TaskStatus } from '../types';
+import type { NewTaskInput, Sprint, Task, TaskStatus } from '../types';
 
 interface CreateOpts {
   reporterId: string;
@@ -125,12 +125,23 @@ export async function moveTask(task: Task, status: TaskStatus, order: number): P
  * trigger `tasks_log_sprint` (migration 0015) tự ghi vào `task_sprints`, nhờ đó đếm được
  * task này đã trễ mấy sprint.
  *
- * Cố ý không đụng `status` (task vẫn dở dang) và không đụng `due_date` (cửa sổ làm việc
- * do người dùng đặt, chuyển sprint không phải lý do để viết lại).
+ * Hạn chót DỜI theo sprint đích: = chủ nhật của tuần sprint mới (cùng luật tạo task, xem
+ * `sundayOfWeek` + TaskModal) — task gánh sang tuần sau thì hạn cũng phải là tuần sau, chứ
+ * không giữ hạn của tuần đã qua. Tính từ ngày BẮT ĐẦU sprint để luôn ra chủ nhật kể cả khi
+ * end_date lỡ đặt lệch; sprint đích không có ngày nào thì giữ nguyên hạn cũ.
+ *
+ * KHÔNG dời hạn task đã `done`: dueDate của task done là NGÀY HOÀN THÀNH THẬT (updateTask/
+ * moveTask ghi vào), báo cáo hiệu suất đọc nó — ghi đè thành chủ nhật tương lai là hỏng số.
+ * Cũng không đụng `status` (task vẫn dở dang).
  */
-export async function moveTaskToSprint(task: Task, sprintId: string): Promise<void> {
-  if (sprintId === task.sprintId) return;
-  const { error } = await supabase.from('tasks').update({ sprint_id: sprintId }).eq('id', task.id);
+export async function moveTaskToSprint(task: Task, sprint: Sprint): Promise<void> {
+  if (sprint.id === task.sprintId) return;
+  const anchor = sprint.startDate?.toDate() ?? sprint.endDate?.toDate() ?? null;
+  const patch: Record<string, unknown> = { sprint_id: sprint.id };
+  if (anchor && task.status !== 'done') {
+    patch.due_date = Timestamp.fromDate(sundayOfWeek(anchor)).toISOString();
+  }
+  const { error } = await supabase.from('tasks').update(patch).eq('id', task.id);
   if (error) throw error;
 }
 

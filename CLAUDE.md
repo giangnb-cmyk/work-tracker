@@ -162,6 +162,8 @@ bot-work-tracker/
 │   └── .env.example        #   DISCORD_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 ├── supabase/
 │   ├── migrations/         # 0001_init … — schema + RLS + realtime (SOURCE OF TRUTH)
+│   ├── functions/          # Edge Functions — member-tasks (API cho app ngoài, gate
+│   │                       #   bằng x-api-key ↔ bảng api_keys; deploy verify_jwt=false)
 │   └── migrate_from_firestore.py
 └── DATA_MODEL.md           # Shared schema (source of truth for web + bot)
 ```

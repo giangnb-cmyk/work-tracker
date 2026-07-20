@@ -459,6 +459,36 @@ sau đó ghi lại `status` (`pending → done | error`) + `result`. Cùng khuô
 
 ---
 
+## `api_keys` (khoá cho app ngoài) & Edge Function `member-tasks`
+
+`{ id, name, key_hash, enabled, created_at, last_used_at }` — migration `0043`.
+
+Khoá truy cập cho **app ngoài** gọi API đọc dữ liệu. Lưu **SHA-256 hex** của key, không
+bao giờ lưu key thô. RLS bật nhưng **không có policy nào** → anon/authenticated bị chặn
+toàn bộ, chỉ service-role (Edge Function, bot) đọc/ghi. Thu hồi = `enabled=false`.
+
+**Edge Function `member-tasks`** (`supabase/functions/member-tasks/index.ts`, deploy với
+`verify_jwt=false` — cổng là API key, không phải JWT):
+
+```
+GET https://<project-ref>.supabase.co/functions/v1/member-tasks
+Header:  x-api-key: <key thô>
+Params:  email= | user_id= | discord_id=   (đúng MỘT định danh)
+         status=active (mặc định: todo,in_progress,review) | all | "todo,review"
+         project_id=<uuid> (tuỳ chọn)
+```
+
+Trả `{ member, statusFilter, count, tasks[] }` — camelCase; mỗi task kèm
+`project/feature/sprint {id,name}`, `subtasks {done,total}`, `overdue`, và `shortCode`
+để app ngoài tự ghép link web `/t/<shortCode>`. Sắp theo trạng thái
+(in_progress → review → todo → done) rồi hạn chót.
+
+> ⚠️ Embed PostgREST phải hint FK (`sprints!tasks_sprint_id_fkey`): tasks→sprints có
+> đường thứ hai qua `task_sprints`, thiếu hint là lỗi nhập nhằng quan hệ.
+> Key thô đưa cho app ngoài; hash sinh bằng `sha256(key)` rồi insert vào `api_keys`.
+
+---
+
 ## Notion sync
 
 Tasks are mirrored to a Notion database. The Notion integration **token is a server-side
