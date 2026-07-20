@@ -1,31 +1,36 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { lazyView } from '../lib/lazyView';
 import { navigate, pathFor, useRoute } from '../lib/router';
 import MemberPreviewBar from './MemberPreviewBar';
 import Sidebar, { ADMIN_ONLY_VIEWS } from './Sidebar';
 import TopBar from './TopBar';
 
 // Lazily code-split each view so the initial shell (and the Chart.js-heavy Dashboard)
-// only download when first opened.
-const SprintBoard = lazy(() => import('./SprintBoard'));
-const MyTasks = lazy(() => import('./MyTasks'));
-const Features = lazy(() => import('./Features'));
-const Backlog = lazy(() => import('./Backlog'));
-const Bugs = lazy(() => import('./Bugs'));
-const Timeline = lazy(() => import('./Timeline'));
+// only download when first opened. Dùng lazyView (không phải lazy thuần) để một
+// deploy mới — vốn xoá chunk hash cũ khỏi CDN — không làm vỡ tab đang mở.
+const SprintBoard = lazyView(() => import('./SprintBoard'));
+const MyTasks = lazyView(() => import('./MyTasks'));
+const Features = lazyView(() => import('./Features'));
+const Backlog = lazyView(() => import('./Backlog'));
+const Bugs = lazyView(() => import('./Bugs'));
+const Timeline = lazyView(() => import('./Timeline'));
 // Dashboard là view MẶC ĐỊNH sau khi vào dự án — kích tải chunk (kéo theo chunk
 // Chart.js) ngay từ lúc boot, song song với các lượt gọi auth, thay vì nối đuôi
 // sau cổng chọn dự án. Các view khác vẫn lazy thuần vì không chắc được mở.
 const dashboardImport = import('./Dashboard');
-const Dashboard = lazy(() => dashboardImport);
-const Performance = lazy(() => import('./Performance'));
-const Visits = lazy(() => import('./Visits'));
-const SprintManager = lazy(() => import('./SprintManager'));
-const Team = lazy(() => import('./Team'));
-const SystemLog = lazy(() => import('./SystemLog'));
-const Settings = lazy(() => import('./Settings'));
+// Promise chạy ngay từ lúc module load, nhưng lazyView chỉ gắn .catch khi render.
+// Nuốt trước một nhánh để lỗi chunk không nổi thành unhandledrejection trong lúc đó.
+dashboardImport.catch(() => {});
+const Dashboard = lazyView(() => dashboardImport);
+const Performance = lazyView(() => import('./Performance'));
+const Visits = lazyView(() => import('./Visits'));
+const SprintManager = lazyView(() => import('./SprintManager'));
+const Team = lazyView(() => import('./Team'));
+const SystemLog = lazyView(() => import('./SystemLog'));
+const Settings = lazyView(() => import('./Settings'));
 // Lazy để TaskModal (nó import tĩnh) không bị kéo vào bundle khởi động.
-const TaskDeepLink = lazy(() => import('./TaskDeepLink'));
+const TaskDeepLink = lazyView(() => import('./TaskDeepLink'));
 
 /** Main authenticated shell: nav + top bar + the active view. */
 export default function Layout() {

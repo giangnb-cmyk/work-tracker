@@ -3,6 +3,7 @@ import {
   ArcElement,
   CategoryScale,
   Chart as ChartJS,
+  Filler,
   Legend,
   LineElement,
   LinearScale,
@@ -28,7 +29,9 @@ import SprintHealthBadge from './SprintHealthBadge';
 import { daysUntil } from '../lib/format';
 import { STATUS_LABEL, TASK_STATUSES } from '../types';
 
-ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+// Filler bắt buộc phải đăng ký vì dataset burndown dùng `fill: true` — thiếu nó
+// Chart.js chỉ cảnh báo rồi vẽ đường trơn, mất phần tô dưới đường.
+ChartJS.register(ArcElement, CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 // Canvas không ăn CSS: nếu không ép, legend/nhãn trục sẽ vẽ bằng Helvetica mặc định của
 // Chart.js, lệch hẳn khỏi font của app.
 applyChartTheme();
