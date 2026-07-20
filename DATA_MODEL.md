@@ -63,7 +63,7 @@ Created/merged on first Google sign-in.
 >
 > **Job role (`jobRole`)** — a separate discipline field the user picks on first sign-in:
 > `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`
-> · `vfx_artist`.
+> · `vfx_artist` · `qa`.
 >
 > Cột `job_role` là **text tự do, KHÔNG có CHECK** — thêm vị trí mới chỉ cần sửa
 > `JOB_ROLES` trong `web/src/types.ts` (nhãn + icon + danh sách chọn đều suy ra từ đó),
