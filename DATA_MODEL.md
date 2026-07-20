@@ -228,7 +228,7 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | `notionPageId` | string \| null    | id of the linked Notion page (null until synced)        |
 | `notionUrl`    | string \| null    | deep link to the Notion page (shown on the task card)   |
 | `attachments`  | Attachment[]      | ref images + embedded links (see below)                 |
-| `subtasks`     | Subtask[]         | checklist; drives the task progress bar                 |
+| `subtasks`     | Subtask[]         | checklist; drives the task progress bar. Đồng bộ sang Notion thành **to_do block** trong thân trang (tạo page → thêm; sửa subtask → xoá to_do cũ rồi thêm lại). App là nguồn sự thật của checklist; chỉ đụng block `to_do`, nội dung khác trong trang giữ nguyên. Chỉ web sửa subtask (bot không) |
 | `watcherIds`   | string[]          | related people (uids) — mentioned on completion         |
 | `watcherNames` | string[]          | denormalized display names of watchers                  |
 

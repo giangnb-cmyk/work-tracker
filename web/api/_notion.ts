@@ -3,6 +3,11 @@
 
 import { Client } from '@notionhq/client';
 
+export interface NotionSubtask {
+  title: string;
+  done: boolean;
+}
+
 export interface NotionTaskInput {
   title: string;
   status: string; // our enum: todo | in_progress | review | done
@@ -13,6 +18,8 @@ export interface NotionTaskInput {
   dueStart?: string | null; // YYYY-MM-DD — work window start
   dueDate?: string | null; // YYYY-MM-DD — work window end / deadline
   description?: string;
+  /** Checklist -> to-do block trong thân trang. undefined = không đụng tới. */
+  subtasks?: NotionSubtask[];
 }
 
 const env = process.env;
@@ -127,6 +134,45 @@ export function buildProperties(input: NotionTaskInput) {
 export const DATABASE_ID = env.NOTION_DATABASE_ID || '';
 export const SYNC_SECRET = env.NOTION_SYNC_SECRET || '';
 export const PROJECTS_DB_ID = env.NOTION_PROJECTS_DB_ID || '';
+
+/** Mỗi subtask -> một to_do block (ô tick) trong thân trang. Bỏ subtask tên rỗng. */
+function toDoBlocks(subtasks: NotionSubtask[]): unknown[] {
+  return subtasks
+    .filter((s) => s.title && s.title.trim())
+    .map((s) => ({
+      object: 'block',
+      type: 'to_do',
+      to_do: {
+        rich_text: [{ type: 'text', text: { content: s.title.trim().slice(0, NOTION_TEXT_LIMIT) } }],
+        checked: Boolean(s.done),
+      },
+    }));
+}
+
+/**
+ * Đồng bộ checklist (subtasks) vào thân trang Notion dưới dạng to_do block.
+ *
+ * Cách làm: XOÁ mọi to_do block cũ trong trang rồi thêm lại đúng danh sách hiện tại —
+ * app là nguồn sự thật của checklist. CỐ Ý chỉ đụng block loại 'to_do': đoạn văn, ảnh,
+ * mọi thứ người ta tự thêm trong Notion đều giữ nguyên.
+ *
+ * Chỉ đọc TRANG ĐẦU children (tối đa 100 block). Task có >100 block trong thân trang là
+ * cực hiếm ở đây; nếu có, phần dư không bị đụng — chấp nhận được, không nổ lỗi.
+ */
+export async function syncSubtaskBlocks(pageId: string, subtasks: NotionSubtask[]): Promise<void> {
+  if (!notion) return;
+  const existing = await notion.blocks.children.list({ block_id: pageId, page_size: 100 });
+  const oldTodoIds = existing.results
+    .filter((b) => (b as { type?: string }).type === 'to_do')
+    .map((b) => (b as { id: string }).id);
+  for (const id of oldTodoIds) {
+    await notion.blocks.delete({ block_id: id });
+  }
+  const blocks = toDoBlocks(subtasks);
+  if (blocks.length > 0) {
+    await notion.blocks.children.append({ block_id: pageId, children: blocks as never });
+  }
+}
 
 export interface NotionProject {
   id: string;

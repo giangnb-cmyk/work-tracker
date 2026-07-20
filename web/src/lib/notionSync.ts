@@ -28,6 +28,9 @@ interface NotionTaskPayload {
   dueStart?: string | null;
   dueDate?: string | null;
   description?: string;
+  /** Checklist -> to-do block trong thân trang Notion. Có MẶT = gateway đồng bộ lại cả
+   *  checklist; VẮNG = để yên (cập nhật status/… không đụng tới subtask). */
+  subtasks?: { title: string; done: boolean }[];
 }
 
 export interface NotionProjectOption {
@@ -77,6 +80,7 @@ function toPayload(
   task: Task,
   assigneeNotionUserId?: string | null,
   notionProjectId?: string | null,
+  withSubtasks = false,
 ): NotionTaskPayload {
   const payload: NotionTaskPayload = {
     title: task.title,
@@ -91,6 +95,12 @@ function toPayload(
   // Only touch the Notion Project relation when a value was explicitly provided,
   // so status-only updates (moveTask) don't wipe it.
   if (notionProjectId !== undefined) payload.notionProjectId = notionProjectId;
+  // Chỉ gửi subtasks khi được yêu cầu (tạo mới, hoặc update mà subtask VỪA đổi) — gửi bừa
+  // ở mỗi lần đổi status là ghi lại cả checklist trên Notion vô ích + có thể xoá to-do
+  // người ta tự thêm.
+  if (withSubtasks) {
+    payload.subtasks = task.subtasks.map((s) => ({ title: s.title, done: s.done }));
+  }
   return payload;
 }
 
@@ -100,20 +110,25 @@ export function createNotionPage(
   assigneeNotionUserId?: string | null,
   notionProjectId?: string | null,
 ) {
-  return callGateway({ action: 'create', task: toPayload(task, assigneeNotionUserId, notionProjectId) });
+  // Tạo mới -> luôn gửi subtasks để dựng checklist ban đầu.
+  return callGateway({ action: 'create', task: toPayload(task, assigneeNotionUserId, notionProjectId, true) });
 }
 
-/** Update the linked Notion page's status/assignee/due/project. */
+/**
+ * Update the linked Notion page. `subtasksChanged` = subtask VỪA đổi ở lần lưu này ->
+ * mới đồng bộ lại checklist; mặc định false để cập nhật status/… không đụng to-do.
+ */
 export function updateNotionPage(
   notionPageId: string,
   task: Task,
   assigneeNotionUserId?: string | null,
   notionProjectId?: string | null,
+  subtasksChanged = false,
 ) {
   return callGateway({
     action: 'update',
     notionPageId,
-    task: toPayload(task, assigneeNotionUserId, notionProjectId),
+    task: toPayload(task, assigneeNotionUserId, notionProjectId, subtasksChanged),
   });
 }
 

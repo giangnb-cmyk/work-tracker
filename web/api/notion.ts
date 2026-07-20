@@ -11,6 +11,7 @@ import {
   listProjects,
   NOTION_ENABLED,
   notion,
+  syncSubtaskBlocks,
   type NotionTaskInput,
 } from './_notion.js';
 
@@ -80,6 +81,8 @@ async function route(req: VercelRequest, res: VercelResponse) {
         parent: { database_id: DATABASE_ID },
         properties: buildProperties(task) as never,
       });
+      // Checklist -> to-do block trong thân trang, sau khi đã có page id.
+      if (task.subtasks?.length) await syncSubtaskBlocks(page.id, task.subtasks);
       const url = 'url' in page ? (page as { url: string }).url : '';
       return res.status(200).json({ synced: true, notionPageId: page.id, notionUrl: url });
     }
@@ -91,6 +94,9 @@ async function route(req: VercelRequest, res: VercelResponse) {
         page_id: notionPageId,
         properties: buildProperties(task) as never,
       });
+      // subtasks CÓ MẶT (kể cả mảng rỗng) = lần lưu này đổi checklist -> đồng bộ lại thân
+      // trang. VẮNG = cập nhật status/… không đụng to-do.
+      if (task.subtasks !== undefined) await syncSubtaskBlocks(notionPageId, task.subtasks);
       return res.status(200).json({ synced: true, notionPageId });
     }
 

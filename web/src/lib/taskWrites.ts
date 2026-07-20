@@ -100,7 +100,12 @@ export async function updateTask(
   if (error) throw error;
 
   const merged = { ...task, ...finalPatch };
-  if (task.notionPageId) void safeNotionUpdate(task.notionPageId, merged, assigneeNotionUserId, notionProjectId);
+  // subtask VỪA đổi ở lần lưu này -> mới đồng bộ lại checklist Notion (tránh ghi lại vô ích
+  // khi chỉ đổi status/tên/…).
+  const subtasksChanged = finalPatch.subtasks !== undefined;
+  if (task.notionPageId) {
+    void safeNotionUpdate(task.notionPageId, merged, assigneeNotionUserId, notionProjectId, subtasksChanged);
+  }
   // Completion notifications are dispatched by the UI (NotifyContext), not here.
 }
 
@@ -207,9 +212,10 @@ async function safeNotionUpdate(
   task: Task,
   assigneeNotionUserId?: string | null,
   notionProjectId?: string | null,
+  subtasksChanged = false,
 ) {
   try {
-    await updateNotionPage(notionPageId, task, assigneeNotionUserId, notionProjectId);
+    await updateNotionPage(notionPageId, task, assigneeNotionUserId, notionProjectId, subtasksChanged);
   } catch (err) {
     reportError('Notion · cập nhật', err, 'Thay đổi vẫn đã lưu trong app; chỉ trang Notion là chưa theo kịp.');
   }
