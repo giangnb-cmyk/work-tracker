@@ -3,6 +3,31 @@
 import type { JobRole, Sprint, Task, TaskStatus, TeamMember } from '../types';
 import { TASK_STATUSES } from '../types';
 
+/**
+ * Sprint ĐANG CHẠY = sprint mà khoảng [startDate, endDate] chứa `nowMs`.
+ *
+ * Xét theo THỜI GIAN, KHÔNG theo cột `status`: sprint tuần tự tạo (pg_cron) không ai bấm
+ * "active" tay, mà mốc thời gian mới là sự thật — task tạo trong tuần phải bám sprint của
+ * tuần đó. `status` giờ chỉ còn để hiển thị / đóng sớm bằng tay.
+ *
+ * Thiếu start hoặc end thì bỏ qua (không xếp được vào trục thời gian). Nhiều sprint cùng
+ * phủ `now` (lỡ tạo chồng) -> lấy cái BẮT ĐẦU MUỘN NHẤT: tuần mới đè tuần cũ.
+ */
+export function activeSprintAt(sprints: Sprint[], nowMs: number): Sprint | null {
+  let best: Sprint | null = null;
+  let bestStart = -Infinity;
+  for (const s of sprints) {
+    const start = s.startDate?.toMillis();
+    const end = s.endDate?.toMillis();
+    if (start == null || end == null) continue;
+    if (nowMs >= start && nowMs <= end && start > bestStart) {
+      best = s;
+      bestStart = start;
+    }
+  }
+  return best;
+}
+
 export interface SprintStats {
   total: number;
   byStatus: Record<TaskStatus, number>;

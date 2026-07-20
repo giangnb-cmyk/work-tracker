@@ -16,7 +16,7 @@ if str(_BOT_DIR) not in sys.path:
 
 from supabase_client import get_client  # noqa: E402
 
-from constants import STATUS_DONE, SPRINT_ACTIVE  # noqa: E402
+from constants import STATUS_DONE  # noqa: E402
 from errors import ResolveError  # noqa: E402,F401 — re-export: skill cu bat `repo.ResolveError`
 
 USERS = "profiles"
@@ -218,9 +218,9 @@ def resolve_sprint(client, token: str):
     """Phan giai sprint tu 'active' hoac ten sprint. Nem ResolveError neu khong tim thay."""
     token = (token or "active").strip()
     if token.lower() == "active":
-        sprint = _first_where(client, SPRINTS, "status", "active")
+        sprint = active_sprint(client)
         if not sprint:
-            raise ResolveError("không có sprint nào đang active")
+            raise ResolveError("không có sprint nào đang chạy (không tuần nào phủ hôm nay)")
         return sprint
 
     sprint = _match_sprint_name(client, token)
@@ -250,12 +250,17 @@ def list_sprints(client) -> list:
 
 
 def active_sprint(client):
-    """Sprint dang active dau tien, hoac None.
+    """Sprint DANG CHAY = tuan chua hom nay (start_date <= now <= end_date), hoac None.
 
-    Luu y: khong co rang buoc DB nao ep chi mot sprint active (web cung chi
-    .find() cai dau tien) -> sprint_ops.py chan viec tao them cai thu hai.
+    Xet theo THOI GIAN chu khong theo cot status (giong web activeSprintAt) — sprint tuan
+    tu tao bang pg_cron (0041) khong ai bam 'active' tay, moc ngay moi la su that. Nhieu
+    sprint cung phu now (lo tao chong) -> lay cai bat dau muon nhat (tuan moi de tuan cu).
     """
-    return _first_where(client, SPRINTS, "status", SPRINT_ACTIVE)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    rows = (client.table(SPRINTS).select("*")
+            .lte("start_date", now_iso).gte("end_date", now_iso)
+            .order("start_date", desc=True).limit(1).execute().data)
+    return _map_sprint(rows[0]) if rows else None
 
 
 # camelCase (skill) -> snake_case (column) cho ghi sprint.

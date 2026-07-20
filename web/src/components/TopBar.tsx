@@ -1,11 +1,21 @@
 import { useSprintContext } from '../contexts/SprintContext';
 import NotificationBell from './NotificationBell';
-import type { SprintStatus } from '../types';
+import { sprintPhase, type SprintPhase } from '../lib/sprintRange';
 
-const SPRINT_STATUS_LABEL: Record<SprintStatus, string> = {
-  planning: 'Chuẩn bị',
-  active: 'Đang chạy',
-  completed: 'Hoàn thành',
+// Badge suy từ NGÀY (sprintPhase), không từ cột status — sprint tuần tự tạo không ai bấm
+// 'active' tay mà mốc thời gian mới là sự thật (xem activeSprintAt / migration 0041).
+const PHASE_LABEL: Record<SprintPhase, string> = {
+  running: 'Đang chạy',
+  upcoming: 'Sắp tới',
+  finished: 'Hoàn thành',
+  unknown: 'Chưa đặt ngày',
+};
+// Dùng lại màu badge status-* cũ: running≈active, finished≈completed, còn lại≈planning.
+const PHASE_STATUS_CLASS: Record<SprintPhase, string> = {
+  running: 'active',
+  upcoming: 'planning',
+  finished: 'completed',
+  unknown: 'planning',
 };
 
 /** Sticky top bar: sprint context selector + notifications. Task creation now
@@ -29,11 +39,12 @@ export default function TopBar() {
             </option>
           ))}
         </select>
-        {selectedSprint && (
-          <span className={`badge status-${selectedSprint.status}`}>
-            {SPRINT_STATUS_LABEL[selectedSprint.status]}
-          </span>
-        )}
+        {selectedSprint && (() => {
+          const phase = sprintPhase(selectedSprint, Date.now());
+          return (
+            <span className={`badge status-${PHASE_STATUS_CLASS[phase]}`}>{PHASE_LABEL[phase]}</span>
+          );
+        })()}
       </div>
 
       <div className="row" style={{ gap: '0.75rem', alignItems: 'center' }}>

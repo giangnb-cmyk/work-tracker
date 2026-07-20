@@ -259,6 +259,11 @@ def cmd_update(args):
     new_atts = _link_fields(args.link, args.link_name)
     if new_atts:
         updates["attachments"] = (task.get("attachments") or []) + new_atts
+    # Chuyen sang 'done' -> han chot ve dung NGAY HOM NAY (giong web becameDone). Khong de
+    # len --due nguoi dung tu dat trong cung lenh. Chi khi truoc do CHUA done.
+    if (updates.get("status") == STATUS_DONE and task.get("status") != STATUS_DONE
+            and "dueDate" not in updates):
+        updates["dueDate"] = datetime.now(timezone.utc)
     if not updates:
         die("không có trường nào để cập nhật (dùng --status/--priority/--title/--desc/--link/...)")
 

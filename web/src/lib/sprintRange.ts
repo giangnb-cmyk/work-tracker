@@ -39,15 +39,21 @@ export function sprintStartMs(sprint: Sprint): number | null {
 }
 
 /**
+ * Giai đoạn của sprint — xét theo THỜI GIAN, không theo cột `status` (trừ 'completed' =
+ * đóng tay). Sprint tuần tự tạo (pg_cron, 0041) không ai bấm 'active', nên "đang chạy"
+ * phải suy từ mốc ngày: now nằm trong [start, end]. Cùng nguồn sự thật với activeSprintAt.
+ *
  * Trả về giai đoạn chứ không phải boolean, để chỗ mập mờ hiện ra thay vì bị đoán ngầm:
- * sprint không ngày và không chạy thì là 'unknown' → UI hiện "—" chứ không đổ lỗi cho ai.
+ * sprint không có ngày nào thì là 'unknown' → UI hiện "—" chứ không đổ lỗi cho ai.
  */
 export function sprintPhase(sprint: Sprint, nowMs: number): SprintPhase {
-  if (sprint.status === 'completed') return 'finished';
+  if (sprint.status === 'completed') return 'finished'; // đóng tay — tôn trọng
   const endMs = sprintEndMs(sprint);
-  if (endMs === null) return sprint.status === 'active' ? 'running' : 'unknown';
-  if (endMs <= nowMs) return 'finished'; // hết hạn mà chưa ai đóng — vẫn tính là đã xong
-  return sprint.status === 'active' ? 'running' : 'upcoming';
+  const startMs = sprintStartMs(sprint);
+  if (endMs === null && startMs === null) return 'unknown';
+  if (endMs !== null && endMs <= nowMs) return 'finished'; // hết hạn mà chưa ai đóng
+  if (startMs !== null && nowMs < startMs) return 'upcoming'; // chưa tới ngày bắt đầu
+  return 'running'; // now trong khoảng
 }
 
 export function isSprintFinished(sprint: Sprint, nowMs: number): boolean {

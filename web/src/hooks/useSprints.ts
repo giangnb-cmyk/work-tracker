@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { rowToSprint } from '../lib/mappers';
+import { activeSprintAt } from '../lib/sprint';
 import { toISO } from '../lib/time';
 import { useLiveQuery } from './useLiveQuery';
 import type { Sprint, SprintStatus } from '../types';
@@ -37,10 +38,10 @@ export function useSprints(currentUid: string) {
 
   const { data: sprints, loading, refetch } = useLiveQuery<Sprint>({ table: 'sprints', fetcher, deps: [] });
 
-  const activeSprint = useMemo(
-    () => sprints.find((s) => s.status === 'active') ?? null,
-    [sprints],
-  );
+  // Sprint đang chạy theo THỜI GIAN (khoảng ngày chứa hôm nay), không theo cột status —
+  // xem activeSprintAt. Đổi sprints là tính lại; qua ranh giới tuần lúc app đang mở thì
+  // realtime insert sprint tuần mới sẽ kích refetch -> render lại -> cập nhật.
+  const activeSprint = useMemo(() => activeSprintAt(sprints, Date.now()), [sprints]);
 
   const createSprint = useCallback(
     async (input: NewSprintInput) => {
