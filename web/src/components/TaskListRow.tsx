@@ -84,6 +84,26 @@ export default function TaskListRow({
 
       <span className="trow-title">{task.title}</span>
 
+      {/* Đã tạo trên Notion chưa — hiện ra ngoài để khỏi phải mở từng task ra dò.
+          Đã tạo: 📝 sáng, bấm mở thẳng Notion. Chưa: dấu mờ, chỉ để biết. */}
+      {task.notionPageId ? (
+        <a
+          className="trow-notion on"
+          href={task.notionUrl ?? undefined}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title="Đã tạo trên Notion — bấm để mở"
+          aria-label="Đã tạo trên Notion"
+        >
+          📝
+        </a>
+      ) : (
+        <span className="trow-notion off" title="Chưa tạo trên Notion" aria-label="Chưa tạo trên Notion">
+          📝
+        </span>
+      )}
+
       <span className="prio-pill trow-prio" style={{ color: PRIO_COLOR[task.priority] }}>
         <span className="prio-dot" style={{ background: PRIO_COLOR[task.priority] }} />
         {PRIORITY_LABEL[task.priority]}

@@ -588,6 +588,11 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   flex: 1; min-width: 0; font-weight: 600; font-size: 0.97rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Cờ "đã tạo Notion": sáng (bấm mở Notion) vs mờ hẳn (chưa tạo) — nhìn phát biết ngay. */
+.trow-notion { flex-shrink: 0; font-size: 0.9rem; line-height: 1; text-decoration: none; }
+.trow-notion.on { opacity: 1; cursor: pointer; }
+.trow-notion.on:hover { transform: scale(1.15); }
+.trow-notion.off { opacity: 0.22; filter: grayscale(1); cursor: default; }
 .trow-prio { flex-shrink: 0; }
 .trow-who { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; width: 160px; }
 .trow-who-name { font-size: 0.85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
