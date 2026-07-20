@@ -16,6 +16,8 @@ import RefImagesSection from './task/RefImagesSection';
 import BugLabelChip from './bug/BugLabelChip';
 import { type FeaturePerson } from './FeatureAvatars';
 import FeatureCard from './FeatureCard';
+import FeatureRow from './FeatureRow';
+import { useStoredView } from '../hooks/useStoredView';
 import FeatureTeamRow from './FeatureTeamRow';
 import FeatureFilterBar, { isFeatureDone, matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
 import { groupFeaturesByVersion, NO_VERSION } from '../lib/featureGroups';
@@ -43,6 +45,11 @@ interface FeatureStats {
 const EMPTY_STATS: FeatureStats = { done: 0, total: 0, done30: 0, byUid: new Map() };
 const EMPTY_PEOPLE: FeaturePerson[] = [];
 
+/** Hai cách đọc cùng bộ feature: lướt (thẻ) vs dò & so (dòng). */
+type FeatureView = 'card' | 'list';
+const FEATURE_VIEWS: readonly FeatureView[] = ['card', 'list'];
+const FEATURE_VIEW_KEY = 'featuresView';
+
 /** Features tab: a card grid of the project's features; open one to see its tasks. */
 export default function Features() {
   const { user, isAdmin, can } = useAuth();
@@ -66,6 +73,7 @@ export default function Features() {
   // Lọc token như tab Bugs: loại / nhãn / version / người làm + tìm theo tên.
   const [tokens, setTokens] = useState<FeatureFilterToken[]>([]);
   const [query, setQuery] = useState('');
+  const [view, setView] = useStoredView<FeatureView>(FEATURE_VIEW_KEY, FEATURE_VIEWS, 'card');
   const meId = user?.uid ?? '';
 
   const projectFeatures = useMemo(
@@ -191,11 +199,15 @@ export default function Features() {
   const groupChipsOf = (f: Feature) => ownLabelsOf(f).filter((l) => labelGroup(l.name) !== 'version');
   const versionChipsOf = (f: Feature) => versionRangeChips(ownLabelsOf(f), labels);
 
-  /** Một card — dựng ở hai nơi (khối sprint và khối version) nên gom lại một chỗ. */
-  function renderCard(f: Feature) {
+  /**
+   * Một feature — dựng ở hai nơi (khối sprint và khối version) nên gom lại một chỗ.
+   * Thẻ hay dòng chỉ khác component đích: cùng props, cùng luật `finished`.
+   */
+  function renderFeature(f: Feature) {
     const stats = statsByFeature.get(f.id) ?? EMPTY_STATS;
+    const Item = view === 'list' ? FeatureRow : FeatureCard;
     return (
-      <FeatureCard
+      <Item
         key={f.id}
         feature={f}
         labels={groupChipsOf(f)}
@@ -216,6 +228,7 @@ export default function Features() {
    * Đang lọc/tìm thì mở hết: nhóm đóng sẽ giấu đúng thứ vừa lọc ra, nhìn như bộ lọc
    * hỏng. Không đụng vào openKeys nên xoá lọc xong là các nhóm về đúng trạng thái cũ.
    */
+  const listClass = view === 'list' ? 'feat-rows' : 'project-grid';
   const filtering = tokens.length > 0 || query.trim().length > 0;
   const isGroupOpen = (key: string) => filtering || openKeys.has(key);
 
@@ -259,9 +272,19 @@ export default function Features() {
           <h1>Features</h1>
           <p>Các hạng mục tính năng của {selectedProject?.name ?? 'dự án'}, chia theo version.</p>
         </div>
-        {canCreate && (
-          <button className="btn-primary" onClick={() => setCreating(true)}>＋ Feature mới</button>
-        )}
+        <div className="row" style={{ gap: '0.6rem' }}>
+          <div className="seg-toggle" role="group" aria-label="Kiểu hiển thị">
+            <button className={`seg${view === 'card' ? ' on' : ''}`} onClick={() => setView('card')}>
+              Thẻ
+            </button>
+            <button className={`seg${view === 'list' ? ' on' : ''}`} onClick={() => setView('list')}>
+              Danh sách
+            </button>
+          </div>
+          {canCreate && (
+            <button className="btn-primary" onClick={() => setCreating(true)}>＋ Feature mới</button>
+          )}
+        </div>
       </div>
 
       {projectFeatures.length > 0 && (
@@ -286,7 +309,7 @@ export default function Features() {
               {selectedSprint?.name ?? 'Backlog'} · {sprintFeatures.length} feature đang có task
             </p>
           </div>
-          <div className="project-grid">{sprintFeatures.map(renderCard)}</div>
+          <div className={listClass}>{sprintFeatures.map(renderFeature)}</div>
         </section>
       )}
 
@@ -313,7 +336,7 @@ export default function Features() {
               <span className="feat-group-done mono">{doneCount}/{g.features.length} xong</span>
             </button>
 
-            {open && <div className="project-grid feat-group-grid">{g.features.map(renderCard)}</div>}
+            {open && <div className={`${listClass} feat-group-grid`}>{g.features.map(renderFeature)}</div>}
           </section>
         );
       })}

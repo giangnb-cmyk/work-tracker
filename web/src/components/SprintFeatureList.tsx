@@ -8,7 +8,7 @@ interface Props {
   groups: FeatureTaskGroup[];
   sprintId: string | null;
   projectId: string | null;
-  /** Đang lọc: mục rỗng nghĩa là "không khớp" nên phải ẩn, và mọi mục còn lại xổ sẵn. */
+  /** Đang lọc: mọi mục xổ sẵn, và câu báo rỗng phải nói "không khớp" chứ không phải "chưa có". */
   filtering: boolean;
   jobRoleOf: (uid: string | null) => JobRole | undefined;
   canChangeStatus: (t: Task) => boolean;
@@ -37,12 +37,10 @@ export default function SprintFeatureList({
 }: Props) {
   const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
 
-  // Lọc xong mà feature không còn task thì bỏ mục đi; lúc không lọc vẫn giữ mục rỗng để
-  // còn chỗ thêm task đầu tiên cho feature mới lập.
-  const shown = useMemo(
-    () => (filtering ? groups.filter((g) => g.tasks.length > 0) : groups),
-    [groups, filtering],
-  );
+  // CHỈ feature có task trong sprint này. Dự án có hàng chục feature mà sprint chỉ chạm
+  // vài cái — liệt kê hết thì mục thật chìm trong một rừng "0 task". Muốn gắn task vào
+  // feature chưa có mặt ở đây thì tạo task rồi chọn feature trong chi tiết.
+  const shown = useMemo(() => groups.filter((g) => g.tasks.length > 0), [groups]);
 
   function toggle(key: string) {
     setOpenKeys((prev) => {
@@ -56,7 +54,7 @@ export default function SprintFeatureList({
   if (shown.length === 0) {
     return (
       <div className="glass empty">
-        {filtering ? 'Không có task nào khớp bộ lọc.' : 'Dự án này chưa có feature nào.'}
+        {filtering ? 'Không có task nào khớp bộ lọc.' : 'Sprint này chưa có task nào gắn feature.'}
       </div>
     );
   }
@@ -84,14 +82,10 @@ export default function SprintFeatureList({
                 </span>
               )}
               <span className="feat-group-count">{total} task</span>
-              {total > 0 && (
-                <>
-                  <span className="progress sfeat-bar" aria-hidden>
-                    <span style={{ width: `${pct}%` }} />
-                  </span>
-                  <span className="feat-group-done mono">{g.done}/{total}</span>
-                </>
-              )}
+              <span className="progress sfeat-bar" aria-hidden>
+                <span style={{ width: `${pct}%` }} />
+              </span>
+              <span className="feat-group-done mono">{g.done}/{total}</span>
             </button>
 
             {open && (

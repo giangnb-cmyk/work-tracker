@@ -82,10 +82,8 @@ export const NO_FEATURE_KEY = '__none__';
 /**
  * Gom task theo feature, giữ nguyên thứ tự `features` truyền vào.
  *
- * Trả về CẢ feature chưa có task nào: mục theo feature vừa là bảng tiến độ vừa là chỗ
- * thêm task nhanh — bỏ mục rỗng đi thì feature mới lập không có lối tạo task đầu tiên.
- * Bên gọi tự lọc mục rỗng khi đang lọc (lúc đó rỗng nghĩa là "không khớp", không phải
- * "chưa có việc").
+ * Trả về CẢ feature chưa có task nào — hàm này không biết mục rỗng nên hiện hay ẩn (bảng
+ * sprint thì ẩn, một màn "chọn feature" thì phải hiện). Bên gọi tự lọc `tasks.length`.
  */
 export function groupTasksByFeature(tasks: Task[], features: Feature[]): FeatureTaskGroup[] {
   const buckets = new Map<string, Task[]>();

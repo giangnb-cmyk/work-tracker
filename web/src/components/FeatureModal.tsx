@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createFeature, updateFeature, type FeatureInput } from '../lib/featureWrites';
+import { createFeature, deleteFeature, updateFeature, type FeatureInput } from '../lib/featureWrites';
 import { createFeatureLabel } from '../lib/featureLabelWrites';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import { usePasteAttachment } from '../hooks/usePasteAttachment';
@@ -11,6 +11,7 @@ import AttachmentsField from './task/AttachmentsField';
 import RefImagesSection from './task/RefImagesSection';
 import WatchersField from './task/WatchersField';
 import LabelSelect from './LabelSelect';
+import ConfirmDialog from './ConfirmDialog';
 import Switch from './Switch';
 import { labelGroup } from '../lib/bugLabelGroups';
 import {
@@ -41,8 +42,11 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /** Admin dialog to create/edit a feature within a project. */
 export default function FeatureModal({ feature, projectId, onClose, onCreated }: FeatureModalProps) {
-  const { user } = useAuth();
+  // isAdmin đã bao cả owner (is_admin() ở 0037 tính owner là admin) — khớp policy
+  // features_delete, nút chỉ hiện đúng với người RLS sẽ cho qua.
+  const { user, isAdmin } = useAuth();
   const { members, refetchFeatures } = useSprintContext();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const isEdit = Boolean(feature);
   const [name, setName] = useState(feature?.name ?? '');
   const [icon, setIcon] = useState(feature?.icon ?? '🧩');
@@ -199,6 +203,24 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
     }
   }
 
+  /**
+   * Xoá feature. Phải huỷ timer tự-lưu trước: một lần sửa đang chờ mà bắn sau lệnh xoá sẽ
+   * update hàng vừa biến mất — lỗi lặng lẽ, chỉ hiện ra ở '⚠ Lưu lỗi'.
+   */
+  async function handleDelete() {
+    if (!feature) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    try {
+      await deleteFeature(feature.id);
+      await refetchFeatures();
+      onClose();
+    } catch (err) {
+      console.error('Xoá feature thất bại', err);
+      setConfirmDelete(false);
+      setError('Xoá thất bại. Cần quyền admin.');
+    }
+  }
+
   const saveHint =
     saveState === 'saving' ? 'Đang lưu…' :
     saveState === 'error' ? '⚠ Lưu lỗi' :
@@ -339,6 +361,11 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
         <div className="modal-actions">
           {isEdit ? (
             <>
+              {isAdmin && (
+                <button className="btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>
+                  🗑 Xoá feature
+                </button>
+              )}
               <span className={`tm-savehint tm-save-${saveState}`}>{saveHint}</span>
               <button className="btn-sm" onClick={() => void handleClose()}>Đóng</button>
             </>
@@ -352,6 +379,17 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
           )}
         </div>
       </div>
+
+      {confirmDelete && feature && (
+        <ConfirmDialog
+          title="Xoá feature?"
+          message={<>Feature <strong>“{feature.name}”</strong> sẽ bị xoá khỏi dự án.</>}
+          detail="Task thuộc feature này KHÔNG bị xoá — chúng chỉ bị gỡ khỏi feature và trở thành task chưa gắn feature. Xoá feature thì không khôi phục được."
+          confirmLabel="Xoá feature"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }
