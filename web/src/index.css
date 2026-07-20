@@ -588,11 +588,14 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   flex: 1; min-width: 0; font-weight: 600; font-size: 0.97rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Cờ "đã tạo Notion": sáng (bấm mở Notion) vs mờ hẳn (chưa tạo) — nhìn phát biết ngay. */
-.trow-notion { flex-shrink: 0; font-size: 0.9rem; line-height: 1; text-decoration: none; }
-.trow-notion.on { opacity: 1; cursor: pointer; }
-.trow-notion.on:hover { transform: scale(1.15); }
-.trow-notion.off { opacity: 0.22; filter: grayscale(1); cursor: default; }
+/* Cờ ngoài lề task: đã gắn feature (mảnh ghép) + đã tạo Notion (logo N). Icon đơn sắc
+   theo currentColor — sáng khi CÓ, mờ hẳn khi CHƯA, nhìn phát biết ngay. */
+.task-flags { display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+.task-flag { display: inline-flex; line-height: 0; text-decoration: none; transition: opacity 0.15s ease, transform 0.15s ease; }
+.task-flag.on { opacity: 0.9; color: var(--text); }
+.task-flag.on.notion { cursor: pointer; }
+.task-flag.on.notion:hover { opacity: 1; transform: scale(1.15); }
+.task-flag.off { opacity: 0.2; color: var(--muted); cursor: default; }
 .trow-prio { flex-shrink: 0; }
 .trow-who { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; width: 160px; }
 .trow-who-name { font-size: 0.85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

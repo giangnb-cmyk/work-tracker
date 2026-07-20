@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import Avatar from './Avatar';
+import TaskFlags from './task/TaskFlags';
 import { daysUntil } from '../lib/format';
 import { taskProgress } from '../lib/sprint';
 import { providerMeta } from '../lib/attachments';
@@ -136,24 +137,8 @@ export default function TaskRow({
           {assigneeJobRole ? JOB_ROLE_ICON[assigneeJobRole] : '📌'}
         </span>
         <h3 className="tcard-title">{task.title}</h3>
-        {/* Cờ đã tạo Notion — cùng ý nghĩa với dòng list (TaskListRow). */}
-        {task.notionPageId ? (
-          <a
-            className="trow-notion on"
-            href={task.notionUrl ?? undefined}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            title="Đã tạo trên Notion — bấm để mở"
-            aria-label="Đã tạo trên Notion"
-          >
-            📝
-          </a>
-        ) : (
-          <span className="trow-notion off" title="Chưa tạo trên Notion" aria-label="Chưa tạo trên Notion">
-            📝
-          </span>
-        )}
+        {/* Cờ đã gắn feature + đã tạo Notion — cùng TaskFlags với dòng list. */}
+        <TaskFlags task={task} />
         <span className="prio-pill" style={{ color: PRIO_COLOR[task.priority] }}>
           <span className="prio-dot" style={{ background: PRIO_COLOR[task.priority] }} />
           {PRIORITY_LABEL[task.priority]}

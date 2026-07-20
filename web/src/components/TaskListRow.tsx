@@ -4,6 +4,7 @@ import { daysUntil } from '../lib/format';
 import { taskProgress } from '../lib/sprint';
 import { PRIO_COLOR } from '../lib/taskColors';
 import { MoreVerticalIcon } from './icons';
+import TaskFlags from './task/TaskFlags';
 import { useClickOutside } from '../hooks/useClickOutside';
 import {
   JOB_ROLE_ICON,
@@ -84,26 +85,6 @@ export default function TaskListRow({
 
       <span className="trow-title">{task.title}</span>
 
-      {/* Đã tạo trên Notion chưa — hiện ra ngoài để khỏi phải mở từng task ra dò.
-          Đã tạo: 📝 sáng, bấm mở thẳng Notion. Chưa: dấu mờ, chỉ để biết. */}
-      {task.notionPageId ? (
-        <a
-          className="trow-notion on"
-          href={task.notionUrl ?? undefined}
-          target="_blank"
-          rel="noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          title="Đã tạo trên Notion — bấm để mở"
-          aria-label="Đã tạo trên Notion"
-        >
-          📝
-        </a>
-      ) : (
-        <span className="trow-notion off" title="Chưa tạo trên Notion" aria-label="Chưa tạo trên Notion">
-          📝
-        </span>
-      )}
-
       <span className="prio-pill trow-prio" style={{ color: PRIO_COLOR[task.priority] }}>
         <span className="prio-dot" style={{ background: PRIO_COLOR[task.priority] }} />
         {PRIORITY_LABEL[task.priority]}
@@ -124,6 +105,9 @@ export default function TaskListRow({
       </span>
 
       <span className="trow-status">{done ? 'Hoàn thành' : STATUS_LABEL[task.status]}</span>
+
+      {/* Sau trạng thái: cờ đã gắn feature + đã tạo Notion (xem TaskFlags). */}
+      <TaskFlags task={task} />
 
       <div className="tcard-menu-wrap" onClick={(e) => e.stopPropagation()} ref={menuRef}>
         <button className="tcard-menu" onClick={() => setMenuOpen((o) => !o)} aria-label="Tuỳ chọn">
