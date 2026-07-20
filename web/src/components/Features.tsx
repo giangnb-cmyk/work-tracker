@@ -11,6 +11,8 @@ import TaskListRow from './TaskListRow';
 import TaskModal from './TaskModal';
 import FeatureModal from './FeatureModal';
 import CreateTaskCard from './CreateTaskCard';
+import AttachmentsField from './task/AttachmentsField';
+import RefImagesSection from './task/RefImagesSection';
 import BugLabelChip from './bug/BugLabelChip';
 import { type FeaturePerson } from './FeatureAvatars';
 import FeatureCard from './FeatureCard';
@@ -22,6 +24,10 @@ import { labelGroup } from '../lib/bugLabelGroups';
 import type { Feature, FeatureLabel, Task, TaskStatus } from '../types';
 
 const DAY = 86_400_000;
+
+/** onChange bắt buộc của AttachmentsField/RefImagesSection nhưng ở chế độ đọc-chỉ (disabled)
+ *  không bao giờ chạy — feature chỉ sửa tài liệu trong FeatureModal. */
+const noop = () => {};
 
 /** Số liệu một feature — gộp trong đúng một vòng lặp qua tasks. */
 interface FeatureStats {
@@ -350,6 +356,20 @@ function FeatureDetail({
     () => sortTasksByProgress(tasks.filter((t) => t.featureId === feature.id)),
     [tasks, feature.id],
   );
+
+  // "Các member tham gia" = người suy từ task (đã có count) + người THÊM TAY (0046) chưa
+  // có task (count 0). Người thêm tay xếp sau, giữ nguyên thứ tự nhiều-task-lên-trước.
+  const allPeople = useMemo(() => {
+    const present = new Set(people.map((p) => p.uid));
+    const byUid = new Map(members.map((m) => [m.uid, m]));
+    const extra: FeaturePerson[] = feature.memberIds
+      .filter((uid) => !present.has(uid))
+      .map((uid) => {
+        const m = byUid.get(uid);
+        return { uid, name: m?.displayName || 'Đã rời nhóm', photoURL: m?.photoURL, count: 0 };
+      });
+    return [...people, ...extra];
+  }, [people, feature.memberIds, members]);
   const canChangeStatus = (t: Task) => isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid;
 
   const featureById = useMemo(() => new Map(features.map((f) => [f.id, f])), [features]);
@@ -405,13 +425,25 @@ function FeatureDetail({
           {versions.map((v) => <BugLabelChip key={v.key} label={v} />)}
         </div>
       )}
-      <FeatureTeamRow people={people} />
+      <FeatureTeamRow people={allPeople} />
       {feature.description && (
         <div className="feat-block">
           <span className="feat-cap">Description</span>
           <p className="muted feat-desc">{feature.description}</p>
         </div>
       )}
+
+      {/* Tài liệu & liên kết đính kèm feature — đọc-chỉ, cùng cách hiện với "Ref dùng
+          chung của feature" trong TaskModal: AttachmentsField cho link, RefImagesSection
+          cho ảnh. Chỉ hiện khối link khi CÓ link (disabled + rỗng sẽ ra "Chưa có tài
+          liệu."); RefImagesSection tự trả null khi không có ảnh. */}
+      {feature.attachments.some((a) => a.kind !== 'image') && (
+        <div className="feat-block">
+          <span className="feat-cap">Tài liệu &amp; liên kết</span>
+          <AttachmentsField attachments={feature.attachments} onChange={noop} disabled />
+        </div>
+      )}
+      <RefImagesSection attachments={feature.attachments} onChange={noop} disabled />
 
       {loading ? (
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>

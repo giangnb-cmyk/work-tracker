@@ -190,6 +190,9 @@ liên tục không bao giờ xong (Polish…) vẫn là feature nhưng mang `kin
 | `description` | string    | optional short description                       |
 | `kind`        | string    | `delivery` (mặc định, gói bán) \| `standard` (tính năng thường) \| `ongoing` (liên tục — KHÔNG hiện %, hiện nhịp 30 ngày) — xem ở trên |
 | `labelIds`    | string[]  | ids into `feature_labels` — nhóm + version, dùng để lọc |
+| `attachments` | jsonb     | link tài liệu + ảnh ref dùng chung mọi task của feature (0019) |
+| `memberIds`   | uuid[]    | **người tham gia thêm tay** (→ `profiles.id`), migration 0046. UI gộp với người suy từ task; task mới thuộc feature auto-gắn cả hai nhóm vào `tasks.watcherIds`. Denormalize, không FK từng phần tử |
+| `doneAt`      | Timestamp \| null | mốc đánh dấu TAY là đã xong (0031); `null` = suy từ task |
 | `createdAt`   | Timestamp | creation time                                    |
 | `createdBy`   | string    | uid of creator                                   |
 

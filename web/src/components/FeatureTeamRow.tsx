@@ -18,10 +18,15 @@ export default function FeatureTeamRow({ people }: FeatureTeamRowProps) {
       <span className="feat-cap">Các member tham gia</span>
       <div className="feat-team-list">
         {people.map((p) => (
-          <span key={p.uid} className="feat-mate" title={`${p.name} · ${p.count} task`}>
+          <span
+            key={p.uid}
+            className="feat-mate"
+            title={p.count > 0 ? `${p.name} · ${p.count} task` : `${p.name} · thêm tay, chưa có task`}
+          >
             <Avatar name={p.name} photoURL={p.photoURL} size="sm" />
             <span className="feat-mate-name">{p.name}</span>
-            <span className="feat-mate-n mono">{p.count}</span>
+            {/* count 0 = người thêm tay chưa có task: ẩn số, khỏi hiện "0" trơ trọi. */}
+            {p.count > 0 && <span className="feat-mate-n mono">{p.count}</span>}
           </span>
         ))}
       </div>

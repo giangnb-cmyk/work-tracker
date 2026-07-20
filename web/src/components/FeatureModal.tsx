@@ -6,8 +6,10 @@ import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { sortFeatureLabels } from '../lib/featureLabelSort';
 import { formatDate } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
+import { useSprintContext } from '../contexts/SprintContext';
 import AttachmentsField from './task/AttachmentsField';
 import RefImagesSection from './task/RefImagesSection';
+import WatchersField from './task/WatchersField';
 import LabelSelect from './LabelSelect';
 import Switch from './Switch';
 import { labelGroup } from '../lib/bugLabelGroups';
@@ -35,6 +37,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 /** Admin dialog to create/edit a feature within a project. */
 export default function FeatureModal({ feature, projectId, onClose }: FeatureModalProps) {
   const { user } = useAuth();
+  const { members } = useSprintContext();
   const isEdit = Boolean(feature);
   const [name, setName] = useState(feature?.name ?? '');
   const [icon, setIcon] = useState(feature?.icon ?? '🧩');
@@ -48,6 +51,8 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
   // Cùng mảng `attachments` với task (phân biệt bằng `kind`), nên dùng lại nguyên
   // AttachmentsField (link) + RefImagesSection (ảnh) của TaskModal.
   const [attachments, setAttachments] = useState<Attachment[]>(feature?.attachments ?? []);
+  /** Người tham gia thêm tay (0046) — hợp nhất với người suy từ task ở trang chi tiết. */
+  const [memberIds, setMemberIds] = useState<string[]>(feature?.memberIds ?? []);
   /** Chỉ dùng cho lúc TẠO — chế độ sửa tự lưu, trạng thái nằm ở saveState. */
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -113,7 +118,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
    * tự sắp lại, snapshot đổi theo và tự-lưu bắn một lần ghi vô nghĩa dù người dùng chưa
    * chạm vào gì.
    */
-  const snapshot = () => JSON.stringify({ name, icon, description, kind, labelIds, attachments, done });
+  const snapshot = () => JSON.stringify({ name, icon, description, kind, labelIds, attachments, memberIds, done });
   const lastSavedRef = useRef<string | null>(null);
   if (lastSavedRef.current === null) lastSavedRef.current = snapshot();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,7 +137,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
     try {
       await updateFeature(feature.id, {
         name: name.trim(), icon, description: description.trim(), kind,
-        labelIds: orderedLabelIds, attachments,
+        labelIds: orderedLabelIds, attachments, memberIds,
         ...(done !== savedDoneRef.current ? { done } : {}),
       });
       savedDoneRef.current = done;
@@ -156,7 +161,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, icon, description, kind, labelIds, attachments, done]);
+  }, [name, icon, description, kind, labelIds, attachments, memberIds, done]);
 
   /** Đóng: đẩy nốt lần sửa đang chờ, kẻo bấm đóng nhanh là mất. */
   async function handleClose() {
@@ -175,7 +180,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
     try {
       const input: FeatureInput = {
         projectId, name, icon, color: feature?.color ?? '#6366f1', description, kind,
-        labelIds: orderedLabelIds, attachments, done,
+        labelIds: orderedLabelIds, attachments, memberIds, done,
       };
       await createFeature(input, user?.uid ?? '');
       onClose();
@@ -212,6 +217,17 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
           <span>Mô tả</span>
           <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
+
+        {/* Người tham gia thêm tay (0046). Ở trang chi tiết, danh sách này gộp với người
+            suy ra từ ai có task; task mới thuộc feature auto-gắn cả nhóm vào watcher. */}
+        <WatchersField
+          members={members}
+          watcherIds={memberIds}
+          onChange={setMemberIds}
+          disabled={saving}
+          label="Người tham gia feature (tự gắn vào task mới của feature)"
+          emptyMembersHint="Chưa có thành viên nào trong dự án."
+        />
 
         <div className="field">
           {/* .field-label chứ không phải <span> trần: nhãn chỉ được style qua

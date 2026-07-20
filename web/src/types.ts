@@ -261,6 +261,11 @@ export interface Feature {
   /** Link tài liệu + ảnh ref dùng chung cho mọi task của feature (migration 0019). */
   attachments: Attachment[];
   /**
+   * Người tham gia THÊM TAY (uid → profiles.id), migration 0046. UI gộp với người suy ra
+   * từ ai có task; task mới thuộc feature auto-gắn cả hai nhóm vào `watcherIds`.
+   */
+  memberIds: string[];
+  /**
    * Mốc ĐÁNH DẤU TAY là đã xong (migration 0031) — cho feature ship từ trước khi có
    * tracker nên không có task để suy ra. null = suy từ task như thường.
    */

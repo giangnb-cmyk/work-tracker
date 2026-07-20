@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Timestamp } from '../lib/time';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
+import { useFeatureAssignees } from '../hooks/useFeatureAssignees';
 import { becameDone, createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDateRange, sundayOfWeek, timeAgo, toInputDate } from '../lib/format';
@@ -111,6 +112,30 @@ export default function TaskModal({
   const sprintName = sprints.find((s) => s.id === sprintId)?.name ?? 'Backlog';
   const projectName = projects.find((p) => p.id === projectId)?.name;
   const projectFeatures = features.filter((f) => f.projectId === projectId);
+
+  // Auto-gắn watcher khi TẠO task thuộc feature (0046): "người tham gia" = thêm tay
+  // (feature.memberIds) ∪ assignee đang có task trong feature. Chỉ tra ở chế độ tạo.
+  const derivedFeatureAssignees = useFeatureAssignees(featureId, !isEdit);
+  const featureParticipants = useMemo(() => {
+    const manual = features.find((f) => f.id === featureId)?.memberIds ?? [];
+    return [...new Set([...manual, ...derivedFeatureAssignees])];
+  }, [features, featureId, derivedFeatureAssignees]);
+
+  // Seed MỘT lần cho mỗi feature được chọn: gộp participant vào watcher (chỉ thêm, trừ
+  // chính người nhận). Ref theo featureId nên bỏ bớt watcher sau đó không bị gắn lại;
+  // đổi sang feature khác thì seed tiếp cho feature mới.
+  const seededFeatureRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isEdit || !featureId) return;
+    if (seededFeatureRef.current === featureId) return;
+    if (featureParticipants.length === 0) return; // chưa tải xong / feature chưa có ai
+    seededFeatureRef.current = featureId;
+    setWatcherIds((prev) => {
+      const next = new Set(prev);
+      for (const uid of featureParticipants) if (uid !== assigneeId) next.add(uid);
+      return [...next];
+    });
+  }, [isEdit, featureId, featureParticipants, assigneeId]);
   // Progress is derived from subtasks; with none, a done task still reads 100%.
   const doneCount = subtasks.filter((s) => s.done).length;
   const progress = subtasks.length

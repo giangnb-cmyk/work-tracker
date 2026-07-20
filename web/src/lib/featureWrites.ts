@@ -13,6 +13,8 @@ export interface FeatureInput {
   labelIds: string[];
   /** Link tài liệu + ảnh ref; mọi task của feature sẽ đọc lại mảng này. */
   attachments: Attachment[];
+  /** Người tham gia thêm tay (uid) — xem 0046. */
+  memberIds: string[];
   /** Đánh dấu tay là đã xong ngay lúc tạo (import feature đã ship từ lâu) — xem 0031. */
   done: boolean;
 }
@@ -29,6 +31,7 @@ export async function createFeature(input: FeatureInput, createdBy: string): Pro
       kind: input.kind,
       label_ids: input.labelIds,
       attachments: input.attachments,
+      member_ids: input.memberIds,
       done_at: input.done ? new Date().toISOString() : null,
       created_by: createdBy || null,
     })
@@ -55,6 +58,7 @@ export async function updateFeature(id: string, patch: FeaturePatch): Promise<vo
   if (patch.kind !== undefined) row.kind = patch.kind;
   if (patch.labelIds !== undefined) row.label_ids = patch.labelIds;
   if (patch.attachments !== undefined) row.attachments = patch.attachments;
+  if (patch.memberIds !== undefined) row.member_ids = patch.memberIds;
   if (patch.done !== undefined) row.done_at = patch.done ? new Date().toISOString() : null;
   const { error } = await supabase.from('features').update(row).eq('id', id);
   if (error) throw error;

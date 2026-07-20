@@ -7,6 +7,10 @@ interface Props {
   watcherIds: string[];
   onChange: (next: string[]) => void;
   disabled: boolean;
+  /** Nhãn field — mặc định cho watcher của task; FeatureModal đổi thành "người tham gia". */
+  label?: string;
+  /** Chữ hiện khi CHƯA có thành viên nào trong hệ thống. */
+  emptyMembersHint?: string;
 }
 
 /**
@@ -15,7 +19,14 @@ interface Props {
  * Chỉ hiện người ĐÃ gắn; nút tròn "+" mở danh sách để thêm. Trước đây field xổ hết mọi
  * thành viên ra thành chip, nên chỉ gắn 1-2 người mà chiếm nguyên một bức tường.
  */
-export default function WatchersField({ members, watcherIds, onChange, disabled }: Props) {
+export default function WatchersField({
+  members,
+  watcherIds,
+  onChange,
+  disabled,
+  label = 'Người liên quan (được báo khi hoàn thành)',
+  emptyMembersHint = 'Chưa có thành viên.',
+}: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -48,15 +59,15 @@ export default function WatchersField({ members, watcherIds, onChange, disabled 
   if (members.length === 0) {
     return (
       <div className="field">
-        <span className="field-label">Người liên quan (được báo khi hoàn thành)</span>
-        <span className="muted watcher-hint">Chưa có thành viên.</span>
+        <span className="field-label">{label}</span>
+        <span className="muted watcher-hint">{emptyMembersHint}</span>
       </div>
     );
   }
 
   return (
     <div className="field" ref={wrapRef}>
-      <span className="field-label">Người liên quan (được báo khi hoàn thành)</span>
+      <span className="field-label">{label}</span>
 
       <div className="watcher-list">
         {selected.map((m) => (
