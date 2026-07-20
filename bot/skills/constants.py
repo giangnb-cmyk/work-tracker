@@ -163,3 +163,15 @@ def end_of_work_week(d):
     if diff < 0:
         diff += 7
     return (d + timedelta(days=diff)).replace(hour=23, minute=59, second=59, microsecond=0)
+
+
+def sunday_of_week(d):
+    """Chu nhat KET THUC tuan (Mon->Sun) chua `d`, cuoi ngay. Pure.
+
+    Giong sundayOfWeek() ben web. Sprint la mot tuan -> han task = chu nhat cua tuan.
+    isoweekday(): T2=1..CN=7 -> so ngay toi CN = 7 - isoweekday (0 neu da la CN).
+    """
+    from datetime import timedelta
+
+    diff = 7 - d.isoweekday()  # T2->6, CN->0
+    return (d + timedelta(days=diff)).replace(hour=23, minute=59, second=59, microsecond=0)

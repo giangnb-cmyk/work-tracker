@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { becameDone, createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
-import { formatDateRange, timeAgo, toInputDate } from '../lib/format';
+import { formatDateRange, sundayOfWeek, timeAgo, toInputDate } from '../lib/format';
 import AttachmentsField from './task/AttachmentsField';
 import SubtasksField from './task/SubtasksField';
 import WatchersField from './task/WatchersField';
@@ -76,12 +76,15 @@ export default function TaskModal({
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? defaultAssigneeId ?? null);
   const [points, setPoints] = useState<number>(task?.points ?? 0);
-  // Tạo mới: hạn chót mặc định = ngày cuối của sprint đang chọn (cùng luật với bot,
-  // xem task_ops._due_window). Người tạo vẫn đổi tay được trước khi bấm Tạo.
+  // Tạo mới: hạn chót mặc định = CHỦ NHẬT của tuần sprint đang chọn (sprint = 1 tuần
+  // Mon→Sun). Tính từ ngày BẮT ĐẦU sprint để luôn ra chủ nhật, kể cả khi end_date của
+  // sprint lỡ đặt lệch sang thứ 2 tuần sau. Cùng luật với bot (task_ops._due_window).
+  // Người tạo vẫn đổi tay được trước khi bấm Tạo.
   const [due, setDue] = useState<string>(() => {
     if (task) return toInputDate(task.dueDate);
     const sprint = sprints.find((s) => s.id === defaultSprintId);
-    return sprint?.endDate ? toInputDate(sprint.endDate) : '';
+    const anchor = sprint?.startDate?.toDate() ?? sprint?.endDate?.toDate();
+    return anchor ? toInputDate(Timestamp.fromDate(sundayOfWeek(anchor))) : '';
   });
   const [attachments, setAttachments] = useState<Attachment[]>(task?.attachments ?? []);
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);

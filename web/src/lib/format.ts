@@ -40,6 +40,22 @@ export function endOfWorkWeek(d: Date): Date {
   return end;
 }
 
+/**
+ * Chủ nhật KẾT THÚC tuần (Mon→Sun) chứa `d`, đặt về cuối ngày.
+ *
+ * Sprint là một tuần, "hạn chót của task = chủ nhật của tuần" (yêu cầu người dùng). Tính
+ * từ NGÀY BẮT ĐẦU sprint (thứ 2) -> +6 = chủ nhật; nên dù end_date của sprint lỡ đặt lệch
+ * (vd thứ 2 tuần sau) thì hạn task vẫn rơi đúng chủ nhật.
+ */
+export function sundayOfWeek(d: Date): Date {
+  const day = d.getDay(); // 0=Sun .. 6=Sat
+  const diff = day === 0 ? 0 : 7 - day; // số ngày tới chủ nhật (0 nếu đã là CN)
+  const end = new Date(d);
+  end.setDate(d.getDate() + diff);
+  end.setHours(23, 59, 59, 0);
+  return end;
+}
+
 /** "14/07" or "14/07 → 18/07" when start & end differ. Dash for empty. */
 export function formatDateRange(
   start: Timestamp | null | undefined,

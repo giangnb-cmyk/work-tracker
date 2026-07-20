@@ -34,6 +34,7 @@ from constants import (
     STATUS_DONE,
     PRIORITY_MEDIUM,
     end_of_work_week,
+    sunday_of_week,
     normalize_priority,
     normalize_status,
     parse_ymd,
@@ -78,16 +79,18 @@ def _resolve_sprint(client, token: str):
 def _due_window(sprint, due_arg: str):
     """Tra ve (dueStart, dueDate) cho task moi.
 
-    Thu tu uu tien: --due nguoi dung dua > cuoi sprint > cuoi tuan lam viec.
-    Cuoi cung bam theo web (endOfWorkWeek) de task backlog/sprint khong ngay van co han.
+    Thu tu uu tien: --due nguoi dung dua > CHU NHAT cua tuan sprint > cuoi tuan lam viec.
+    Sprint la mot tuan -> han = chu nhat, tinh tu NGAY BAT DAU sprint (thu 2) nen dung ca
+    khi end_date sprint dat lech. Giong web (TaskModal + sundayOfWeek).
     dueStart = bay gio, giong createTask ben web -> Timeline ve duoc thanh Gantt.
     """
     now = datetime.now(timezone.utc)
     explicit = _parse_due(due_arg)
     if explicit:
         return now, explicit, "bạn đặt"
-    if sprint and sprint.get("endDate"):
-        return now, repo._as_datetime(sprint["endDate"]), "cuối sprint"
+    anchor = (sprint or {}).get("startDate") or (sprint or {}).get("endDate")
+    if anchor:
+        return now, sunday_of_week(repo._as_datetime(anchor)), "chủ nhật của sprint"
     return now, end_of_work_week(now), "cuối tuần"
 
 
