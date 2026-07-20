@@ -1917,7 +1917,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .feat-group-grid { margin: 0.75rem 0 1.25rem; animation: fadeIn 0.2s ease; }
 
 /* Feature: nhãn + loại (delivery/ongoing) + thanh lọc */
-.feat-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; }
+/* Bám TRÁI như mọi thứ khác trong .project-card (align-items:flex-start). center làm
+   hàng chip xuống dòng (vd IAP+Feature rồi 1.2.x rớt xuống) bị căn giữa, lệch hẳn với
+   các thẻ một hàng chip — và lệch với .feat-chip-row của trang chi tiết (vốn trái). */
+.feat-chips { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 0.3rem; }
 /* Nhãn của feature (card + trang chi tiết) là thông tin CHÍNH — gói bán nào, version
    nào — chứ không phải chú thích bên lề như chip trong danh sách bug, nên to hơn chip
    mặc định. Bó trong .feat-chips-lg để tab Bugs không đổi theo. */

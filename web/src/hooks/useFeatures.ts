@@ -17,11 +17,13 @@ export function useFeatures() {
     return (data ?? []).map(rowToFeature);
   }, []);
 
-  const { data: features, loading } = useLiveQuery<Feature>({
+  const { data: features, loading, refetch } = useLiveQuery<Feature>({
     table: 'features',
     fetcher,
     deps: [],
   });
 
-  return { features, loading };
+  // refetch để hiện feature mới/sửa NGAY sau khi ghi, không đợi realtime dội về
+  // (cùng khuôn với useSprints).
+  return { features, loading, refetch };
 }

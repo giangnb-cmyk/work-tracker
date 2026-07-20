@@ -18,7 +18,7 @@ import { type FeaturePerson } from './FeatureAvatars';
 import FeatureCard from './FeatureCard';
 import FeatureTeamRow from './FeatureTeamRow';
 import FeatureFilterBar, { isFeatureDone, matchFeature, type FeatureFilterToken } from './FeatureFilterBar';
-import { groupFeaturesByVersion } from '../lib/featureGroups';
+import { groupFeaturesByVersion, NO_VERSION } from '../lib/featureGroups';
 import { versionRangeChips, type VersionChip } from '../lib/versionRange';
 import { labelGroup } from '../lib/bugLabelGroups';
 import type { Feature, FeatureLabel, Task, TaskStatus } from '../types';
@@ -149,6 +149,24 @@ export default function Features() {
       const n = new Set(s);
       if (n.has(key)) n.delete(key);
       else n.add(key);
+      return n;
+    });
+  }
+
+  /**
+   * Vừa tạo feature xong: mở nhóm version chứa nó, kẻo feature mới rơi vào nhóm đang thu
+   * gọn = "tạo mà không thấy". Nhãn version của feature CHÍNH LÀ key nhóm (xem
+   * groupFeaturesByVersion); không có version nào thì nó nằm ở nhóm NO_VERSION.
+   */
+  function openGroupsForNewFeature(labelIds: string[]) {
+    const versionKeys = labelIds.filter((id) => {
+      const l = labelById.get(id);
+      return l && labelGroup(l.name) === 'version';
+    });
+    setOpenKeys((s) => {
+      const n = new Set(s);
+      if (versionKeys.length === 0) n.add(NO_VERSION);
+      else versionKeys.forEach((k) => n.add(k));
       return n;
     });
   }
@@ -310,7 +328,11 @@ export default function Features() {
       )}
 
       {creating && selectedProjectId && (
-        <FeatureModal projectId={selectedProjectId} onClose={() => setCreating(false)} />
+        <FeatureModal
+          projectId={selectedProjectId}
+          onClose={() => setCreating(false)}
+          onCreated={openGroupsForNewFeature}
+        />
       )}
     </div>
   );

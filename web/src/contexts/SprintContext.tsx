@@ -26,6 +26,8 @@ interface SprintContextState extends ReturnType<typeof useSprints> {
   projectsLoading: boolean;
   features: Feature[];
   featuresLoading: boolean;
+  /** Nạp lại feature ngay sau khi tạo/sửa (khỏi đợi realtime). */
+  refetchFeatures: () => Promise<void>;
   selectedProjectId: string | null;
   selectedProject: Project | null;
   selectProject: (id: string | null) => void;
@@ -41,7 +43,7 @@ export function SprintProvider({ children }: { children: ReactNode }) {
   const sprintApi = useSprints(user?.uid ?? '');
   const { members, loading: membersLoading } = useMembers();
   const { projects, loading: projectsLoading } = useProjects();
-  const { features, loading: featuresLoading } = useFeatures();
+  const { features, loading: featuresLoading, refetch: refetchFeatures } = useFeatures();
   // Selected project is the app-entry gate; persist it so a refresh stays in the project.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     () => localStorage.getItem(PROJECT_KEY),
@@ -92,6 +94,7 @@ export function SprintProvider({ children }: { children: ReactNode }) {
       projectsLoading,
       features,
       featuresLoading,
+      refetchFeatures,
       selectedProjectId,
       selectedProject,
       selectProject,
@@ -102,7 +105,7 @@ export function SprintProvider({ children }: { children: ReactNode }) {
         setSelectedSprintId(id);
       },
     }),
-    [sprintApi, members, membersLoading, projects, projectsLoading, features, featuresLoading, selectedProjectId, selectedProject, selectedSprintId, selectedSprint],
+    [sprintApi, members, membersLoading, projects, projectsLoading, features, featuresLoading, refetchFeatures, selectedProjectId, selectedProject, selectedSprintId, selectedSprint],
   );
 
   return <SprintContext.Provider value={value}>{children}</SprintContext.Provider>;

@@ -30,14 +30,19 @@ interface FeatureModalProps {
   feature?: Feature | null; // null = create
   projectId: string; // owning project (create)
   onClose: () => void;
+  /**
+   * Tạo xong -> báo labelIds vừa dùng để lưới mở đúng nhóm version chứa feature mới.
+   * Không có nó thì feature mới rơi vào nhóm version đang thu gọn = "tạo mà không thấy".
+   */
+  onCreated?: (labelIds: string[]) => void;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /** Admin dialog to create/edit a feature within a project. */
-export default function FeatureModal({ feature, projectId, onClose }: FeatureModalProps) {
+export default function FeatureModal({ feature, projectId, onClose, onCreated }: FeatureModalProps) {
   const { user } = useAuth();
-  const { members } = useSprintContext();
+  const { members, refetchFeatures } = useSprintContext();
   const isEdit = Boolean(feature);
   const [name, setName] = useState(feature?.name ?? '');
   const [icon, setIcon] = useState(feature?.icon ?? '🧩');
@@ -143,6 +148,7 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
       savedDoneRef.current = done;
       lastSavedRef.current = pending;
       setSaveState('saved');
+      void refetchFeatures(); // sửa xong phản ánh ngay ở lưới/chi tiết, không đợi realtime
     } catch (err) {
       console.error('Tự động lưu feature thất bại', err);
       setSaveState('error');
@@ -183,6 +189,8 @@ export default function FeatureModal({ feature, projectId, onClose }: FeatureMod
         labelIds: orderedLabelIds, attachments, memberIds, done,
       };
       await createFeature(input, user?.uid ?? '');
+      onCreated?.(orderedLabelIds);
+      await refetchFeatures(); // hiện feature mới NGAY, không đợi realtime dội về
       onClose();
     } catch (err) {
       console.error('Tạo feature thất bại', err);
