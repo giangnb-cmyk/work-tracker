@@ -3,6 +3,9 @@ import Avatar from '../Avatar';
 import { foldDiacritics } from '../../lib/text';
 import { JOB_ROLE_LABEL, type TeamMember } from '../../types';
 
+/** Tham chiếu ổn định cho "không loại ai" — khỏi tạo mảng mới mỗi lần render (vỡ useMemo). */
+const NO_EXCLUDE: string[] = [];
+
 interface Props {
   members: TeamMember[];
   watcherIds: string[];
@@ -12,6 +15,11 @@ interface Props {
   label?: string;
   /** Chữ hiện khi CHƯA có thành viên nào trong hệ thống. */
   emptyMembersHint?: string;
+  /**
+   * uid bị LOẠI khỏi cả danh sách hiện lẫn ô thêm — TaskModal truyền người NHẬN vào đây:
+   * người nhận đã là người làm task, không cần liệt kê lại ở "người liên quan".
+   */
+  excludeIds?: string[];
 }
 
 /**
@@ -27,6 +35,7 @@ export default function WatchersField({
   disabled,
   label = 'Người liên quan (được báo khi hoàn thành)',
   emptyMembersHint = 'Chưa có thành viên.',
+  excludeIds = NO_EXCLUDE,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -36,12 +45,16 @@ export default function WatchersField({
   const selected = useMemo(() => {
     const byId = new Map(members.map((m) => [m.uid, m]));
     // Duyệt theo watcherIds chứ không theo members: giữ đúng thứ tự người dùng đã thêm.
-    return watcherIds.map((id) => byId.get(id)).filter((m): m is TeamMember => Boolean(m));
-  }, [members, watcherIds]);
+    // Loại excludeIds (người nhận) — dù còn trong watcherIds thì cũng không hiện lại.
+    return watcherIds
+      .filter((id) => !excludeIds.includes(id))
+      .map((id) => byId.get(id))
+      .filter((m): m is TeamMember => Boolean(m));
+  }, [members, watcherIds, excludeIds]);
 
   const addable = useMemo(
-    () => members.filter((m) => !watcherIds.includes(m.uid)),
-    [members, watcherIds],
+    () => members.filter((m) => !watcherIds.includes(m.uid) && !excludeIds.includes(m.uid)),
+    [members, watcherIds, excludeIds],
   );
 
   // Lọc theo tên (không dấu) — danh sách thành viên sẽ dài dần.

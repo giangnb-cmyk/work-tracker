@@ -269,7 +269,8 @@ def _notify_created(client, task_id, short_code, task_doc, project, feature, spr
         "author": {"name": "🆕 Task mới"},
         "title": task_doc.get("title", ""),
         "color": 0x6366F1,  # indigo accent (design system), song song web
-        "description": "\n".join(lines),  # moi thong tin mot dong
+        # '\n\n' (dong trong xen giua) cho thoang — '\n' don thi cac dong sat nhau kho doc.
+        "description": "\n\n".join(lines),
     }
     url = web_link.task_short_url(short_code, task_id)
     if url:

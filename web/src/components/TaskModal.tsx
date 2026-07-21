@@ -95,6 +95,9 @@ export default function TaskModal({
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
   const [watcherIds, setWatcherIds] = useState<string[]>(task?.watcherIds ?? []);
   const [creating, setCreating] = useState(false);
+  // Người NHẬN không hiện ở "người liên quan" (họ đã là người làm task). Loại ngay trên UI
+  // — không đụng dữ liệu: đổi người nhận thì người cũ lại xuất hiện đúng như một watcher.
+  const watcherExclude = useMemo(() => (assigneeId ? [assigneeId] : []), [assigneeId]);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -403,7 +406,7 @@ export default function TaskModal({
                   <input className="input" type="number" min={0} value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} disabled={!isAdmin} />
                 </label>
               </div>
-              <WatchersField members={members} watcherIds={watcherIds} onChange={setWatcherIds} disabled={!canEditFields} />
+              <WatchersField members={members} watcherIds={watcherIds} onChange={setWatcherIds} disabled={!canEditFields} excludeIds={watcherExclude} />
             </section>
 
             {/* Tài liệu (chỉ link) */}

@@ -25,19 +25,12 @@ export default function ProjectSelect() {
           <span>Work Tracker</span>
         </div>
         <div className="row" style={{ gap: '0.6rem' }}>
-          {/* Việc bao quát cả web — mở ngoài dự án. Chỉ admin; người thường không thấy. */}
+          {/* Một cửa vào khu quản trị (thành viên toàn web, cấu hình, hệ thống) — bao quát
+              cả web nên sống NGOÀI dự án, mở thành trang riêng. Chỉ admin thấy nút này. */}
           {isAdmin && (
-            <div className="row global-admin-links" style={{ gap: '0.4rem' }}>
-              <button className="btn-sm" onClick={() => navigate('/team')} title="Toàn bộ thành viên đã vào web">
-                👥 Thành viên
-              </button>
-              <button className="btn-sm" onClick={() => navigate('/settings')} title="Cấu hình đăng nhập web">
-                ⚙️ Cấu hình
-              </button>
-              <button className="btn-sm" onClick={() => navigate('/log')} title="Nhật ký hệ thống">
-                🖥️ Hệ thống
-              </button>
-            </div>
+            <button className="btn-sm" onClick={() => navigate('/team')} title="Khu quản trị: thành viên toàn web, cấu hình, hệ thống">
+              🛠️ Admin
+            </button>
           )}
           <Avatar name={profile?.displayName ?? ''} photoURL={profile?.photoURL} size="sm" />
           <span className="muted" style={{ fontSize: '0.85rem' }}>{profile?.displayName}</span>

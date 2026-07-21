@@ -2526,18 +2526,37 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .log-actor { display: inline-flex; align-items: center; gap: 0.4rem; }
 
 /* ============================================================================
-   Khu quản trị NGOÀI dự án (GlobalAdmin) + bộ chọn người vào dự án
+   Khu quản trị NGOÀI dự án (GlobalAdmin): sidebar trái thu/mở + nội dung
    ========================================================================== */
-.global-admin { min-height: 100vh; display: flex; flex-direction: column; }
-.global-admin-top {
-  position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-  padding: 0.9rem 1.5rem;
-  background: var(--glass); backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+.ga-shell {
+  display: grid; grid-template-columns: 64px 1fr; min-height: 100vh;
+  transition: grid-template-columns 0.18s ease;
 }
-.global-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1; }
-.global-admin-body { width: 100%; max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
+.ga-shell.expanded { grid-template-columns: 240px 1fr; }
+
+.ga-sidebar {
+  background: var(--surface); border-right: 1px solid var(--border);
+  padding: 1rem 0.55rem; display: flex; flex-direction: column; gap: 0.35rem;
+  position: sticky; top: 0; height: 100vh; overflow: hidden;
+}
+/* Nút thu/mở đứng đầu; nút "Chọn dự án" cách nhóm tab một chút cho ra khối riêng. */
+.ga-toggle { color: var(--muted); }
+.ga-back { margin-bottom: 0.5rem; }
+.ga-nav { display: flex; flex-direction: column; gap: 0.2rem; }
+.ga-label { white-space: nowrap; overflow: hidden; }
+
+.ga-footer { margin-top: auto; border-top: 1px solid var(--border); padding-top: 0.6rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.ga-user { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0.5rem; min-width: 0; }
+.ga-user-name { font-size: 0.85rem; color: var(--text); text-overflow: ellipsis; }
+.ga-signout .icon { transform: rotate(0deg); }
+
+/* Thu gọn: chỉ còn icon, canh giữa; nhãn ẩn (title tooltip vẫn cho biết là gì). */
+.ga-shell:not(.expanded) .ga-label { display: none; }
+.ga-shell:not(.expanded) .nav-item { justify-content: center; padding-left: 0; padding-right: 0; gap: 0; }
+.ga-shell:not(.expanded) .ga-user { justify-content: center; padding-left: 0; padding-right: 0; }
+
+.ga-main { display: flex; flex-direction: column; min-width: 0; }
+.ga-main-inner { padding: 1.75rem 2rem 4rem; min-width: 0; }
 
 /* Bộ chọn thành viên (ProjectMemberPicker) — danh sách cuộn, mỗi dòng một người. */
 .picker-list {

@@ -75,7 +75,8 @@ function buildCreatedMessage(p: CreatedPayload): { content: string; embeds: Embe
     author: { name: '🆕 Task mới' },
     title: p.title,
     color: CREATED_COLOR,
-    description: lines.join('\n'),
+    // '\n\n' (dòng trống xen giữa) cho thoáng — '\n' đơn thì các dòng sát nhau khó đọc.
+    description: lines.join('\n\n'),
   };
   if (p.url) embed.url = p.url; // tên task bấm được → mở link rút gọn
   const content = users.length > 0 ? users.map((id) => `<@${id}>`).join(' ') : '';
