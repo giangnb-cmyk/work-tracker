@@ -4,6 +4,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { formatDate } from '../lib/format';
 import Avatar from './Avatar';
 import ProjectModal from './ProjectModal';
+import type { Project } from '../types';
 
 /**
  * Landing page: pick a project before entering the app. Selecting one opens the
@@ -13,6 +14,7 @@ export default function ProjectSelect() {
   const { profile, isAdmin, signOut } = useAuth();
   const { projects, projectsLoading, selectProject } = useSprintContext();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Project | null>(null);
 
   return (
     <div className="project-select">
@@ -45,13 +47,25 @@ export default function ProjectSelect() {
               </button>
             )}
             {projects.map((p) => (
-              <button key={p.id} className="project-card glass" onClick={() => selectProject(p.id)}>
-                <span className="project-icon" style={{ background: `${p.color}22` }}>{p.icon}</span>
-                <span className="project-name">{p.name}</span>
-                <span className="project-meta">
-                  {p.notionProjectId ? '🔗 Notion · ' : ''}{formatDate(p.createdAt)}
-                </span>
-              </button>
+              <div key={p.id} className="project-card-wrap">
+                <button className="project-card glass" onClick={() => selectProject(p.id)}>
+                  <span className="project-icon" style={{ background: `${p.color}22` }}>{p.icon}</span>
+                  <span className="project-name">{p.name}</span>
+                  <span className="project-meta">
+                    {p.notionProjectId ? '🔗 Notion · ' : ''}{formatDate(p.createdAt)}
+                  </span>
+                </button>
+                {isAdmin && (
+                  <button
+                    className="project-edit-btn"
+                    title="Sửa dự án (webhook báo cáo, Notion, sheet…)"
+                    aria-label={`Sửa dự án ${p.name}`}
+                    onClick={(e) => { e.stopPropagation(); setEditing(p); }}
+                  >
+                    ⚙
+                  </button>
+                )}
+              </div>
             ))}
             {projects.length === 0 && !isAdmin && (
               <div className="glass empty">Chưa có dự án nào. Nhờ admin tạo dự án nhé.</div>
@@ -61,6 +75,7 @@ export default function ProjectSelect() {
       </div>
 
       {creating && <ProjectModal onClose={() => setCreating(false)} />}
+      {editing && <ProjectModal project={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }

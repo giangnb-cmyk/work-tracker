@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quy trình RAG của bot — Bot Work Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --glass: rgba(30, 41, 59, 0.7);
+        --primary: #6366f1;
+        --sky: #38bdf8;
+        --gold: #fbbf24;
+        --green: #22c55e;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.1);
+        --radius: 16px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; font-size: 1rem; }
+      .bg-premium {
+        position: fixed; inset: 0; z-index: -1;
+        background:
+          radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+          radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.06) 0%, transparent 40%),
+          var(--bg);
+      }
+      .layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1200px; margin: 0 auto; gap: 2rem; padding: 2rem; }
+      .toc { position: sticky; top: 2rem; align-self: start; font-size: 0.9rem; }
+      .toc h2 { font-family: 'Outfit'; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.75rem; }
+      .toc a { display: block; color: var(--muted); text-decoration: none; padding: 0.35rem 0.6rem; border-radius: 8px; border-left: 2px solid transparent; }
+      .toc a:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+      article { min-width: 0; }
+      .doc-header { margin-bottom: 2rem; }
+      .doc-header .eyebrow { color: var(--sky); font-weight: 600; font-size: 0.85rem; letter-spacing: 0.04em; }
+      h1 { font-family: 'Outfit'; font-weight: 800; font-size: 2.4rem; line-height: 1.15; margin: 0.4rem 0; }
+      .doc-header .meta { color: var(--muted); font-size: 0.9rem; }
+      h2 { font-family: 'Outfit'; font-weight: 700; font-size: 1.5rem; margin: 2.5rem 0 1rem; padding-top: 0.5rem; scroll-margin-top: 1.5rem; }
+      h3 { font-family: 'Outfit'; font-weight: 600; font-size: 1.15rem; margin: 1.75rem 0 0.75rem; }
+      p, ul, ol { margin-bottom: 1rem; }
+      ul, ol { padding-left: 1.4rem; }
+      li { margin-bottom: 0.35rem; }
+      a { color: var(--sky); }
+      strong { color: #fff; }
+      code { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; background: rgba(255, 255, 255, 0.08); padding: 0.15em 0.4em; border-radius: 5px; }
+      pre { background: rgba(2, 6, 23, 0.6); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; overflow-x: auto; margin-bottom: 1.25rem; }
+      pre code { background: none; padding: 0; font-size: 0.85rem; line-height: 1.6; }
+      .card { background: var(--glass); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+      .callout { border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; background: rgba(0, 0, 0, 0.2); }
+      .callout.info { border-left: 3px solid var(--sky); }
+      .callout.success { border-left: 3px solid var(--green); }
+      .callout.warning { border-left: 3px solid var(--amber); }
+      .callout.danger { border-left: 3px solid var(--red); }
+      .callout .label { font-weight: 700; font-family: 'Outfit'; display: block; margin-bottom: 0.25rem; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.92rem; }
+      th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0.75rem; border-bottom: 1px solid var(--border); }
+      td { padding: 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+      .table-wrap { overflow-x: auto; }
+      footer { color: var(--muted); font-size: 0.82rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+
+      /* ---- Sơ đồ node ---- */
+      .diagram { margin: 1.25rem 0 1.5rem; }
+      .flow { display: flex; flex-direction: column; align-items: center; }
+      .node {
+        width: 100%; max-width: 600px; background: var(--glass); backdrop-filter: blur(10px);
+        border: 1px solid var(--border); border-left: 4px solid var(--primary);
+        border-radius: 12px; padding: 0.8rem 1.05rem; text-align: left;
+      }
+      .node .kind { font-family: 'Outfit'; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); display: block; margin-bottom: 0.15rem; }
+      .node .title { font-weight: 600; font-family: 'Outfit'; font-size: 0.98rem; }
+      .node .desc { color: var(--muted); font-size: 0.84rem; margin-top: 0.3rem; }
+      .node code { font-size: 0.78em; }
+      .node.k-trigger { border-left-color: var(--amber); }
+      .node.k-source  { border-left-color: var(--sky); }
+      .node.k-proc    { border-left-color: var(--primary); }
+      .node.k-store   { border-left-color: var(--green); }
+      .node.k-gate    { border-left-color: var(--gold); }
+      .node.k-out     { border-left-color: var(--sky); }
+      .arrow { color: var(--muted); font-size: 1.05rem; line-height: 1; padding: 0.3rem 0; text-align: center; }
+      .arrow small { display: block; font-size: 0.7rem; color: var(--muted); }
+      .branch-row { display: flex; gap: 1rem; width: 100%; justify-content: center; flex-wrap: wrap; align-items: stretch; }
+      .flow-col { flex: 1; min-width: 232px; max-width: 340px; display: flex; flex-direction: column; align-items: center; }
+      .flow-col .node { max-width: none; height: 100%; }
+      .legend { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin: 1rem 0 0; }
+      .legend .lg { display: flex; align-items: center; gap: 0.45rem; font-size: 0.8rem; color: var(--muted); }
+      .legend .sw { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+      .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      .chip { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.82rem; }
+      .chip b { color: var(--sky); font-weight: 600; }
+
+      @media (max-width: 860px) {
+        .layout { grid-template-columns: 1fr; padding: 1.25rem; }
+        .toc { position: static; }
+        h1 { font-size: 1.9rem; }
+        .branch-row { flex-direction: column; align-items: center; }
+        .flow-col { max-width: 600px; width: 100%; }
+      }
+      @media print { .bg-premium, .toc { display: none; } body { background: #fff; color: #000; } .layout { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="bg-premium"></div>
+    <div class="layout">
+      <nav class="toc">
+        <h2>Mục lục</h2>
+        <a href="#tong-quan">Tổng quan</a>
+        <a href="#cong-nghe">Công nghệ &amp; thành phần</a>
+        <a href="#luong-nap">Luồng 1 — Nạp tài liệu</a>
+        <a href="#kho">Kho lưu trữ</a>
+        <a href="#luong-hoi">Luồng 2 — Hỏi tài liệu</a>
+        <a href="#phan-quyen">Phân quyền tài liệu</a>
+        <a href="#van-hanh">Ghi chú vận hành</a>
+      </nav>
+
+      <article>
+        <header class="doc-header">
+          <span class="eyebrow">TÀI LIỆU KỸ THUẬT</span>
+          <h1>Quy trình RAG của bot</h1>
+          <p class="meta">Cập nhật: 21/07/2026 · Người viết: giangnb · Dự án: Bot Work Tracker (<code>bot/</code>)</p>
+        </header>
+
+        <section id="tong-quan">
+          <h2>Tổng quan</h2>
+          <p>
+            <strong>RAG</strong> (Retrieval-Augmented Generation) là cách bot Discord trả lời câu hỏi về
+            <strong>nội dung tài liệu</strong> (spec, hướng dẫn, quy trình, meeting notes…). Thay vì để mô hình
+            "bịa", bot đi <em>tìm</em> các đoạn văn liên quan trong kho rồi mới <em>tổng hợp</em> câu trả lời
+            dựa trên đúng các đoạn đó, kèm trích nguồn.
+          </p>
+          <p>Hệ thống gồm <strong>hai luồng tách rời</strong>:</p>
+          <div class="diagram">
+            <div class="branch-row">
+              <div class="flow-col">
+                <div class="node k-proc">
+                  <span class="kind">Luồng 1 · offline</span>
+                  <span class="title">📥 Nạp tài liệu</span>
+                  <span class="desc">Chạy nền, tự động 9h/ngày. Đọc tài liệu → cắt đoạn → tạo <em>embedding</em> → lưu vào kho vector. Người dùng không thấy.</span>
+                </div>
+              </div>
+              <div class="flow-col">
+                <div class="node k-out">
+                  <span class="kind">Luồng 2 · realtime</span>
+                  <span class="title">💬 Hỏi tài liệu</span>
+                  <span class="desc">Khi bị @tag trên Discord. Biến câu hỏi thành vector → tìm đoạn gần nhất trong kho → Claude tổng hợp trả lời.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p>
+            Cả hai luồng dùng <strong>chung một mô hình embedding</strong> (<code>bge-m3</code>) và
+            <strong>chung một kho</strong> (bảng <code>documents</code> trên Supabase + pgvector) — đó là điểm mấu
+            chốt để "câu hỏi" và "tài liệu" so khớp được với nhau.
+          </p>
+          <div class="legend card" style="padding: 1rem 1.25rem;">
+            <div class="lg"><span class="sw" style="background: var(--amber)"></span> Điểm kích hoạt / lịch chạy</div>
+            <div class="lg"><span class="sw" style="background: var(--sky)"></span> Nguồn dữ liệu / đầu ra</div>
+            <div class="lg"><span class="sw" style="background: var(--primary)"></span> Bước xử lý</div>
+            <div class="lg"><span class="sw" style="background: var(--green)"></span> Kho lưu trữ</div>
+            <div class="lg"><span class="sw" style="background: var(--gold)"></span> Rẽ nhánh / phân quyền</div>
+          </div>
+        </section>
+
+        <section id="cong-nghe">
+          <h2>Công nghệ &amp; thành phần</h2>
+          <div class="chips">
+            <span class="chip"><b>discord.py</b> — bot lắng nghe &amp; trả lời</span>
+            <span class="chip"><b>Claude CLI</b> — bộ não điều phối skill</span>
+            <span class="chip"><b>Ollama + bge-m3</b> — tạo embedding 1024 chiều (chạy trên máy bot)</span>
+            <span class="chip"><b>Supabase Postgres + pgvector</b> — kho vector</span>
+            <span class="chip"><b>Google Drive API</b> — nguồn tài liệu (service account)</span>
+          </div>
+          <div class="callout info" style="margin-top: 1.25rem;">
+            <span class="label">Các skill liên quan (thư mục <code>bot/skills/</code>)</span>
+            <code>sync_docs.py</code>, <code>drive_catalog.py</code>, <code>drive_ingest.py</code>,
+            <code>doc_reader.py</code>, <code>doc_ingest.py</code>, <code>embeddings.py</code>,
+            <code>doc_repo.py</code>, <code>doc_search.py</code> · RPC <code>match_documents</code> (Supabase).
+          </div>
+        </section>
+
+        <section id="luong-nap">
+          <h2>Luồng 1 — Nạp tài liệu (offline)</h2>
+          <p>
+            Điều phối bởi <code>bot.py → daily_rag_sync()</code>, chạy lúc <strong>9h sáng</strong>
+            (<code>Asia/Ho_Chi_Minh</code>) mỗi ngày nếu bật <code>rag_sync_enabled</code>. Gồm <strong>3 phần
+            tách lỗi</strong> (một phần hỏng không làm gãy phần còn lại):
+          </p>
+
+          <div class="diagram">
+            <div class="flow">
+              <div class="node k-trigger">
+                <span class="kind">Điểm kích hoạt</span>
+                <span class="title">⏰ daily_rag_sync — 9h mỗi ngày</span>
+                <span class="desc"><code>bot.py</code>, chỉ chạy khi <code>rag_sync_enabled = true</code>. Mỗi phần có giới hạn thời gian riêng (<code>drive_ingest</code> tới 3 giờ).</span>
+              </div>
+              <div class="arrow">▼ <small>chạy 3 phần</small></div>
+              <div class="branch-row">
+                <div class="flow-col">
+                  <div class="node k-source">
+                    <span class="kind">Phần (a)</span>
+                    <span class="title">📂 sync_docs.py</span>
+                    <span class="desc">Tài liệu trong thư mục <code>docs/</code> + các link ngoài đã khai báo ("tài liệu chung").</span>
+                  </div>
+                </div>
+                <div class="flow-col">
+                  <div class="node k-source">
+                    <span class="kind">Phần (b)</span>
+                    <span class="title">🗂️ drive_catalog.py</span>
+                    <span class="desc"><strong>Danh mục</strong> Google Drive: chỉ ghi <em>file NẰM Ở ĐÂU</em> (trả lời "file ở đâu"), <strong>không</strong> đọc ruột.</span>
+                  </div>
+                </div>
+                <div class="flow-col">
+                  <div class="node k-source">
+                    <span class="kind">Phần (c)</span>
+                    <span class="title">📄 drive_ingest.py</span>
+                    <span class="desc">Đọc <strong>RUỘT</strong> (nội dung) file trên Drive → đây là phần chính của RAG (xem chi tiết bên dưới).</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3>Chi tiết phần (c) — <code>drive_ingest.py</code></h3>
+          <p>Đây là nơi tài liệu Drive được biến thành vector và lưu vào kho:</p>
+          <div class="diagram">
+            <div class="flow">
+              <div class="node k-source">
+                <span class="kind">Nguồn</span>
+                <span class="title">☁️ Drive API — liệt kê file</span>
+                <span class="desc">Mọi file được share cho <em>service account</em> (<code>drive_gateway.list_documents</code>).</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-gate">
+                <span class="kind">Lọc</span>
+                <span class="title">🧹 Bỏ file không cần</span>
+                <span class="desc"><code>rag_drive_skip</code>: bỏ folder <code>csv_config</code>, tên chứa <code>localization</code> (toàn chuỗi/số, nạp vào chỉ nhiễu kho).</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-gate">
+                <span class="kind">Tăng dần</span>
+                <span class="title">⏭️ Bỏ qua file không đổi</span>
+                <span class="desc">So <code>modifiedTime</code> với <code>source_version</code> đã lưu — chỉ nạp lại file <strong>vừa sửa</strong>. Embedding local rất chậm nên không nạp lại cả kho mỗi ngày.</span>
+              </div>
+              <div class="arrow">▼ <small>với mỗi file cần nạp</small></div>
+              <div class="node k-proc">
+                <span class="kind">Đọc</span>
+                <span class="title">📖 Tải/export → doc_reader.read_sections</span>
+                <span class="desc">Tải file về (Sheet lớn thì đọc qua Sheets API), tách thành các "mục" (section / tab).</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-proc">
+                <span class="kind">Cắt đoạn</span>
+                <span class="title">✂️ chunk_text → build_pairs</span>
+                <span class="desc">Cắt mỗi mục thành đoạn ~<strong>800 ký tự</strong>, gối đầu <strong>120 ký tự</strong> giữa 2 đoạn để giữ ngữ cảnh.</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-proc">
+                <span class="kind">Embedding</span>
+                <span class="title">🧠 embed_batch — bge-m3 qua Ollama</span>
+                <span class="desc">Mỗi đoạn → 1 vector <strong>1024 chiều</strong>. Gọi tuần tự (Ollama xử lý 1 prompt/lần) — đây là bước tốn thời gian nhất (~3s/đoạn).</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-store">
+                <span class="kind">Ghi kho</span>
+                <span class="title">💾 doc_repo.insert_chunks → bảng documents</span>
+                <span class="desc">Lưu mỗi đoạn kèm: <code>source</code>, <code>section</code>, <code>chunk_index</code>, <code>content</code>, <code>embedding(1024)</code>, <code>source_url</code> (deep link — Google Sheets trỏ đúng tab <code>#gid</code>), <code>source_version</code>, <code>drive_folder_ids</code> (id folder tổ tiên).</span>
+              </div>
+              <div class="arrow">▼ <small>sau khi duyệt hết file</small></div>
+              <div class="node k-proc">
+                <span class="kind">Dọn</span>
+                <span class="title">🗑️ Prune — gỡ nguồn đã mất</span>
+                <span class="desc">Xoá khỏi kho những nguồn "Drive: …" không còn trên Drive (hoặc vừa bị lọc bỏ).</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="callout warning">
+            <span class="label">Vì sao nạp "tăng dần"?</span>
+            Kho hiện có khoảng <strong>2.4 nghìn đoạn</strong>. Embedding chạy cục bộ trên máy bot nên rất chậm;
+            nạp lại toàn bộ mỗi ngày là bất khả thi (nhiều giờ). Vì vậy chỉ file có <code>modifiedTime</code> thay
+            đổi mới được đọc &amp; embedding lại.
+          </div>
+        </section>
+
+        <section id="kho">
+          <h2>Kho lưu trữ — bảng <code>documents</code></h2>
+          <p>
+            Nằm giữa hai luồng: <strong>luồng nạp ghi vào</strong>, <strong>luồng hỏi đọc ra</strong>. Là một bảng
+            Postgres trên Supabase có cột <code>embedding</code> kiểu <code>vector(1024)</code> nhờ extension
+            <strong>pgvector</strong> — cho phép tìm "đoạn gần nghĩa nhất" bằng khoảng cách cosine.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cột</th><th>Ý nghĩa</th></tr></thead>
+              <tbody>
+                <tr><td><code>source</code></td><td>Tên nguồn (vd <code>Drive: &lt;tên file&gt;</code>).</td></tr>
+                <tr><td><code>section</code> · <code>chunk_index</code></td><td>Mục/tab và số thứ tự đoạn trong nguồn.</td></tr>
+                <tr><td><code>content</code></td><td>Nội dung đoạn văn (text gốc để hiển thị/trích).</td></tr>
+                <tr><td><code>embedding</code></td><td><code>vector(1024)</code> — "dấu vân tay" ngữ nghĩa của đoạn, dùng để so khớp.</td></tr>
+                <tr><td><code>source_url</code></td><td>Link mở đúng chỗ (Google Sheets trỏ đúng tab qua <code>#gid</code>).</td></tr>
+                <tr><td><code>source_version</code></td><td><code>modifiedTime</code> của file — để nạp tăng dần.</td></tr>
+                <tr><td><code>drive_folder_ids</code></td><td>Tập id folder tổ tiên của file — để lọc tài liệu theo folder cho member.</td></tr>
+                <tr><td><code>project_id</code></td><td>Gắn theo dự án; <code>NULL</code> = tài liệu chung (dùng cho mọi dự án).</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="luong-hoi">
+          <h2>Luồng 2 — Hỏi tài liệu (realtime)</h2>
+          <p>Xảy ra ngay khi có người @tag bot trên Discord và hỏi về nội dung tài liệu:</p>
+          <div class="diagram">
+            <div class="flow">
+              <div class="node k-source">
+                <span class="kind">Đầu vào</span>
+                <span class="title">💬 User @tag bot trên Discord</span>
+                <span class="desc"><code>bot.py</code> nhận tin, truyền câu hỏi + <code>BOT_SENDER_ID</code> (discord id người hỏi) sang Claude CLI kèm bộ "hints".</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-proc">
+                <span class="kind">Điều phối</span>
+                <span class="title">🤖 Claude CLI nhận diện "câu hỏi tài liệu"</span>
+                <span class="desc">Theo hint, Claude quyết định chạy skill tìm tài liệu thay vì tra task/sprint.</span>
+              </div>
+              <div class="arrow">▼ <small>chạy skill</small></div>
+              <div class="node k-proc">
+                <span class="kind">Skill</span>
+                <span class="title">🔎 doc_search.py "&lt;câu hỏi&gt;"</span>
+                <span class="desc"><code>embed_text(câu hỏi)</code> qua <strong>bge-m3</strong> → 1 vector 1024 chiều (cùng "không gian" với tài liệu đã nạp).</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-store">
+                <span class="kind">Tìm trong kho</span>
+                <span class="title">📐 RPC match_documents (pgvector)</span>
+                <span class="desc">So cosine giữa vector câu hỏi và mọi <code>embedding</code>, lấy <strong>top-12</strong> đoạn gần nhất. Tham số: <code>filter_project</code>, <code>filter_folder</code>.</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-gate">
+                <span class="kind">Phân quyền</span>
+                <span class="title">🔐 Lọc theo vai trò người hỏi</span>
+                <span class="desc"><strong>Admin/owner</strong>: thấy tất cả. <strong>Member</strong>: chỉ folder cho phép (<code>filter_folder</code>) + ẩn nguồn nhạy cảm. Không nhận diện được → coi là member (khoá chặt). Xem mục dưới.</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-out">
+                <span class="kind">Kết quả thô</span>
+                <span class="title">📑 Các đoạn + 🔗 nguồn + 📁 link folder</span>
+                <span class="desc">In ra cho Claude: từng đoạn kèm <code>source_url</code> và link thư mục tài liệu.</span>
+              </div>
+              <div class="arrow">▼</div>
+              <div class="node k-out">
+                <span class="kind">Trả lời</span>
+                <span class="title">✍️ Claude tổng hợp &amp; gửi Discord</span>
+                <span class="desc">Trả lời <strong>chỉ dựa trên các đoạn đó</strong>, trích nguồn <code>[1][2]…</code>, đính kèm link — rồi gửi lại kênh Discord.</span>
+              </div>
+            </div>
+          </div>
+          <div class="callout success">
+            <span class="label">Điểm mấu chốt</span>
+            Câu hỏi và tài liệu được embedding bằng <strong>cùng mô hình bge-m3</strong>, nên hai vector nằm chung
+            "không gian nghĩa" và đo được độ gần. Đổi mô hình embedding thì phải nạp lại toàn bộ kho.
+          </div>
+        </section>
+
+        <section id="phan-quyen">
+          <h2>Phân quyền tài liệu (gate)</h2>
+          <p>
+            Danh tính người hỏi lấy từ <code>BOT_SENDER_ID</code> (id Discord thật, do <code>bot.py</code> đặt),
+            khớp <strong>chính xác</strong> với <code>profiles.discord_id</code>. Từ đó quyết định phạm vi tài liệu:
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Vai trò</th><th>Được thấy gì</th><th>Cơ chế</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>Admin / Owner</strong></td>
+                  <td>Toàn bộ kho.</td>
+                  <td><code>filter_folder = NULL</code>, không ẩn nguồn.</td>
+                </tr>
+                <tr>
+                  <td><strong>Member</strong></td>
+                  <td>Chỉ tài liệu trong <strong>folder cấu hình</strong> (tính cả folder con) &amp; không thấy nguồn nhạy cảm.</td>
+                  <td>Lọc ngay trong RPC qua <code>filter_folder = rag_member_folder_id</code> (so với <code>drive_folder_ids</code>) + chặn <code>rag_member_hidden_sources</code>.</td>
+                </tr>
+                <tr>
+                  <td><strong>Chưa link Discord</strong></td>
+                  <td>Bị coi như member (khoá chặt).</td>
+                  <td>Không nhận diện được → mặc định phạm vi hẹp (fail-closed).</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout warning">
+            <span class="label">Cần backfill sau khi bật lọc folder</span>
+            Cột <code>drive_folder_ids</code> mới thêm, tài liệu nạp trước đó đang rỗng. Phải chạy một lần
+            <code>python skills/drive_ingest.py --backfill-folders</code> trên máy bot; nếu chưa, member sẽ
+            không thấy tài liệu nào.
+          </div>
+        </section>
+
+        <section id="van-hanh">
+          <h2>Ghi chú vận hành</h2>
+          <ul>
+            <li><strong>Bật/tắt sync tự động:</strong> <code>rag_sync_enabled</code> trong <code>bot/settings.json</code>.</li>
+            <li><strong>Chạy tay:</strong> <code>python skills/drive_ingest.py</code> (nạp ruột Drive), <code>--dry-run</code> để chỉ đếm, <code>--force</code> để nạp lại cả file không đổi.</li>
+            <li><strong>Backfill folder:</strong> <code>--backfill-folders</code> (gắn <code>drive_folder_ids</code>, không embedding lại).</li>
+            <li><strong>Điều kiện chạy:</strong> Ollama phải bật trên máy bot (<code>ollama serve</code> + <code>ollama pull bge-m3</code>), và folder Drive đã share cho service account.</li>
+            <li><strong>Thử tìm:</strong> <code>python skills/doc_search.py "&lt;câu hỏi&gt;"</code>.</li>
+          </ul>
+          <div class="callout info">
+            <span class="label">Tách vai trò rõ ràng</span>
+            <code>drive_catalog.py</code> trả lời <em>"file nằm ở đâu"</em> (danh mục), còn <code>drive_ingest.py</code>
+            trả lời <em>"trong file viết gì"</em> (ruột). Hai skill khác nhau, chạy cùng lịch.
+          </div>
+        </section>
+
+        <footer>
+          Tài liệu tạo bằng skill <code>write-docs</code> — Bot Work Tracker · Nguồn: <code>bot/bot.py</code>,
+          <code>bot/skills/*</code>, <code>supabase/migrations/*documents*</code>.
+        </footer>
+      </article>
+    </div>
+  </body>
+</html>

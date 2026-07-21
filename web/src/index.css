@@ -1877,6 +1877,18 @@ table.data-table { width: 100%; border-collapse: collapse; }
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 1rem;
 }
+/* Bọc card để đặt nút ⚙ sửa dự án (admin) — không lồng button trong button. */
+.project-card-wrap { position: relative; display: flex; }
+.project-card-wrap > .project-card { flex: 1; width: 100%; }
+.project-edit-btn {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 30px; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border);
+  color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.project-edit-btn:hover { color: var(--text); border-color: var(--primary); background: rgba(99, 102, 241, 0.18); }
 .project-card {
   display: flex;
   flex-direction: column;
