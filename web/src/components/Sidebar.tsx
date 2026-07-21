@@ -26,6 +26,7 @@ const NAV: NavDef[] = [
   { id: 'backlog', label: 'Backlog', icon: '📥' },
   { id: 'bugs', label: 'Bugs', icon: '🐞' },
   { id: 'timeline', label: 'Timeline', icon: '📆' },
+  { id: 'workflow', label: 'Quy trình', icon: '📘' },
 ];
 
 /**

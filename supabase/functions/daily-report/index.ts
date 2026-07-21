@@ -10,7 +10,8 @@
 // nay, giống activeSprintAt của web — KHÔNG theo cột status). Nội dung mỗi project:
 //  🌙 Hôm qua đã hoàn thành (task trong sprint, done ngày làm việc trước).
 //  ☀️ Hôm nay cần làm = task CHƯA xong TRONG SPRINT (⚠️ đánh dấu quá hạn).
-// Mỗi task là link Discord [tiêu đề](url): ưu tiên notion_url, không thì link web /tasks/<id>.
+// Mỗi task là link Discord [tiêu đề](WEB_BASE_URL/tasks/<id>) — LINK WEB, không dùng Notion.
+// Tin dài > 2000 ký tự (giới hạn Discord) được cắt theo dòng thành nhiều tin (hàm chunk).
 //
 // Chạy trong Supabase (không cần máy self-host). Đọc DB bằng service_role (auto-inject),
 // dùng raw fetch tới PostgREST (không import supabase-js — tránh cold start).
@@ -31,7 +32,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const TASK_FIELDS = 'id,title,assignee_id,project_id,due_date,notion_url';
+const TASK_FIELDS = 'id,title,assignee_id,project_id,due_date';
 
 interface Task {
   id: string;
@@ -39,7 +40,6 @@ interface Task {
   assignee_id: string | null;
   project_id: string | null;
   due_date: string | null;
-  notion_url: string | null;
 }
 interface Profile {
   id: string;
@@ -79,10 +79,8 @@ function mention(p: Profile | undefined): string {
   if (p && (p.display_name ?? '').trim()) return p.display_name as string;
   return 'Người dùng';
 }
-/** Link mở task: ưu tiên trang Notion (nếu đã sync), không thì trang task trên web. */
+/** Link mở task = trang task trên web (/tasks/<id>). KHÔNG dùng notion_url theo yêu cầu. */
 function taskLink(t: Task): string {
-  const notion = (t.notion_url ?? '').trim();
-  if (notion) return notion;
   return WEB_BASE_URL ? `${WEB_BASE_URL}/tasks/${t.id}` : '';
 }
 function dueVnNum(iso: string | null): number | null {
