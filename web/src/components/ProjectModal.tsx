@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createProject, extractSheetId, updateProject, type ProjectInput } from '../lib/projectWrites';
 import { listNotionProjects, type NotionProjectOption } from '../lib/notionSync';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../supabase';
 import SearchableSelect from './SearchableSelect';
 import type { Project } from '../types';
 
@@ -31,6 +32,40 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const sheetInvalid = sheetInput.trim().length > 0 && !sheetId;
   // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
   const webhookInvalid = dailyWebhook.trim().length > 0 && !dailyWebhook.includes('/api/webhooks/');
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+
+  /** Gọi Edge Function daily-report ở chế độ TEST cho ĐÚNG project này -> gửi report thử
+   *  (nhãn 🧪) vào webhook đang nhập. Chỉ edit mode (cần project.id) + đã có admin JWT. */
+  async function handleTest() {
+    if (!project) return;
+    if (webhookInvalid || !dailyWebhook.trim()) {
+      setTestMsg('⚠ Nhập webhook hợp lệ trước khi gửi thử.');
+      return;
+    }
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('daily-report', {
+        body: { projectId: project.id, webhook: dailyWebhook.trim() },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        setTestMsg(
+          data.sent > 0
+            ? `✅ Đã gửi thử (${data.sent} tin) — mở kênh Discord xem thử.`
+            : '⚠ Gửi xong nhưng webhook trả lỗi — kiểm tra lại URL webhook.',
+        );
+      } else {
+        setTestMsg(`❌ ${data?.message ?? 'Gửi thử thất bại.'}`);
+      }
+    } catch (err) {
+      console.error('Gửi thử báo cáo thất bại', err);
+      setTestMsg('❌ Gửi thử thất bại (cần quyền admin, hoặc kiểm tra kết nối).');
+    } finally {
+      setTesting(false);
+    }
+  }
 
   // Load the linkable Notion projects once when the dialog opens.
   useEffect(() => {
@@ -146,20 +181,37 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           )}
         </p>
 
-        <label className="field">
+        <div className="field">
           <span>Webhook Discord — báo cáo task hằng ngày</span>
-          <input
-            className="input"
-            value={dailyWebhook}
-            onChange={(e) => setDailyWebhook(e.target.value)}
-            placeholder="https://discord.com/api/webhooks/…"
-          />
-        </label>
+          <div className="row" style={{ gap: '0.5rem', alignItems: 'stretch' }}>
+            <input
+              className="input"
+              style={{ flex: 1 }}
+              value={dailyWebhook}
+              onChange={(e) => setDailyWebhook(e.target.value)}
+              placeholder="https://discord.com/api/webhooks/…"
+            />
+            {/* Gửi thử chỉ khi đang SỬA project (cần id để build report). Tạo mới thì lưu trước. */}
+            {isEdit && (
+              <button
+                type="button"
+                className="btn-sm"
+                onClick={handleTest}
+                disabled={testing || webhookInvalid || !dailyWebhook.trim()}
+                title="Gửi thử báo cáo của project này vào webhook trên"
+              >
+                {testing ? 'Đang gửi…' : '🧪 Gửi thử'}
+              </button>
+            )}
+          </div>
+        </div>
         <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
-          {webhookInvalid ? (
+          {testMsg ? (
+            <span>{testMsg}</span>
+          ) : webhookInvalid ? (
             <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
           ) : dailyWebhook.trim() ? (
-            <>✅ 10:30 mỗi ngày làm việc, bot gửi task của project này vào kênh webhook, tag người theo Discord ID.</>
+            <>✅ 10:30 mỗi ngày làm việc, bot gửi task của project này vào kênh webhook, tag người theo Discord ID.{isEdit && ' Bấm “Gửi thử” để xem trước ngay.'}</>
           ) : (
             <>💡 Dán webhook của kênh Discord để nhận báo cáo task hằng ngày (10:30). Rỗng = project này không gửi.</>
           )}

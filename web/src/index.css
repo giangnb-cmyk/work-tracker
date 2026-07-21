@@ -1618,6 +1618,17 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 /* Tự cao theo nội dung (AutoGrowTextarea set height): không cần kéo tay hay thanh cuộn. */
 .tm-desc { min-height: 80px; resize: none; overflow: hidden; }
 
+/* Mô tả ở chế độ ĐỌC (chưa bấm sửa): giữ xuống dòng, không có gạch đỏ chính tả. */
+.tm-desc-view {
+  min-height: 80px; padding: 0.6rem 0.75rem; border-radius: 10px;
+  white-space: pre-wrap; word-break: break-word; line-height: 1.5;
+  font-size: 0.9rem; color: var(--text);
+  border: 1px solid transparent; background: rgba(255, 255, 255, 0.02);
+}
+.tm-desc-view.empty { color: var(--muted); }
+.tm-desc-view.editable { cursor: text; transition: border-color 0.18s ease, background 0.18s ease; }
+.tm-desc-view.editable:hover { border-color: var(--border); background: rgba(255, 255, 255, 0.04); }
+
 /* --- EmojiPicker: chọn icon feature/dự án --- */
 .emoji-wrap { position: relative; }
 .emoji-trigger {

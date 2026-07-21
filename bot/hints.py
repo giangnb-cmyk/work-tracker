@@ -218,7 +218,12 @@ DOC_HINT = (
     "asks you to send / open / 'gui tai lieu' / 'mo dung tab' / where the info lives, "
     "include that url VERBATIM (never trim the '#gid=' part, never relabel it). If the "
     "matching chunk has NO 🔗 line, say you don't have a link for it — do NOT invent one "
-    "or hand out a generic file link when the user asked for a specific tab."
+    "or hand out a generic file link when the user asked for a specific tab.\n"
+    "  SCOPE ENFORCED IN CODE: for a MEMBER the script returns ONLY documents inside the "
+    "allowed Drive folder (admins see all). Do NOT try to reach anything outside what the "
+    "script returns, and never claim a document exists that it did not return.\n"
+    "  FOLDER LINK: if the output ends with a '📁 Thư mục tài liệu: <url>' line, include "
+    "that folder url in your reply (as-is) so the user can open the whole document folder."
 )
 
 SHEET_HINT = (

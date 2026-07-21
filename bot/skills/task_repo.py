@@ -389,9 +389,16 @@ def update_task(client, task_id: str, fields: dict) -> None:
     client.table(TASKS).update(_to_row(fields)).eq("id", task_id).execute()
 
 
-def delete_task(client, task_id: str) -> None:
-    """Xoa task theo id (uuid day du). Quyen da gate o task_ops.cmd_delete."""
-    client.table(TASKS).delete().eq("id", task_id).execute()
+def delete_task(client, task_id: str, actor_id=None, actor_name: str = "") -> None:
+    """Xoa task theo id (uuid day du). Quyen da gate o task_ops.cmd_delete.
+
+    Goi RPC bot_delete_task (thay vi DELETE thang) de trigger audit ghi NGUOI YEU CAU
+    (0049) — bot chay service_role nen neu xoa thang thi log chi hien 'Bot', mat dau ai nho.
+    """
+    client.rpc(
+        "bot_delete_task",
+        {"p_task_id": task_id, "p_actor_id": actor_id, "p_actor_name": actor_name or ""},
+    ).execute()
 
 
 def set_notion_link(client, task_id: str, page_id, url) -> None:

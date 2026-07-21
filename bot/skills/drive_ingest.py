@@ -140,6 +140,7 @@ class _Job:
         self.client = None if args.dry_run else repo.db()
         self.known = {} if self.client is None else repo.source_versions(
             self.client, SOURCE_PREFIX, args.project)
+        self.folder_cache = {}  # cache id folder cha dung chung khi tra to tien (0050)
 
     def is_fresh(self, source: str, modified: str) -> bool:
         """Nguon da co trong kho DUNG phien ban Drive hien tai -> khoi nap lai."""
@@ -229,9 +230,10 @@ def _ingest_one(job: _Job, f: dict) -> int:
         return len(pairs)
     print(f"  - {name}: {len(pairs)} chunk, embedding...", flush=True)
     section_urls, default_url = _source_links(job, f)
+    folder_ids = drive.folder_ancestors(job.sess, f, job.folder_cache)
     store_pairs(job.client, SOURCE_PREFIX + name, pairs, job.project_id, replace=True,
                 source_version=f.get("modifiedTime"),
-                section_urls=section_urls, default_url=default_url)
+                section_urls=section_urls, default_url=default_url, folder_ids=folder_ids)
     return len(pairs)
 
 
@@ -328,7 +330,38 @@ def cmd_relink(args):
           f"(không embedding lại).")
 
 
+def cmd_backfill_folders(args):
+    """Gan drive_folder_ids cho tai lieu Drive DA nap (khong embedding lai) — backfill 0050.
+
+    Chay 1 lan sau migration 0050: member chi thay tai lieu trong folder cau hinh, ma tai
+    lieu nap truoc do co drive_folder_ids rong -> member khong thay gi toi khi backfill.
+    """
+    try:
+        sess = drive.make_session(drive.resolve_key(args.key))
+        print("Đang liệt kê tài liệu trên Drive để gắn folder...", flush=True)
+        files = drive.list_documents(sess)
+    except drive.DriveError as e:
+        die(str(e))
+
+    client = repo.db()
+    known = set(repo.source_versions(client, SOURCE_PREFIX, args.project))  # nguon Drive da nap
+    cache, done, total = {}, 0, 0
+    for f in files:
+        source = SOURCE_PREFIX + f.get("name", "?")
+        if source not in known:
+            continue  # file chua nap ruot -> khong co chunk de gan
+        folder_ids = drive.folder_ancestors(sess, f, cache)
+        n = repo.update_folder_ids(client, source, folder_ids, args.project)
+        if n:
+            done += 1
+            total += n
+            print(f"  - {source}: {n} chunk -> {len(folder_ids)} folder tổ tiên")
+    print(f"\nXong backfill: {done} tài liệu, {total} chunk gắn folder (không embedding lại).")
+
+
 def cmd_sync(args):
+    if args.backfill_folders:  # chi gan folder cho chunk da nap, khong embedding
+        return cmd_backfill_folders(args)
     if args.relink:  # relink = chi gan lai link, khong nap/embedding
         return cmd_relink(args)
     skip = SkipRules.from_args(args)
@@ -380,6 +413,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--relink", action="store_true",
                    help="Chi gan lai link tung tab cho Sheet da nap (khong embedding lai) — "
                         "backfill nhanh sau migration 0038")
+    p.add_argument("--backfill-folders", action="store_true",
+                   help="Chi gan drive_folder_ids cho tai lieu da nap (khong embedding lai) — "
+                        "backfill sau migration 0050 de member loc theo folder")
     p.add_argument("--dry-run", action="store_true", help="Chi dem chunk, khong embed/nap")
     p.set_defaults(func=cmd_sync)
     return p

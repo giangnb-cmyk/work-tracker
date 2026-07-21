@@ -191,6 +191,37 @@ def attach_parents(sess: requests.Session, files: list) -> None:
         f["_parent"] = folder_name(sess, f["parents"][0], cache) if f.get("parents") else ""
 
 
+def _folder_parent(sess: requests.Session, fid: str, cache: dict):
+    """Id thu muc CHA cua folder `fid` (cache; 1 GET/folder). None neu la goc/loi."""
+    if fid in cache:
+        return cache[fid]
+    parent = None
+    try:
+        r = sess.get(f"{API}/{fid}", params={"fields": "parents", "supportsAllDrives": "true"}, timeout=15)
+        if r.ok:
+            parents = r.json().get("parents") or []
+            parent = parents[0] if parents else None
+    except requests.RequestException:
+        parent = None
+    cache[fid] = parent
+    return parent
+
+
+def folder_ancestors(sess: requests.Session, f: dict, cache: dict) -> list:
+    """Tap id folder TO TIEN cua file: folder cha + moi cap tren tro toi goc.
+
+    Dung de gioi han RAG theo folder cho member (tinh ca folder con — 0050): file nam sau
+    trong cay se co id folder muc tieu trong danh sach nay. Cache dung chung qua nhieu file.
+    """
+    ids, seen = [], set()
+    fid = (f.get("parents") or [None])[0]
+    while fid and fid not in seen:
+        seen.add(fid)
+        ids.append(fid)
+        fid = _folder_parent(sess, fid, cache)
+    return ids
+
+
 def local_ext(f: dict):
     """Duoi file cuc bo sau khi tai ve, hoac None neu khong the lay chu (Form/Drawing...)."""
     mime = f.get("mimeType", "")

@@ -43,11 +43,13 @@ def build_pairs(sections: list) -> list:
 
 
 def store_pairs(client, source: str, pairs: list, project_id, replace: bool,
-                source_version=None, section_urls=None, default_url=None) -> int:
+                source_version=None, section_urls=None, default_url=None,
+                folder_ids=None) -> int:
     """Embed cac chunk roi ghi vao DB. replace=True -> xoa ban cu cung source truoc.
 
     source_version: 'phien ban' cua nguon de sync tang dan (xem doc_repo.insert_chunks).
     section_urls / default_url: link mo dung cho tung chunk (xem doc_repo.insert_chunks).
+    folder_ids: tap id folder to tien tren Drive (loc RAG theo folder cho member — 0050).
     """
     if not pairs:
         return 0
@@ -55,7 +57,8 @@ def store_pairs(client, source: str, pairs: list, project_id, replace: bool,
     if replace:
         repo.delete_by_source(client, source, project_id)
     return repo.insert_chunks(client, project_id, source, pairs, vectors, source_version,
-                              section_urls=section_urls, default_url=default_url)
+                              section_urls=section_urls, default_url=default_url,
+                              folder_ids=folder_ids)
 
 
 def _collect_files(target: str) -> list:

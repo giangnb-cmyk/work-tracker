@@ -37,6 +37,19 @@ def _clip(text: str) -> str:
     return text if len(text) <= _MAX_SNIPPET else text[:_MAX_SNIPPET] + " [...]"
 
 
+def _member_folder() -> tuple:
+    """(folder_id, folder_url) gioi han RAG cho member (settings.json > rag_member_folder_*).
+
+    Member hoi tai lieu chi thay chunk thuoc folder Drive nay (hoac folder con — 0050);
+    admin/owner thay tat ca. Rong = khong gioi han. folder_url de gui kem cho nguoi hoi.
+    """
+    try:
+        cfg = json.loads((_BOT_DIR / "settings.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None, ""
+    return (cfg.get("rag_member_folder_id") or None), (cfg.get("rag_member_folder_url") or "")
+
+
 def _hidden_sources() -> list:
     """Nguon RAG KHONG duoc gui cho member (settings.json > rag_member_hidden_sources).
 
@@ -82,17 +95,22 @@ def cmd_search(args):
 
     client = repo.db()
     hidden = _hidden_sources()
-    # is_admin cham DB -> chi hoi khi that su co nguon an. Khong co nguon an => coi nhu
-    # admin (khong loc gi). Danh tinh lay tu BOT_SENDER_ID (bot.py); khong nhan dien duoc
-    # -> is_admin=False -> member -> van an nguon nhay cam (fail-closed).
-    is_admin = permissions.is_admin(client) if hidden else True
-    # Member phai loc bot nguon an -> lay du rong roi cat, de sau khi bo van con du top-k.
+    folder_id, folder_url = _member_folder()
+    # is_admin cham DB -> chi hoi khi CO nguon an HOAC co gioi han folder cho member. Khong
+    # co gi de phan biet => coi nhu admin. Danh tinh lay tu BOT_SENDER_ID (bot.py); khong
+    # nhan dien duoc -> is_admin=False -> member -> van an nguon/gioi han folder (fail-closed).
+    is_admin = permissions.is_admin(client) if (hidden or folder_id) else True
+    # Member: khoa RAG trong folder cho phep (loc NGAY trong RPC — 0050); admin = khong loc.
+    member_folder = None if is_admin else folder_id
+    # Member con phai loc bot nguon an -> lay du rong roi cat, de sau khi bo van con du top-k.
     pool_k = args.top_k if is_admin else max(args.top_k * 4, args.top_k + 30)
-    hits = _visible(repo.match(client, vector, project_id=args.project, top_k=pool_k),
+    hits = _visible(repo.match(client, vector, project_id=args.project, top_k=pool_k,
+                               member_folder=member_folder),
                     hidden, is_admin)[:args.top_k]
     if not hits:
         print("Không tìm thấy tài liệu liên quan trong kho "
               "(có thể chưa nạp tài liệu nào: chạy doc_ingest.py add ...).")
+        _print_folder_link(folder_url)
         return
 
     print(f"Tìm thấy {len(hits)} đoạn liên quan (nguồn ở cuối mỗi đoạn):")
@@ -107,6 +125,13 @@ def cmd_search(args):
         if url:  # link mo DUNG cho (Google Sheets: dung tab qua #gid) — de bot gui cho nguoi
             print(f"    🔗 {url}")
         print(_clip(h.get("content", "")))
+    _print_folder_link(folder_url)
+
+
+def _print_folder_link(folder_url: str) -> None:
+    """In link folder tai lieu de bot gui kem (khi duoc hoi tai lieu). Rong = bo qua."""
+    if folder_url and folder_url.strip():
+        print(f"\n📁 Thư mục tài liệu (mở để xem tất cả): {folder_url.strip()}")
 
 
 def build_parser() -> argparse.ArgumentParser:

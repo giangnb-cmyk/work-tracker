@@ -437,7 +437,9 @@ def cmd_delete(args):
         )
 
     title = task.get("title", "")
-    repo.delete_task(client, task["_id"])
+    # Truyen nguoi yeu cau -> audit log ghi 'Bot · yêu cầu bởi <ten>' thay vi tro 'Bot' (0049).
+    repo.delete_task(client, task["_id"], user.get("_id") if user else None,
+                     user.get("displayName") if user else "")
     print(f'Đã xoá task [{repo.short_id(task["_id"])}] "{title}".')
 
     # Don luon trang Notion da lien ket (best-effort, khong lam hong lenh xoa).

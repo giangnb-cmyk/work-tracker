@@ -1,16 +1,13 @@
-// POST /functions/v1/daily-report — báo cáo task hằng ngày (10:30 VN) vào webhook Discord
-// của TỪNG project (projects.daily_report_webhook), tag người theo discord_id.
+// POST /functions/v1/daily-report — báo cáo task hằng ngày vào webhook Discord của TỪNG
+// project (projects.daily_report_webhook), tag người theo discord_id.
 //
-// Thay cho job Python self-host: chạy trong Supabase, gọi bởi pg_cron (migration 0048) nên
-// không cần máy nào bật terminal. Đọc DB bằng service_role (auto-inject) — KHÔNG import
-// supabase-js (tránh cold start), dùng raw fetch tới PostgREST như function member-tasks.
+// Hai chế độ:
+//  • CRON (body rỗng): gọi bởi pg_cron 10:30 VN (migration 0048), quét MỌI project có webhook.
+//  • TEST (body {projectId, webhook?}): admin bấm "Gửi thử" trong web → gửi report của ĐÚNG
+//    project đó (nhãn 🧪 TEST) vào webhook truyền lên (hoặc webhook đã lưu). Gate = admin.
 //
-// Nội dung mỗi project:
-//   🌙 Hôm qua đã hoàn thành (task done trong ngày làm việc trước, giờ VN)
-//   ☀️ Hôm nay = task CHƯA xong trong sprint đang chạy (đánh dấu ⚠️ nếu quá hạn)
-//
-// verify_jwt = true: gateway Supabase chặn gọi ẩn danh; cron gọi kèm service_role key
-// (lấy từ Vault). Đặt WEB_BASE_URL qua secret của function để link task trỏ về web.
+// Chạy trong Supabase (không cần máy self-host). Đọc DB bằng service_role (auto-inject),
+// dùng raw fetch tới PostgREST (không import supabase-js — tránh cold start).
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -18,6 +15,12 @@ const WEB_BASE_URL = (Deno.env.get('WEB_BASE_URL') ?? '').trim().replace(/\/+$/,
 
 const DAY_MS = 86_400_000;
 const VN_OFFSET_MS = 7 * 3_600_000;
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey',
+};
 
 interface Task {
   id: string;
@@ -48,11 +51,9 @@ function vnParts(d: Date) {
   const v = new Date(d.getTime() + VN_OFFSET_MS); // đọc bằng getUTC* = giờ treo tường VN
   return { y: v.getUTCFullYear(), mo: v.getUTCMonth(), da: v.getUTCDate(), wd: v.getUTCDay() };
 }
-/** yyyymmdd (số) để so ngày. */
 function dayNum(y: number, mo: number, da: number): number {
   return y * 10000 + (mo + 1) * 100 + da;
 }
-/** Mốc UTC ứng với 00:00 giờ VN của ngày (y,mo,da). */
 function vnMidnightUtc(y: number, mo: number, da: number): Date {
   return new Date(Date.UTC(y, mo, da) - VN_OFFSET_MS);
 }
@@ -77,10 +78,7 @@ function dueVnNum(iso: string | null): number | null {
 
 function groupByAssignee(tasks: Task[]): Map<string | null, Task[]> {
   const g = new Map<string | null, Task[]>();
-  for (const t of tasks) {
-    const k = t.assignee_id;
-    (g.get(k) ?? g.set(k, []).get(k)!).push(t);
-  }
+  for (const t of tasks) push(g, t.assignee_id, t);
   return g;
 }
 
@@ -104,8 +102,7 @@ function renderSection(
       if (todayNum !== null) {
         const dn = dueVnNum(t.due_date);
         if (dn !== null && dn < todayNum) {
-          const dd = new Date(t.due_date as string);
-          const p = vnParts(dd);
+          const p = vnParts(new Date(t.due_date as string));
           line += ` ⚠️ quá hạn ${ddmm(p.y, p.mo, p.da)}`;
         }
       }
@@ -115,16 +112,37 @@ function renderSection(
   return msg;
 }
 
+function buildMessage(
+  prjName: string,
+  sprintName: string | null,
+  done: Task[],
+  open: Task[],
+  profiles: Map<string, Profile>,
+  yLabel: string,
+  tLabel: string,
+  todayNum: number,
+  test: boolean,
+): string {
+  const tag = test ? '🧪 (TEST) ' : '';
+  let msg = `\n# 📢 **${tag}DAILY REPORT: ${prjName.toUpperCase()}**\n`;
+  msg += renderSection('🌙', `TASK HÔM QUA (ĐÃ HOÀN THÀNH) — ${yLabel}`, done, profiles, null);
+  msg += '\n─────────────────────────────\n';
+  const sp = sprintName ? ` · Sprint ${sprintName}` : '';
+  msg += renderSection('☀️', `TASK HÔM NAY (CHƯA XONG${sp}) — ${tLabel}`, open, profiles, todayNum);
+  return msg;
+}
+
 /** Cắt theo dòng để không vượt 2000 ký tự Discord. */
 function chunk(message: string, size = 1900): string[] {
   const parts: string[] = [];
   let buf = '';
-  for (const line of message.split(/(?<=\n)/)) {
-    if (buf.length + line.length > size) {
+  for (const line of message.split('\n')) {
+    const withNl = line + '\n';
+    if (buf.length + withNl.length > size) {
       if (buf) parts.push(buf);
-      buf = line;
+      buf = withNl;
     } else {
-      buf += line;
+      buf += withNl;
     }
   }
   if (buf) parts.push(buf);
@@ -151,7 +169,52 @@ async function postWebhook(webhook: string, message: string): Promise<number> {
   return sent;
 }
 
-Deno.serve(async () => {
+function push<T>(m: Map<string | null, T[]> | Map<string, T[]>, k: string | null, v: T): void {
+  const map = m as Map<string | null, T[]>;
+  const arr = map.get(k);
+  if (arr) arr.push(v);
+  else map.set(k, [v]);
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS },
+  });
+}
+
+/** uid từ JWT người gọi (chế độ TEST). null nếu không phải JWT (vd publishable key của cron). */
+function uidFromJwt(req: Request): string | null {
+  const auth = req.headers.get('Authorization') ?? '';
+  const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const parts = tok.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '==='.slice((b64.length + 3) % 4);
+    return JSON.parse(atob(padded)).sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function isAdmin(uid: string): Promise<boolean> {
+  const rows = await pg<{ role: string }>(`profiles?id=eq.${uid}&select=role`);
+  return rows.length > 0 && ['admin', 'owner'].includes(rows[0].role);
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    /* cron gửi body rỗng -> full mode */
+  }
+  const testProjectId = typeof body?.projectId === 'string' ? (body.projectId as string) : null;
+  const testWebhookIn = typeof body?.webhook === 'string' ? (body.webhook as string).trim() : '';
+
   try {
     const now = new Date();
     const t = vnParts(now);
@@ -159,7 +222,45 @@ Deno.serve(async () => {
     // Ngày làm việc trước: thứ 2 (wd=1) lùi 3 ngày về thứ 6, còn lại lùi 1.
     const prev = new Date(Date.UTC(t.y, t.mo, t.da) - (t.wd === 1 ? 3 : 1) * DAY_MS);
     const yv = { y: prev.getUTCFullYear(), mo: prev.getUTCMonth(), da: prev.getUTCDate() };
+    const yLabel = ddmm(yv.y, yv.mo, yv.da);
+    const tLabel = ddmm(t.y, t.mo, t.da);
+    const startIso = vnMidnightUtc(yv.y, yv.mo, yv.da).toISOString();
+    const endIso = vnMidnightUtc(t.y, t.mo, t.da).toISOString();
 
+    // ---- TEST MODE: 1 project, admin bấm "Gửi thử" ----
+    if (testProjectId) {
+      const uid = uidFromJwt(req);
+      if (!uid || !(await isAdmin(uid))) {
+        return json({ ok: false, error: 'forbidden', message: 'Chỉ admin mới gửi thử được.' }, 403);
+      }
+      const prjs = await pg<{ id: string; name: string; daily_report_webhook: string | null }>(
+        `projects?id=eq.${testProjectId}&select=id,name,daily_report_webhook`,
+      );
+      if (prjs.length === 0) return json({ ok: false, error: 'project_not_found' }, 404);
+      const prj = prjs[0];
+      const webhook = testWebhookIn || (prj.daily_report_webhook ?? '').trim();
+      if (!webhook) return json({ ok: false, error: 'no_webhook', message: 'Chưa có webhook để gửi thử.' }, 400);
+
+      const [sprints, profilesRaw] = await Promise.all([
+        pg<{ id: string; name: string }>('sprints?status=eq.active&select=id,name&limit=1'),
+        pg<Profile>('profiles?select=id,display_name,discord_id'),
+      ]);
+      const sprint = sprints[0] ?? null;
+      const profiles = new Map(profilesRaw.map((p) => [p.id, p]));
+      const open = sprint
+        ? await pg<Task>(
+            `tasks?sprint_id=eq.${sprint.id}&status=neq.done&project_id=eq.${prj.id}&select=id,title,assignee_id,project_id,due_date`,
+          )
+        : [];
+      const done = await pg<Task>(
+        `tasks?status=eq.done&project_id=eq.${prj.id}&due_date=gte.${startIso}&due_date=lt.${endIso}&select=id,title,assignee_id,project_id,due_date`,
+      );
+      const msg = buildMessage(prj.name, sprint?.name ?? null, done, open, profiles, yLabel, tLabel, todayNum, true);
+      const sent = await postWebhook(webhook, msg);
+      return json({ ok: true, test: true, project: prj.name, sent, openCount: open.length, doneCount: done.length });
+    }
+
+    // ---- FULL MODE: cron, mọi project có webhook ----
     const [sprints, projectsRaw, profilesRaw] = await Promise.all([
       pg<{ id: string; name: string }>('sprints?status=eq.active&select=id,name&limit=1'),
       pg<{ id: string; name: string; daily_report_webhook: string | null }>(
@@ -176,18 +277,13 @@ Deno.serve(async () => {
       return json({ ok: true, note: 'Không project nào cấu hình webhook.', sent: 0 });
     }
 
-    // Task chưa xong trong sprint active (mọi project)
     const openTasks = sprint
       ? await pg<Task>(
           `tasks?sprint_id=eq.${sprint.id}&status=neq.done&select=id,title,assignee_id,project_id,due_date`,
         )
       : [];
-    // Task done "hôm qua" theo due_date (khi done, due_date = ngày xong), khoảng giờ VN
-    const startIso = vnMidnightUtc(yv.y, yv.mo, yv.da).toISOString();
-    const endIso = vnMidnightUtc(t.y, t.mo, t.da).toISOString();
     const doneTasks = await pg<Task>(
-      `tasks?status=eq.done&due_date=gte.${startIso}&due_date=lt.${endIso}` +
-        `&select=id,title,assignee_id,project_id,due_date`,
+      `tasks?status=eq.done&due_date=gte.${startIso}&due_date=lt.${endIso}&select=id,title,assignee_id,project_id,due_date`,
     );
 
     const openByPrj = new Map<string, Task[]>();
@@ -195,34 +291,20 @@ Deno.serve(async () => {
     const doneByPrj = new Map<string, Task[]>();
     for (const tk of doneTasks) if (tk.project_id) push(doneByPrj, tk.project_id, tk);
 
-    const yLabel = ddmm(yv.y, yv.mo, yv.da);
-    const tLabel = ddmm(t.y, t.mo, t.da);
-    const sprintPart = sprint ? ` · Sprint ${sprint.name}` : '';
-
+    const sprintName = sprint?.name ?? null;
     const results: { project: string; sent: number }[] = [];
     for (const prj of projects) {
-      let msg = `\n# 📢 **DAILY REPORT: ${prj.name.toUpperCase()}**\n`;
-      msg += renderSection('🌙', `TASK HÔM QUA (ĐÃ HOÀN THÀNH) — ${yLabel}`, doneByPrj.get(prj.id) ?? [], profiles, null);
-      msg += '\n─────────────────────────────\n';
-      msg += renderSection('☀️', `TASK HÔM NAY (CHƯA XONG${sprintPart}) — ${tLabel}`, openByPrj.get(prj.id) ?? [], profiles, todayNum);
+      const msg = buildMessage(
+        prj.name, sprintName, doneByPrj.get(prj.id) ?? [], openByPrj.get(prj.id) ?? [],
+        profiles, yLabel, tLabel, todayNum, false,
+      );
       const sent = await postWebhook((prj.daily_report_webhook as string).trim(), msg);
       results.push({ project: prj.name, sent });
     }
 
-    return json({ ok: true, activeSprint: sprint?.name ?? null, projects: results });
+    return json({ ok: true, activeSprint: sprintName, projects: results });
   } catch (err) {
     console.error('LOI: daily-report thất bại:', (err as Error).message);
     return json({ ok: false, error: (err as Error).message }, 500);
   }
 });
-
-function push<T>(m: Map<string, T[]>, k: string, v: T): void {
-  (m.get(k) ?? m.set(k, []).get(k)!).push(v);
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  });
-}

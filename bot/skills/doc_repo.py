@@ -29,7 +29,8 @@ def db():
 
 
 def insert_chunks(client, project_id, source: str, chunks: list, embeddings: list,
-                  source_version=None, section_urls=None, default_url=None) -> int:
+                  source_version=None, section_urls=None, default_url=None,
+                  folder_ids=None) -> int:
     """Chen cac chunk (kem embedding) cua 1 nguon. Tra ve so chunk da chen.
 
     chunks: list (section, content); embeddings: list vector cung thu tu.
@@ -37,8 +38,11 @@ def insert_chunks(client, project_id, source: str, chunks: list, embeddings: lis
     None = khong theo doi phien ban (file trong docs/, link...).
     section_urls: {section: url} — link mo DUNG cho theo section (Google Sheets: tung tab).
     default_url: link dung khi section khong co trong section_urls (vd webViewLink cua file).
+    folder_ids: TAP id folder to tien cua file tren Drive (folder cha + moi cap tren) — de
+    loc RAG theo folder cho member (0050). Rong = file ngoai Drive (docs/, link).
     """
     section_urls = section_urls or {}
+    folder_ids = folder_ids or []
     rows = [
         {
             "project_id": project_id,
@@ -49,6 +53,7 @@ def insert_chunks(client, project_id, source: str, chunks: list, embeddings: lis
             "embedding": vector,
             "source_version": source_version,
             "source_url": section_urls.get(section, default_url),
+            "drive_folder_ids": folder_ids,
         }
         for idx, ((section, content), vector) in enumerate(zip(chunks, embeddings))
     ]
@@ -79,17 +84,34 @@ def delete_by_source(client, source: str, project_id=None) -> None:
     q.execute()
 
 
-def match(client, query_embedding: list, project_id=None, top_k: int = 5) -> list:
-    """Tim top-k chunk gan nhat qua RPC match_documents. Tra ve list dict (co 'similarity')."""
+def match(client, query_embedding: list, project_id=None, top_k: int = 5,
+          member_folder=None) -> list:
+    """Tim top-k chunk gan nhat qua RPC match_documents. Tra ve list dict (co 'similarity').
+
+    member_folder: id folder Drive gioi han cho member — chi tra chunk thuoc folder do
+    (hoac folder con). None = khong loc (admin/owner thay tat ca).
+    """
     res = client.rpc(
         "match_documents",
         {
             "query_embedding": query_embedding,
             "match_count": top_k,
             "filter_project": project_id,
+            "filter_folder": member_folder,
         },
     ).execute()
     return res.data or []
+
+
+def update_folder_ids(client, source: str, folder_ids: list, project_id=None) -> int:
+    """Gan drive_folder_ids cho cac chunk DA nap cua 1 nguon (khong embedding lai) — backfill.
+
+    Dung mot lan sau khi them cot drive_folder_ids (0050): tai lieu Drive nap truoc do
+    chua co folder -> member khong thay gi toi khi backfill. Tra ve so chunk cap nhat.
+    """
+    q = client.table(DOCUMENTS).update({"drive_folder_ids": folder_ids or []}).eq("source", source)
+    q = q.is_("project_id", "null") if project_id is None else q.eq("project_id", project_id)
+    return len(q.execute().data or [])
 
 
 def source_versions(client, prefix: str, project_id=None) -> dict:

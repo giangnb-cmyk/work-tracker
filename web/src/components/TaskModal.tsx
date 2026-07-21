@@ -101,6 +101,9 @@ export default function TaskModal({
   const [notionSyncing, setNotionSyncing] = useState(false);
   const [notionMsg, setNotionMsg] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  // Mô tả: mặc định hiện dạng ĐỌC (giữ xuống dòng), bấm mới ra ô sửa — tránh textarea gạch
+  // đỏ chính tả lúc chỉ xem. Chỉ người sửa được (canEditOwn) mới bấm vào để sửa.
+  const [editingDesc, setEditingDesc] = useState(false);
 
   function copyTaskLink() {
     if (!task) return;
@@ -320,13 +323,25 @@ export default function TaskModal({
             {/* Mô tả + tiến độ tổng */}
             <section className="tm-section">
               <h4 className="tm-h"><FileIcon size={16} /> Mô tả</h4>
-              <AutoGrowTextarea
-                className="textarea tm-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={!canEditOwn}
-                placeholder="Mô tả công việc…"
-              />
+              {canEditOwn && editingDesc ? (
+                <AutoGrowTextarea
+                  className="textarea tm-desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Mô tả công việc…"
+                  autoFocus
+                  spellCheck={false}
+                  onBlur={() => setEditingDesc(false)}
+                />
+              ) : (
+                <div
+                  className={`tm-desc-view${description.trim() ? '' : ' empty'}${canEditOwn ? ' editable' : ''}`}
+                  onClick={() => canEditOwn && setEditingDesc(true)}
+                  title={canEditOwn ? 'Bấm để sửa mô tả' : undefined}
+                >
+                  {description.trim() || 'Mô tả công việc…'}
+                </div>
+              )}
               <div className="tm-progress" title="Tự tính từ subtask đã hoàn thành">
                 <span className="tm-progress-label">Tiến độ tổng</span>
                 <span className="progress"><span style={{ width: `${progress}%` }} /></span>

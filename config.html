@@ -375,6 +375,15 @@ localize</textarea>
             <textarea id="ragMemberHidden" rows="2" placeholder="M1 - Weekly Report"></textarea>
             <span class="hint">Tài liệu nội bộ: admin/owner vẫn tra cứu được, member thì không. Khớp MỘT PHẦN cả tên nguồn lẫn tên tab → chặn cả nội dung lẫn link. Để trống = không ẩn gì.</span>
           </div>
+          <div class="field">
+            <label>Folder Drive giới hạn cho member<span class="tgt">rag_member_folder_id</span></label>
+            <input type="text" id="ragMemberFolderId" placeholder="1sBp5eSM5cL02Tcoju45c0DCACcTDIrtK" />
+            <span class="hint">Member hỏi tài liệu CHỈ thấy folder này (+ folder con); admin thấy tất. Để trống = không giới hạn. Sau khi đặt, chạy <code>drive_ingest.py --backfill-folders</code> để tài liệu đã nạp có folder.</span>
+          </div>
+          <div class="field">
+            <label>Link folder tài liệu — gửi kèm khi hỏi<span class="tgt">rag_member_folder_url</span></label>
+            <input type="text" id="ragMemberFolderUrl" placeholder="https://drive.google.com/drive/folders/…" />
+          </div>
         </div>
       </details>
 
@@ -552,6 +561,7 @@ const NOTES = {
   ragTimeout: `Gioi han thoi gian (giay) moi skill RAG trong lan chay tu dong. rag_drive_timeout_seconds danh RIENG cho drive_ingest.py vi no phai embedding noi dung that (~3s/chunk tren may nay): ngay thuong nap tang dan nen chi vai giay, NHUNG lan dau (kho rong) phai nap ~2000 chunk = ~2 tieng -> de 10800 (3h) cho lan dau chay tron, khong thi bot giet giua chung. Bi giet cung KHONG mat du lieu: file da xong da co source_version nen hom sau chay tiep tu do.`,
   ragDriveSkip: `File KHONG nap RUOT vao RAG (drive_ingest.py). 'folders' = ten thu muc Drive, khop CHINH XAC (khong phan biet hoa thuong). 'name_contains' = ten file chua chuoi nay thi bo qua, khop MOT PHAN (vd 'localization' bat 'M1 - Localization.csv'). Mac dinh bo bang so cau hinh game (csv_config) va bang dich thuat (localization): toan cap chuoi/so, nap vao chi lam nhieu kho ma khong tra loi duoc cau hoi nao, lai ton hang gio embedding. DU AN MOI chi can sua o day, KHONG phai sua code. Cac file nay VAN nam trong DANH MUC (drive_catalog.py) -> bot van chi duoc 'file nam o dau', chi khong doc ruot. Them tam thoi 1 lan chay: --skip-folder <ten> / --skip-name <chuoi>; nap tat ca: --no-skip.`,
   ragMemberHidden: `Nguon tai lieu RAG mà bot KHÔNG được gửi cho member khi họ hỏi (skills/doc_search.py). Admin/owner (đã link discord_id ở web > Thành viên) VẪN tra cứu được — chặn theo vai trò, không xoá khỏi kho. Khớp MỘT PHẦN, không phân biệt hoa/thường, đối chiếu cả tên nguồn (nội dung 'Drive: <tên>') lẫn tên mục/tab (danh mục 'Google Drive' -> section = <tên file>) nên chặn cả nội dung lẫn link. Dùng cho tài liệu nội bộ (vd weekly report). Người hỏi không nhận diện được (chưa link discord_id) bị coi là member -> vẫn bị chặn (fail-closed).`,
+  ragMemberFolder: `Giới hạn RAG theo folder Drive cho MEMBER (skills/doc_search.py). rag_member_folder_id != rỗng -> member hỏi tài liệu CHỈ thấy chunk thuộc folder này hoặc folder con của nó (lọc trong match_documents, migration 0050); admin/owner thấy tất cả. Người hỏi chưa link discord_id bị coi là member (fail-closed). QUAN TRỌNG: sau khi đặt, chạy 'python skills/drive_ingest.py --backfill-folders' (các lần nạp sau tự gắn) để tài liệu đã nạp có folder — chưa backfill thì member không thấy gì. rag_member_folder_url = link folder để bot gửi kèm khi được hỏi tài liệu.`,
   weeklyReport: `true = SANG THU 2 luc bug_sync_hour (9h) tu dong dien weekly report vao Google Sheet cua tung project (cot 'Tien do / Hien tai' = task da xong sprint truoc, 'Tien do / Tiep theo lam gi' = task con lai sprint hien tai). Link sheet cau hinh RIENG tung project o web > Du an > 'Google Sheet weekly report' (cot projects.weekly_sheet_id), KHONG dat o day. Yeu cau: keys/service-account-gsheets.json, va sheet phai duoc Share quyen EDITOR cho email service account. Lan chay tu dong KHONG BAO GIO ghi de o da co chu (nguoi viet tay) - muon ghi de phai go tay '@bot weekly report' voi --force. Ket qua ghi log; gui Discord neu bug_sync_channel_id != 0.`,
   ga4: `Chi so GA4 trong weekly report (o 'Chi so san pham / Hien tai'). Moi muc: project_id (uuid tu web) + property_id (so trong URL GA4: .../p<property_id>/...). Dung CHUNG service account voi sheets (keys/service-account-gsheets.json) — SA phai duoc them vao GA4 property quyen Viewer (Admin > Property access management) va project GCP cua SA phai bat Analytics Data API. Project khong co trong list = bo qua chi so, khong phai loi.`,
   weeklyMail: `Tu dong soan MAIL weekly report tu template DRAFT trong Gmail (muc Templates cua Gmail thi API khong doc duoc — soan thu tu template roi LUU NHAP, subject giu '[TEMPLATE]'). KHONG gui thang: bot DM ban xem truoc cho nguoi duyet (approver_ids; de trong = moi admin da link discord_id), bam '✅ Gui mail' moi gui — het han approve_timeout_hours hoac bam Huy la KHONG gui. Setup 1 lan: bat Gmail API + tao OAuth client Desktop -> keys/gmail-oauth-client.json, roi chay 'python skills/gmail_gateway.py --auth'. Placeholder trong draft: {{START}} {{END}} (dd/mm), {{START_FULL}} {{END_FULL}} (dd/mm/yyyy), {{DONE}} {{PLAN}} (danh sach task), {{SHEET_URL}}. weekday: 0=thu 2. Thu tay (gui truc tiep, khong qua duyet): '@bot gui mail weekly report'; xem truoc: python skills/weekly_mail.py --dry-run.`,
@@ -641,6 +651,7 @@ function collect(){
     ragDriveTimeoutSeconds: num('ragDriveTimeoutSeconds',10800),
     ragDriveSkipFolders: lines('ragDriveSkipFolders'), ragDriveSkipNames: lines('ragDriveSkipNames'),
     ragMemberHidden: lines('ragMemberHidden'),
+    ragMemberFolderId: val('ragMemberFolderId'), ragMemberFolderUrl: val('ragMemberFolderUrl'),
     sheetsMcpEnabled: $('sheetsMcpEnabled').checked, driveFolderId: val('driveFolderId'),
     mcpServiceAccountPath: val('mcpServiceAccountPath'), gdriveServiceAccount: val('gdriveServiceAccount'),
     notionSyncSecret: val('notionSyncSecret'), notionGatewayUrl: val('notionGatewayUrl'),
@@ -786,6 +797,9 @@ function buildSettings(v){
     '  "rag_drive_skip": ' + strListBlock(v.ragDriveSkipFolders, v.ragDriveSkipNames) + ',',
     '  "_note_rag_member_hidden": ' + jstr(NOTES.ragMemberHidden) + ',',
     '  "rag_member_hidden_sources": [' + v.ragMemberHidden.map(jstr).join(', ') + '],',
+    '  "_note_rag_member_folder": ' + jstr(NOTES.ragMemberFolder) + ',',
+    '  "rag_member_folder_id": ' + jstr(v.ragMemberFolderId) + ',',
+    '  "rag_member_folder_url": ' + jstr(v.ragMemberFolderUrl) + ',',
     '  "_note_weekly_report": ' + jstr(NOTES.weeklyReport) + ',',
     '  "weekly_report_enabled": ' + v.weeklyReportEnabled + ',',
     '  "_note_ga4": ' + jstr(NOTES.ga4) + ',',
@@ -1011,6 +1025,8 @@ function applySettings(text){
   const sf = grabStrList(text, 'folders'); if (sf) setVal('ragDriveSkipFolders', sf.join('\n'));
   const sn = grabStrList(text, 'name_contains'); if (sn) setVal('ragDriveSkipNames', sn.join('\n'));
   const rmh = grabStrList(text, 'rag_member_hidden_sources'); if (rmh) setVal('ragMemberHidden', rmh.join('\n'));
+  const rmfi = grabStr(text, 'rag_member_folder_id'); if (rmfi != null) setVal('ragMemberFolderId', rmfi);
+  const rmfu = grabStr(text, 'rag_member_folder_url'); if (rmfu != null) setVal('ragMemberFolderUrl', rmfu);
 
   if (/"weekly_report_enabled"/.test(text)) setChk('weeklyReportEnabled', grabBool(text, 'weekly_report_enabled'));
   // weekly_mail / member_dm: doc trong PHAM VI khoi cua tung khoa (deu co 'enabled','hour').
@@ -1155,6 +1171,8 @@ function restore(v){
   setVal('ragDriveSkipFolders', (v.ragDriveSkipFolders || []).join('\n'));
   setVal('ragDriveSkipNames', (v.ragDriveSkipNames || []).join('\n'));
   setVal('ragMemberHidden', (v.ragMemberHidden || []).join('\n'));
+  setVal('ragMemberFolderId', v.ragMemberFolderId || '');
+  setVal('ragMemberFolderUrl', v.ragMemberFolderUrl || '');
   setChk('weeklyReportEnabled', v.weeklyReportEnabled);
   const wm = v.weeklyMail || {};
   setChk('weeklyMailEnabled', wm.enabled); setVal('weeklyMailWeekday', wm.weekday);
