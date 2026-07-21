@@ -65,7 +65,7 @@
     "template_subject": "[TEMPLATE]",
     "to": ["bang@easygoing.vn"],
     "cc": ["dungnc@easygoing.vn", "namds@easygoing.vn"],
-    "approver_ids": [],
+    "approver_ids": ["592506826067804198"],
     "approve_timeout_hours": 24
   },
   "_note_bug_mirror_videos": "false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.",

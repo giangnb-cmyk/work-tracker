@@ -473,14 +473,14 @@ async def _mail_channel_note(text: str):
 
 async def _weekly_mail_approvers() -> list[int]:
     """Discord id cua nguoi duyet mail: settings.weekly_mail.approver_ids, khong co thi
-    lay MOI admin da link Discord (profiles.role=admin, discord_id khac rong)."""
+    lay MOI admin/owner da link Discord (discord_id khac rong)."""
     ids = [int(x) for x in WEEKLY_MAIL_CFG.get("approver_ids", []) if str(x).strip()]
     if ids:
         return ids
 
     def _fetch():
         rows = (get_client().table("profiles").select("discord_id")
-                .eq("role", "admin").execute().data or [])
+                .in_("role", ["admin", "owner"]).execute().data or [])
         return [int(r["discord_id"]) for r in rows if r.get("discord_id")]
 
     try:
