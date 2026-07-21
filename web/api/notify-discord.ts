@@ -4,7 +4,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authorize } from './_auth.js';
-import { DISCORD_ENABLED, postDone, type DonePayload } from './_discord.js';
+import { DISCORD_ENABLED, postCreated, postDone, type CreatedPayload, type DonePayload } from './_discord.js';
 
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -28,9 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const payload = req.body as DonePayload;
+  const payload = req.body as DonePayload | CreatedPayload;
   if (!payload?.title) return res.status(400).json({ error: 'title required' });
 
-  const ok = await postDone(payload);
+  // 'event' vắng mặt = payload "done" cũ (giữ tương thích ngược với client đang chạy).
+  const ok =
+    'event' in payload && payload.event === 'created'
+      ? await postCreated(payload)
+      : await postDone(payload as DonePayload);
   return res.status(200).json({ notified: ok });
 }

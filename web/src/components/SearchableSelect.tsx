@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { foldDiacritics as fold } from '../lib/text';
 
 export interface SelectOption {
   value: string;
@@ -21,11 +22,6 @@ interface Props {
    *   (thanh lọc, hàng flex), vì 'inflow' sẽ đẩy lệch mọi thứ quanh nó khi mở.
    */
   panel?: 'inflow' | 'overlay';
-}
-
-/** Diacritic-insensitive lowercase fold for Vietnamese-friendly matching. */
-function fold(s: string): string {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
 }
 
 /**

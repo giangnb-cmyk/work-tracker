@@ -11,6 +11,7 @@ import AttachmentsField from './task/AttachmentsField';
 import RefImagesSection from './task/RefImagesSection';
 import WatchersField from './task/WatchersField';
 import LabelSelect from './LabelSelect';
+import EmojiPicker from './EmojiPicker';
 import ConfirmDialog from './ConfirmDialog';
 import Switch from './Switch';
 import { labelGroup } from '../lib/bugLabelGroups';
@@ -233,10 +234,10 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
         <h2>{isEdit ? 'Sửa feature' : 'Feature mới'}</h2>
 
         <div className="grid-2">
-          <label className="field">
+          <div className="field">
             <span>Icon</span>
-            <input className="input" value={icon} onChange={(e) => setIcon(e.target.value)} maxLength={2} />
-          </label>
+            <EmojiPicker value={icon} onChange={setIcon} />
+          </div>
           <label className="field">
             <span>Tên feature *</span>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />

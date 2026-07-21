@@ -14,6 +14,8 @@ import StatusToggle from './task/StatusToggle';
 import RefImagesSection from './task/RefImagesSection';
 import TaskActivity from './TaskActivity';
 import ConfirmDialog from './ConfirmDialog';
+import SearchableSelect from './SearchableSelect';
+import AutoGrowTextarea from './AutoGrowTextarea';
 import { FileIcon, PaperclipIcon } from './icons';
 import type { Attachment, Subtask, Task, TaskPriority, TaskStatus } from '../types';
 
@@ -318,7 +320,7 @@ export default function TaskModal({
             {/* Mô tả + tiến độ tổng */}
             <section className="tm-section">
               <h4 className="tm-h"><FileIcon size={16} /> Mô tả</h4>
-              <textarea
+              <AutoGrowTextarea
                 className="textarea tm-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -341,30 +343,41 @@ export default function TaskModal({
             <section className="tm-section">
               <h4 className="tm-h">Thông tin</h4>
               <div className="tm-info">
-                <label className="tm-field">
+                <div className="tm-field">
                   <span>Sprint</span>
-                  <select className="select" value={sprintId ?? 'backlog'} onChange={(e) => setSprintId(e.target.value === 'backlog' ? null : e.target.value)} disabled={!canEditFields}>
-                    <option value="backlog">Backlog</option>
-                    {sprints.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                  </select>
-                </label>
-                <label className="tm-field">
+                  {/* Backlog là một lựa chọn THẬT (không phải "trống"): value 'backlog' -> sprintId null. */}
+                  <SearchableSelect
+                    value={sprintId ?? 'backlog'}
+                    onChange={(v) => setSprintId(v === 'backlog' ? null : v)}
+                    options={[{ value: 'backlog', label: 'Backlog' }, ...sprints.map((s) => ({ value: s.id, label: s.name }))]}
+                    disabled={!canEditFields}
+                  />
+                </div>
+                <div className="tm-field">
                   <span>Feature</span>
-                  <select className="select" value={featureId ?? ''} onChange={(e) => setFeatureId(e.target.value || null)} disabled={!canEditOwn}>
-                    <option value="">— Chưa gắn —</option>
-                    {/* Tên ĐỨNG TRƯỚC icon: gõ phím trong select nhảy theo ký tự ĐẦU của
-                        option — để icon lên đầu thì mọi option đều bắt đầu bằng cùng 1 emoji
-                        nên typeahead của trình duyệt vô dụng (list feature dài nên cần nó). */}
-                    {projectFeatures.map((f) => (<option key={f.id} value={f.id}>{f.name} {f.icon}</option>))}
-                  </select>
-                </label>
-                <label className="tm-field">
+                  {/* Tên ĐỨNG TRƯỚC icon để gõ tìm theo tên (list feature dài — xem lý do cũ ở git). */}
+                  <SearchableSelect
+                    value={featureId ?? ''}
+                    onChange={(v) => setFeatureId(v || null)}
+                    options={projectFeatures.map((f) => ({ value: f.id, label: `${f.name} ${f.icon}` }))}
+                    allowEmpty
+                    emptyLabel="— Chưa gắn —"
+                    placeholder="— Chưa gắn —"
+                    disabled={!canEditOwn}
+                  />
+                </div>
+                <div className="tm-field">
                   <span>Người nhận</span>
-                  <select className="select" value={assigneeId ?? ''} onChange={(e) => setAssigneeId(e.target.value || null)} disabled={!canEditOwn}>
-                    <option value="">Chưa giao</option>
-                    {members.map((m) => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}
-                  </select>
-                </label>
+                  <SearchableSelect
+                    value={assigneeId ?? ''}
+                    onChange={(v) => setAssigneeId(v || null)}
+                    options={members.map((m) => ({ value: m.uid, label: m.displayName }))}
+                    allowEmpty
+                    emptyLabel="Chưa giao"
+                    placeholder="Chưa giao"
+                    disabled={!canEditOwn}
+                  />
+                </div>
                 <label className="tm-field">
                   <span>Hạn chót</span>
                   <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditOwn} />

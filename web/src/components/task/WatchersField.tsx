@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from '../Avatar';
+import { foldDiacritics } from '../../lib/text';
 import { JOB_ROLE_LABEL, type TeamMember } from '../../types';
 
 interface Props {
@@ -28,7 +29,9 @@ export default function WatchersField({
   emptyMembersHint = 'Chưa có thành viên.',
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const wrapRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(() => {
     const byId = new Map(members.map((m) => [m.uid, m]));
@@ -40,6 +43,18 @@ export default function WatchersField({
     () => members.filter((m) => !watcherIds.includes(m.uid)),
     [members, watcherIds],
   );
+
+  // Lọc theo tên (không dấu) — danh sách thành viên sẽ dài dần.
+  const shown = useMemo(() => {
+    const q = foldDiacritics(query.trim());
+    return q ? addable.filter((m) => foldDiacritics(m.displayName).includes(q)) : addable;
+  }, [addable, query]);
+
+  // Mở panel: focus ô tìm. Đóng: xoá từ khoá để lần sau mở lại là danh sách đầy đủ.
+  useEffect(() => {
+    if (open) searchRef.current?.focus();
+    else setQuery('');
+  }, [open]);
 
   // Đóng khi bấm ra ngoài field.
   useEffect(() => {
@@ -104,18 +119,32 @@ export default function WatchersField({
           .ss-panel — modal cuộn được sẽ cắt mất panel absolute), mà vẫn không xô lệch chip. */}
       {open && (
         <div className="watcher-pop glass">
-          {addable.map((m) => (
-            <button
-              key={m.uid}
-              type="button"
-              className="watcher-opt"
-              onClick={() => onChange([...watcherIds, m.uid])}
-            >
-              <Avatar name={m.displayName} photoURL={m.photoURL} size="sm" />
-              <span>{m.displayName}</span>
-              {m.jobRole && <span className="muted watcher-role">{JOB_ROLE_LABEL[m.jobRole]}</span>}
-            </button>
-          ))}
+          <input
+            ref={searchRef}
+            className="input watcher-search"
+            value={query}
+            placeholder="Gõ để tìm…"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {/* Ô tìm cố định ở trên, chỉ danh sách cuộn (giống .ss-panel). */}
+          <div className="watcher-optlist">
+            {shown.length === 0 ? (
+              <span className="watcher-empty muted">Không có kết quả.</span>
+            ) : (
+              shown.map((m) => (
+                <button
+                  key={m.uid}
+                  type="button"
+                  className="watcher-opt"
+                  onClick={() => onChange([...watcherIds, m.uid])}
+                >
+                  <Avatar name={m.displayName} photoURL={m.photoURL} size="sm" />
+                  <span>{m.displayName}</span>
+                  {m.jobRole && <span className="muted watcher-role">{JOB_ROLE_LABEL[m.jobRole]}</span>}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>

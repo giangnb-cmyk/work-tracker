@@ -429,7 +429,7 @@ localize</textarea>
               <input type="text" id="notionProjectsDbId" />
             </div>
             <div class="field">
-              <label>Discord webhook URL<span class="tgt">web · DISCORD_WEBHOOK_URL</span></label>
+              <label>Discord webhook URL<span class="tgt">web + bot · DISCORD_WEBHOOK_URL</span></label>
               <input type="text" id="discordWebhookUrl" placeholder="https://discord.com/api/webhooks/..." />
             </div>
           </div>
@@ -717,6 +717,10 @@ function buildBotEnv(v){
     '# Dung URL cong khai, KHONG dung localhost: link nay gui cho ca team tren Discord.',
     'WEB_BASE_URL='+v.webBaseUrl,
     '',
+    '# --- Webhook Discord bao "task moi" (tuy chon) ---',
+    '# Trung gia tri voi DISCORD_WEBHOOK_URL cua web (cung 1 webhook). De trong = khong bao.',
+    'DISCORD_WEBHOOK_URL='+v.discordWebhookUrl,
+    '',
     '# --- RAG tai lieu (bge-m3 qua Ollama) ---',
     'OLLAMA_HOST='+v.ollamaHost,
     'RAG_EMBED_MODEL='+v.ragEmbedModel,
@@ -974,6 +978,7 @@ function applyBotEnv(m){
   if (m.SUPABASE_URL) setVal('supabaseUrl', m.SUPABASE_URL);
   if (m.SUPABASE_SERVICE_ROLE_KEY) setVal('supabaseServiceKey', m.SUPABASE_SERVICE_ROLE_KEY);
   if ('WEB_BASE_URL' in m) setVal('webBaseUrl', m.WEB_BASE_URL);
+  if ('DISCORD_WEBHOOK_URL' in m) setVal('discordWebhookUrl', m.DISCORD_WEBHOOK_URL);
   if (m.CLAUDE_CMD) setVal('claudeCmd', m.CLAUDE_CMD);
   if (m.OLLAMA_HOST) setVal('ollamaHost', m.OLLAMA_HOST);
   if (m.RAG_EMBED_MODEL) setVal('ragEmbedModel', m.RAG_EMBED_MODEL);

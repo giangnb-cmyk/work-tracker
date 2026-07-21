@@ -29,6 +29,7 @@ import permissions
 import project_repo as projects
 import task_repo as repo
 import web_link
+import webhook_notify
 from constants import (
     STATUS_TODO,
     STATUS_DONE,
@@ -46,6 +47,9 @@ from task_title import MAX_TITLE, clean_title, merge_desc
 # doi ten hay sua mo ta task thi trang Notion cung phai theo (mo ta chi len Notion khi
 # NOTION_PROP_DESCRIPTION duoc khai o server; khong thi gateway lang le bo qua field do).
 _NOTION_TRIGGER_FIELDS = ("title", "status", "assigneeId", "priority", "dueDate", "description")
+
+# Nhan uu tien tieng Viet cho thong bao webhook (khop PRIORITY_LABEL ben web).
+_PRIORITY_LABEL = {"low": "Thấp", "medium": "Trung bình", "high": "Cao", "urgent": "Gấp"}
 
 
 def die(message: str):
@@ -223,6 +227,50 @@ def cmd_create(args):
     if extra:
         print(f"Lưu ý: đầu vào là một dòng bảng; đã lấy ô đầu làm tiêu đề, phần còn lại ({extra}) đưa vào mô tả.")
     print(_sync_create(client, task_id, task_doc, assignee_id, project.get("notionProjectId")))
+    # Bao webhook Discord co task moi (best-effort, khong in ra reply de khoi nhieu).
+    try:
+        _notify_created(client, task_id, task_doc, project, feature, sprint)
+    except Exception as e:  # loi resolve/gui KHONG duoc lam hong lenh tao task
+        print(f"(Không gửi được thông báo webhook task mới: {e})", file=sys.stderr)
+
+
+def _notify_created(client, task_id, task_doc, project, feature, sprint) -> None:
+    """Bao webhook Discord co task moi, ping nguoi duoc giao neu ho da link discord_id.
+
+    Best-effort: thieu DISCORD_WEBHOOK_URL thi bo qua. Cung dinh dang voi web
+    (_discord.buildCreatedContent) de bot va web bao giong nhau.
+    """
+    if not webhook_notify.is_configured():
+        return
+    creator = permissions.current_user(client)
+    creator_name = creator.get("displayName") if creator else None
+    assignee_id = task_doc.get("assigneeId")
+    assignee_prof = repo.get_profile(client, assignee_id) if assignee_id else None
+    assignee_did = assignee_prof.get("discordId") if assignee_prof else None
+
+    lines = ["🆕 Task mới:", f"## {task_doc.get('title', '')}"]
+    who = []
+    if creator_name:
+        who.append(f"Người tạo: {creator_name}")
+    who.append(f"Giao cho: {task_doc.get('assigneeName') or 'chưa giao'}")
+    lines.append(" · ".join(who))
+    ctx = [f"Dự án {project['name']}", f"Sprint {sprint['name']}" if sprint else "Sprint backlog"]
+    if feature:
+        ctx.append(f"Feature {feature['name']}")
+    prio = _PRIORITY_LABEL.get(task_doc.get("priority"))
+    if prio:
+        ctx.append(f"Ưu tiên {prio}")
+    lines.append(" · ".join(ctx))
+    due = task_doc.get("dueDate")
+    if due:
+        lines.append(f"Hạn: {due:%d/%m}")
+    url = web_link.task_url(task_id)
+    if url:
+        lines.append(url)
+    if assignee_did:
+        lines.append(f"<@{assignee_did}>")
+
+    webhook_notify.post("\n".join(lines), [assignee_did] if assignee_did else [])
 
 
 def _sync_create(client, task_id, task_doc, assignee_id, notion_project_id) -> str:

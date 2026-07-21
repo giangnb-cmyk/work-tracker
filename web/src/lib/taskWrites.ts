@@ -4,6 +4,7 @@
 
 import { supabase } from '../supabase';
 import { reportError } from './errorBus';
+import { notifyTaskCreated } from './discordNotify';
 import { archiveNotionPage, createNotionPage, updateNotionPage } from './notionSync';
 import { taskPatchToRow } from './mappers';
 import { endOfWorkWeek, sundayOfWeek } from './format';
@@ -83,6 +84,19 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     dueDate,
   } as Task;
   void syncNewToNotion(id, created, opts.assigneeNotionUserId, opts.notionProjectId);
+  // Báo Discord có task mới (webhook) — fire-and-forget, không chặn việc tạo nếu lỗi.
+  void notifyTaskCreated({
+    taskId: id,
+    title: input.title,
+    assigneeId: input.assigneeId,
+    assigneeName: opts.assigneeName,
+    reporterId: opts.reporterId,
+    projectId: input.projectId,
+    featureId: input.featureId,
+    sprintId: input.sprintId,
+    priority: input.priority,
+    dueDate,
+  });
   return id;
 }
 

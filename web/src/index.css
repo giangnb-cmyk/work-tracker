@@ -503,10 +503,13 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 /* In-flow (không absolute) vì field nằm trong modal cuộn được — xem chú thích .ss-panel. */
 .watcher-pop {
   margin-top: 0.5rem; border-radius: 12px; padding: 0.35rem;
-  max-height: 200px; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 0.1rem;
+  display: flex; flex-direction: column;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
+.watcher-search { margin-bottom: 0.35rem; }
+/* Chỉ danh sách cuộn; ô tìm ở trên đứng yên. */
+.watcher-optlist { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.1rem; }
+.watcher-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; }
 .watcher-opt {
   display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left;
   background: none; border: none; border-radius: 8px;
@@ -1612,7 +1615,32 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .tmodal-scroll { flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
 .tm-section { display: flex; flex-direction: column; gap: 0.6rem; }
 .tm-h { display: flex; align-items: center; gap: 0.45rem; font-family: var(--font-head); font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; }
-.tm-desc { min-height: 80px; }
+/* Tự cao theo nội dung (AutoGrowTextarea set height): không cần kéo tay hay thanh cuộn. */
+.tm-desc { min-height: 80px; resize: none; overflow: hidden; }
+
+/* --- EmojiPicker: chọn icon feature/dự án --- */
+.emoji-wrap { position: relative; }
+.emoji-trigger {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; text-align: left;
+}
+.emoji-trigger:disabled { opacity: 0.6; cursor: not-allowed; }
+.emoji-current { font-size: 1.35rem; line-height: 1; }
+/* Nổi đè xuống dưới trigger (field icon nằm đầu modal nên không bị vùng cuộn cắt). */
+.emoji-pop {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 60;
+  width: min(320px, 90vw); max-height: 280px; overflow-y: auto;
+  border-radius: 12px; padding: 0.5rem; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+.emoji-custom { margin-bottom: 0.5rem; }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.15rem; }
+.emoji-cell {
+  display: flex; align-items: center; justify-content: center; aspect-ratio: 1;
+  background: none; border: none; border-radius: 8px; padding: 0;
+  font-size: 1.2rem; cursor: pointer; transition: background 0.15s ease;
+}
+.emoji-cell:hover { background: rgba(99, 102, 241, 0.18); }
+.emoji-cell.selected { background: var(--primary); }
 .tm-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1.25rem; }
 .tm-field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .tm-field > span { font-size: 0.75rem; color: var(--muted); }
