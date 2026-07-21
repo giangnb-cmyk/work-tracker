@@ -37,7 +37,6 @@ const NAV: NavDef[] = [
  */
 const ADMIN_NAV: NavDef[] = [
   { id: 'performance', label: 'Hiệu suất', icon: '📈' },
-  { id: 'visits', label: 'Truy cập', icon: '👣' },
   { id: 'sprints', label: 'Quản lý Sprint', icon: '🗂️' },
 ];
 

@@ -2526,67 +2526,31 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .log-actor { display: inline-flex; align-items: center; gap: 0.4rem; }
 
 /* ============================================================================
-   Khu quản trị NGOÀI dự án (GlobalAdmin): rail trái tự mở khi rê chuột + ghim
-   Pattern: rail thu gọn (chỉ icon) → hover mở overlay (không xô layout) → nút mũi
-   tên tròn giữa mép phải để GHIM mở (đẩy nội dung) hoặc thu lại.
+   Khu quản trị NGOÀI dự án (GlobalAdmin): sidebar trái CỐ ĐỊNH (luôn mở) + nội dung.
+   Cùng ngôn ngữ .nav-item với sidebar dự án; không thu gọn.
    ========================================================================== */
-.ga-shell { min-height: 100vh; }
+.ga-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
 
 .ga-sidebar {
-  position: fixed; left: 0; top: 0; z-index: 50;
-  width: 64px; height: 100vh;
   background: var(--surface); border-right: 1px solid var(--border);
-  padding: 1.1rem 0.6rem; display: flex; flex-direction: column; gap: 0.35rem;
-  overflow: visible;                    /* để nút ghim tràn ra mép phải */
-  transition: width 0.18s ease, box-shadow 0.18s ease;
+  padding: 1.1rem 0.8rem; display: flex; flex-direction: column; gap: 0.3rem;
+  position: sticky; top: 0; height: 100vh;
 }
-/* Ghim HOẶC rê chuột → mở rộng. Rê chuột = overlay (đổ bóng, KHÔNG đẩy nội dung);
-   ghim = đẩy nội dung (margin của .ga-main đổi theo .pinned). */
-.ga-shell.pinned .ga-sidebar,
-.ga-sidebar:hover { width: 240px; }
-.ga-sidebar:hover { box-shadow: 8px 0 28px rgba(2, 6, 23, 0.45); }
-.ga-shell.pinned .ga-sidebar { box-shadow: none; }
-
-.ga-main { margin-left: 64px; transition: margin-left 0.18s ease; }
-.ga-shell.pinned .ga-main { margin-left: 240px; }
-.ga-main-inner { padding: 1.75rem 2rem 4rem; min-width: 0; }
-
-/* Nút mũi tên ghim: tròn, GIỮA mép phải panel; chỉ hiện khi panel đang mở. */
-.ga-pin-btn {
-  position: absolute; top: 50%; right: -13px; transform: translateY(-50%);
-  width: 26px; height: 26px; border-radius: 50%;
-  display: grid; place-items: center; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
-  box-shadow: 0 2px 8px rgba(2, 6, 23, 0.4); font-size: 1.05rem; line-height: 1;
-  opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
-}
-.ga-shell.pinned .ga-pin-btn,
-.ga-sidebar:hover .ga-pin-btn { opacity: 1; }
-.ga-pin-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
-
-/* Rail (thu gọn): icon canh giữa, giấu nhãn. Mở (ghim/hover): về .nav-item bình thường.
-   Tooltip title vẫn cho biết mỗi icon là gì khi đang thu gọn. */
-.ga-sidebar .nav-item { justify-content: center; padding-left: 0; padding-right: 0; gap: 0; }
-.ga-shell.pinned .ga-sidebar .nav-item,
-.ga-sidebar:hover .nav-item { justify-content: flex-start; padding-left: 1rem; padding-right: 1rem; gap: 0.7rem; }
-.ga-sidebar .ga-label { display: none; white-space: nowrap; }
-.ga-shell.pinned .ga-sidebar .ga-label,
-.ga-sidebar:hover .ga-label { display: block; }
-
-.ga-back { color: var(--muted); }
+.ga-back { color: var(--muted); margin-bottom: 0.35rem; }
 .ga-nav { display: flex; flex-direction: column; gap: 0.2rem; }
+
+.ga-main { min-width: 0; }
+.ga-main-inner { padding: 1.75rem 2rem 4rem; min-width: 0; }
 
 .ga-footer {
   margin-top: auto; border-top: 1px solid var(--border);
   padding-top: 0.7rem; display: flex; flex-direction: column; gap: 0.4rem;
 }
-.ga-user { display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0.4rem; justify-content: center; min-width: 0; }
-.ga-shell.pinned .ga-user,
-.ga-sidebar:hover .ga-user { justify-content: flex-start; }
-.ga-user-meta { min-width: 0; text-align: left; }
+.ga-user { display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0.4rem; min-width: 0; }
+.ga-user-meta { min-width: 0; }
 .ga-user-name { font-size: 0.82rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ga-user-role { font-size: 0.7rem; }
-.ga-signout-btn { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; }
+.ga-signout-btn { width: 100%; margin-top: 0.2rem; }
 
 /* Bộ chọn thành viên (ProjectMemberPicker) — danh sách cuộn, mỗi dòng một người. */
 .picker-list {
