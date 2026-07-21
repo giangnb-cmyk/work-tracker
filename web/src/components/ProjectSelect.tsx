@@ -11,7 +11,7 @@ import type { Project } from '../types';
  * main workspace (Layout); the top-left icon there returns here.
  */
 export default function ProjectSelect() {
-  const { profile, isAdmin, signOut } = useAuth();
+  const { profile, isAdmin, isOwner, signOut } = useAuth();
   const { projects, projectsLoading, selectProject } = useSprintContext();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
@@ -55,7 +55,8 @@ export default function ProjectSelect() {
                     {p.notionProjectId ? '🔗 Notion · ' : ''}{formatDate(p.createdAt)}
                   </span>
                 </button>
-                {isAdmin && (
+                {/* Chỉ OWNER được sửa dự án (webhook, Notion, sheet…) — không mở cho admin thường. */}
+                {isOwner && (
                   <button
                     className="project-edit-btn"
                     title="Sửa dự án (webhook báo cáo, Notion, sheet…)"

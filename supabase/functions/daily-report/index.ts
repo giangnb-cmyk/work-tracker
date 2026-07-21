@@ -19,7 +19,8 @@ const VN_OFFSET_MS = 7 * 3_600_000;
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey',
+  // supabase-js functions.invoke gửi kèm x-client-info -> phải cho phép, không thì preflight chặn.
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface Task {
