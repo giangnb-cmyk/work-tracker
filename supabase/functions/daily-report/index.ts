@@ -6,12 +6,20 @@
 //  • TEST (body {projectId, webhook?}): admin bấm "Gửi thử" trong web → gửi report của ĐÚNG
 //    project đó (nhãn 🧪 TEST) vào webhook truyền lên (hoặc webhook đã lưu). Gate = admin.
 //
+// Báo cáo CHỈ task của SPRINT ĐANG CHẠY (sprint tuần này = sprint có [start,end] phủ hôm
+// nay, giống activeSprintAt của web — KHÔNG theo cột status). Nội dung mỗi project:
+//  🌙 Hôm qua đã hoàn thành (task trong sprint, done ngày làm việc trước).
+//  ☀️ Hôm nay cần làm = task CHƯA xong TRONG SPRINT (⚠️ đánh dấu quá hạn).
+// Mỗi task là link Discord [tiêu đề](url): ưu tiên notion_url, không thì link web /tasks/<id>.
+//
 // Chạy trong Supabase (không cần máy self-host). Đọc DB bằng service_role (auto-inject),
 // dùng raw fetch tới PostgREST (không import supabase-js — tránh cold start).
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const WEB_BASE_URL = (Deno.env.get('WEB_BASE_URL') ?? '').trim().replace(/\/+$/, '');
+// Mặc định về domain đã deploy để link web luôn bấm được kể cả khi chưa đặt secret WEB_BASE_URL.
+const WEB_BASE_URL = (Deno.env.get('WEB_BASE_URL') || 'https://work-tracker-zeta-two.vercel.app')
+  .trim().replace(/\/+$/, '');
 
 const DAY_MS = 86_400_000;
 const VN_OFFSET_MS = 7 * 3_600_000;
@@ -23,12 +31,15 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const TASK_FIELDS = 'id,title,assignee_id,project_id,due_date,notion_url';
+
 interface Task {
   id: string;
   title: string | null;
   assignee_id: string | null;
   project_id: string | null;
   due_date: string | null;
+  notion_url: string | null;
 }
 interface Profile {
   id: string;
@@ -68,8 +79,11 @@ function mention(p: Profile | undefined): string {
   if (p && (p.display_name ?? '').trim()) return p.display_name as string;
   return 'Người dùng';
 }
-function taskUrl(id: string): string {
-  return WEB_BASE_URL ? `${WEB_BASE_URL}/tasks/${id}` : '';
+/** Link mở task: ưu tiên trang Notion (nếu đã sync), không thì trang task trên web. */
+function taskLink(t: Task): string {
+  const notion = (t.notion_url ?? '').trim();
+  if (notion) return notion;
+  return WEB_BASE_URL ? `${WEB_BASE_URL}/tasks/${t.id}` : '';
 }
 function dueVnNum(iso: string | null): number | null {
   if (!iso) return null;
@@ -98,7 +112,7 @@ function renderSection(
     msg += `\n👤 **${who}: ${items.length} task**\n`;
     for (const t of items) {
       const titleTxt = t.title || '(không tên)';
-      const url = taskUrl(t.id);
+      const url = taskLink(t);
       let line = url ? `[${titleTxt}](${url})` : titleTxt;
       if (todayNum !== null) {
         const dn = dueVnNum(t.due_date);
@@ -125,11 +139,12 @@ function buildMessage(
   test: boolean,
 ): string {
   const tag = test ? '🧪 (TEST) ' : '';
-  let msg = `\n# 📢 **${tag}DAILY REPORT: ${prjName.toUpperCase()}**\n`;
+  const sp = sprintName ? ` · ${sprintName}` : '';
+  let msg = `\n# 📢 **${tag}DAILY REPORT: ${prjName.toUpperCase()}**${sp}\n`;
   msg += renderSection('🌙', `TASK HÔM QUA (ĐÃ HOÀN THÀNH) — ${yLabel}`, done, profiles, null);
   msg += '\n─────────────────────────────\n';
-  const sp = sprintName ? ` · Sprint ${sprintName}` : '';
-  msg += renderSection('☀️', `TASK HÔM NAY (CHƯA XONG${sp}) — ${tLabel}`, open, profiles, todayNum);
+  msg += renderSection('☀️', `TASK HÔM NAY (CHƯA XONG) — ${tLabel}`, open, profiles, todayNum);
+  if (!sprintName) msg += '\n_(Chưa có sprint nào đang chạy tuần này.)_\n';
   return msg;
 }
 
@@ -204,6 +219,15 @@ async function isAdmin(uid: string): Promise<boolean> {
   return rows.length > 0 && ['admin', 'owner'].includes(rows[0].role);
 }
 
+/** Sprint đang chạy = sprint có [start,end] phủ NOW, lấy cái bắt đầu muộn nhất (như web). */
+async function currentSprint(): Promise<{ id: string; name: string } | null> {
+  const nowIso = new Date().toISOString();
+  const rows = await pg<{ id: string; name: string }>(
+    `sprints?start_date=lte.${nowIso}&end_date=gte.${nowIso}&order=start_date.desc&limit=1&select=id,name`,
+  );
+  return rows[0] ?? null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
@@ -242,35 +266,34 @@ Deno.serve(async (req: Request) => {
       const webhook = testWebhookIn || (prj.daily_report_webhook ?? '').trim();
       if (!webhook) return json({ ok: false, error: 'no_webhook', message: 'Chưa có webhook để gửi thử.' }, 400);
 
-      const [sprints, profilesRaw] = await Promise.all([
-        pg<{ id: string; name: string }>('sprints?status=eq.active&select=id,name&limit=1'),
+      const [sprint, profilesRaw] = await Promise.all([
+        currentSprint(),
         pg<Profile>('profiles?select=id,display_name,discord_id'),
       ]);
-      const sprint = sprints[0] ?? null;
       const profiles = new Map(profilesRaw.map((p) => [p.id, p]));
+      // CHỈ task của sprint đang chạy tuần này (theo ngày), trong project.
       const open = sprint
+        ? await pg<Task>(`tasks?sprint_id=eq.${sprint.id}&status=neq.done&project_id=eq.${prj.id}&select=${TASK_FIELDS}`)
+        : [];
+      const done = sprint
         ? await pg<Task>(
-            `tasks?sprint_id=eq.${sprint.id}&status=neq.done&project_id=eq.${prj.id}&select=id,title,assignee_id,project_id,due_date`,
+            `tasks?sprint_id=eq.${sprint.id}&status=eq.done&project_id=eq.${prj.id}&due_date=gte.${startIso}&due_date=lt.${endIso}&select=${TASK_FIELDS}`,
           )
         : [];
-      const done = await pg<Task>(
-        `tasks?status=eq.done&project_id=eq.${prj.id}&due_date=gte.${startIso}&due_date=lt.${endIso}&select=id,title,assignee_id,project_id,due_date`,
-      );
       const msg = buildMessage(prj.name, sprint?.name ?? null, done, open, profiles, yLabel, tLabel, todayNum, true);
       const sent = await postWebhook(webhook, msg);
       return json({ ok: true, test: true, project: prj.name, sent, openCount: open.length, doneCount: done.length });
     }
 
     // ---- FULL MODE: cron, mọi project có webhook ----
-    const [sprints, projectsRaw, profilesRaw] = await Promise.all([
-      pg<{ id: string; name: string }>('sprints?status=eq.active&select=id,name&limit=1'),
+    const [sprint, projectsRaw, profilesRaw] = await Promise.all([
+      currentSprint(),
       pg<{ id: string; name: string; daily_report_webhook: string | null }>(
         'projects?select=id,name,daily_report_webhook',
       ),
       pg<Profile>('profiles?select=id,display_name,discord_id'),
     ]);
 
-    const sprint = sprints[0] ?? null;
     const projects = projectsRaw.filter((p) => (p.daily_report_webhook ?? '').trim());
     const profiles = new Map(profilesRaw.map((p) => [p.id, p]));
 
@@ -278,32 +301,32 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, note: 'Không project nào cấu hình webhook.', sent: 0 });
     }
 
+    // CHỈ task của sprint đang chạy tuần này. Hôm nay = chưa xong; Hôm qua = done ngày trước.
     const openTasks = sprint
+      ? await pg<Task>(`tasks?sprint_id=eq.${sprint.id}&status=neq.done&select=${TASK_FIELDS}`)
+      : [];
+    const doneTasks = sprint
       ? await pg<Task>(
-          `tasks?sprint_id=eq.${sprint.id}&status=neq.done&select=id,title,assignee_id,project_id,due_date`,
+          `tasks?sprint_id=eq.${sprint.id}&status=eq.done&due_date=gte.${startIso}&due_date=lt.${endIso}&select=${TASK_FIELDS}`,
         )
       : [];
-    const doneTasks = await pg<Task>(
-      `tasks?status=eq.done&due_date=gte.${startIso}&due_date=lt.${endIso}&select=id,title,assignee_id,project_id,due_date`,
-    );
 
     const openByPrj = new Map<string, Task[]>();
     for (const tk of openTasks) if (tk.project_id) push(openByPrj, tk.project_id, tk);
     const doneByPrj = new Map<string, Task[]>();
     for (const tk of doneTasks) if (tk.project_id) push(doneByPrj, tk.project_id, tk);
 
-    const sprintName = sprint?.name ?? null;
     const results: { project: string; sent: number }[] = [];
     for (const prj of projects) {
       const msg = buildMessage(
-        prj.name, sprintName, doneByPrj.get(prj.id) ?? [], openByPrj.get(prj.id) ?? [],
+        prj.name, sprint?.name ?? null, doneByPrj.get(prj.id) ?? [], openByPrj.get(prj.id) ?? [],
         profiles, yLabel, tLabel, todayNum, false,
       );
       const sent = await postWebhook((prj.daily_report_webhook as string).trim(), msg);
       results.push({ project: prj.name, sent });
     }
 
-    return json({ ok: true, activeSprint: sprintName, projects: results });
+    return json({ ok: true, sprint: sprint?.name ?? null, projects: results });
   } catch (err) {
     console.error('LOI: daily-report thất bại:', (err as Error).message);
     return json({ ok: false, error: (err as Error).message }, 500);
