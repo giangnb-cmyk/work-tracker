@@ -126,6 +126,7 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
 | `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
 | `releaseSheetId`  | string \| null | Google Spreadsheet **id** chứa lịch phát hành, tab `Timeline` (migration `0033`). KHÁC `weeklySheetId` — hai sheet khác nhau, xem `release_sync_requests` |
+| `dailyReportWebhook` | string \| null | Discord webhook URL cho báo cáo task hằng ngày 10:30 (migration `0047`). Job ngoài `daily-report-notion` (đọc bằng service_role) gửi report của project này vào đây. Rỗng = không gửi |
 | `createdAt`       | Timestamp      | creation time                                             |
 | `createdBy`       | string         | uid of creator                                            |
 

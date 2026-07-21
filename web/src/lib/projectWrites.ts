@@ -11,6 +11,7 @@ export interface ProjectInput {
   description: string;
   notionProjectId: string | null;
   weeklySheetId: string | null;
+  dailyReportWebhook?: string | null;
 }
 
 /**
@@ -37,6 +38,7 @@ export async function createProject(input: ProjectInput, createdBy: string): Pro
       description: input.description.trim(),
       notion_project_id: input.notionProjectId,
       weekly_sheet_id: input.weeklySheetId,
+      daily_report_webhook: input.dailyReportWebhook ?? null,
       created_by: createdBy || null,
     })
     .select('id')
@@ -53,6 +55,7 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.notionProjectId !== undefined) row.notion_project_id = patch.notionProjectId;
   if (patch.weeklySheetId !== undefined) row.weekly_sheet_id = patch.weeklySheetId;
+  if (patch.dailyReportWebhook !== undefined) row.daily_report_webhook = patch.dailyReportWebhook;
   const { error } = await supabase.from('projects').update(row).eq('id', id);
   if (error) throw error;
 }

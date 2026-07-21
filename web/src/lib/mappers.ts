@@ -61,6 +61,7 @@ export function rowToProject(r: Row): Project {
     notionProjectId: r.notion_project_id ?? null,
     weeklySheetId: r.weekly_sheet_id ?? null,
     releaseSheetId: r.release_sheet_id ?? null,
+    dailyReportWebhook: r.daily_report_webhook ?? null,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };

@@ -25,9 +25,12 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   // Giữ nguyên thứ người dùng dán (link đầy đủ) — chỉ bóc id lúc lưu, để họ vẫn đọc được
   // đúng cái mình vừa dán thay vì thấy nó biến thành một chuỗi lạ.
   const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
+  const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
 
   const sheetId = extractSheetId(sheetInput);
   const sheetInvalid = sheetInput.trim().length > 0 && !sheetId;
+  // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
+  const webhookInvalid = dailyWebhook.trim().length > 0 && !dailyWebhook.includes('/api/webhooks/');
 
   // Load the linkable Notion projects once when the dialog opens.
   useEffect(() => {
@@ -50,6 +53,10 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       setError('Link Google Sheet không hợp lệ. Dán link dạng docs.google.com/spreadsheets/d/…');
       return;
     }
+    if (webhookInvalid) {
+      setError('Webhook Discord không hợp lệ. Dán link dạng https://discord.com/api/webhooks/…');
+      return;
+    }
     setSaving(true);
     setError(null);
     const input: ProjectInput = {
@@ -59,6 +66,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       description,
       notionProjectId: notionProjectId || null,
       weeklySheetId: sheetId,
+      dailyReportWebhook: dailyWebhook.trim() || null,
     };
     try {
       if (isEdit && project) {
@@ -68,6 +76,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           description: description.trim(),
           notionProjectId: notionProjectId || null,
           weeklySheetId: sheetId,
+          dailyReportWebhook: dailyWebhook.trim() || null,
         });
       } else {
         await createProject(input, user?.uid ?? '');
@@ -134,6 +143,25 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           ) : (
             <>💡 Bot điền “đã hoàn thành tuần trước” + “kế hoạch tuần tới” vào sheet này mỗi
               sáng thứ 2. Nhớ Share sheet cho service account của bot với quyền <b>Editor</b>.</>
+          )}
+        </p>
+
+        <label className="field">
+          <span>Webhook Discord — báo cáo task hằng ngày</span>
+          <input
+            className="input"
+            value={dailyWebhook}
+            onChange={(e) => setDailyWebhook(e.target.value)}
+            placeholder="https://discord.com/api/webhooks/…"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {webhookInvalid ? (
+            <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
+          ) : dailyWebhook.trim() ? (
+            <>✅ 10:30 mỗi ngày làm việc, bot gửi task của project này vào kênh webhook, tag người theo Discord ID.</>
+          ) : (
+            <>💡 Dán webhook của kênh Discord để nhận báo cáo task hằng ngày (10:30). Rỗng = project này không gửi.</>
           )}
         </p>
 

@@ -291,6 +291,11 @@ export interface Project {
    * đó là sheet báo cáo tuần. Rỗng = dự án không đồng bộ lịch. Migration 0033.
    */
   releaseSheetId: string | null;
+  /**
+   * Webhook Discord cho báo cáo task hằng ngày (10:30) — job daily-report ngoài đọc
+   * qua Supabase và gửi report của project này vào đây. Rỗng = project không gửi.
+   */
+  dailyReportWebhook: string | null;
   createdAt?: Timestamp;
   createdBy: string;
 }
