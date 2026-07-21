@@ -68,11 +68,12 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
       watcher_ids: input.watcherIds ?? [],
       watcher_names: opts.watcherNames ?? [],
     })
-    .select('id')
+    .select('id, short_code')
     .single();
   if (error) throw error;
 
   const id = data.id as string;
+  const shortCode = (data.short_code as string | null) ?? null;
   const created = {
     id,
     title: input.title,
@@ -87,6 +88,7 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
   // Báo Discord có task mới (webhook) — fire-and-forget, không chặn việc tạo nếu lỗi.
   void notifyTaskCreated({
     taskId: id,
+    shortCode,
     title: input.title,
     assigneeId: input.assigneeId,
     assigneeName: opts.assigneeName,

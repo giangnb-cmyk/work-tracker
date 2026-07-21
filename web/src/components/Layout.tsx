@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { lazyView } from '../lib/lazyView';
-import { navigate, pathFor, useRoute } from '../lib/router';
+import { isGlobalAdminView, navigate, pathFor, useRoute } from '../lib/router';
 import MemberPreviewBar from './MemberPreviewBar';
 import Sidebar, { ADMIN_ONLY_VIEWS } from './Sidebar';
 import TopBar from './TopBar';
@@ -26,9 +26,7 @@ const Dashboard = lazyView(() => dashboardImport);
 const Performance = lazyView(() => import('./Performance'));
 const Visits = lazyView(() => import('./Visits'));
 const SprintManager = lazyView(() => import('./SprintManager'));
-const Team = lazyView(() => import('./Team'));
-const SystemLog = lazyView(() => import('./SystemLog'));
-const Settings = lazyView(() => import('./Settings'));
+const ProjectMembers = lazyView(() => import('./ProjectMembers'));
 // Lazy để TaskModal (nó import tĩnh) không bị kéo vào bundle khởi động.
 const TaskDeepLink = lazyView(() => import('./TaskDeepLink'));
 
@@ -40,8 +38,12 @@ export default function Layout() {
   const route = useRoute();
 
   // Guard against a non-admin landing on an admin-only view. Danh sách suy ra từ NAV
-  // của Sidebar nên không thể lệch khi thêm view admin mới.
-  const activeView = ADMIN_ONLY_VIEWS.includes(route.view) && !isAdmin ? 'dashboard' : route.view;
+  // của Sidebar nên không thể lệch khi thêm view admin mới. View toàn-web (team/settings/
+  // log) mở ở GlobalAdmin NGOÀI dự án, không dựng ở đây — ai lỡ điều hướng tới trong lúc
+  // đang ở dự án thì đưa về Thống kê thay vì màn trắng.
+  const guarded =
+    isGlobalAdminView(route.view) || (ADMIN_ONLY_VIEWS.includes(route.view) && !isAdmin);
+  const activeView = guarded ? 'dashboard' : route.view;
 
   // Deep link task theo id (/tasks/<id>) HOẶC short_code (/t/<mã>) — hai path loại trừ nhau.
   const taskMatch: { column: 'id' | 'short_code'; value: string } | null = route.taskId
@@ -74,9 +76,7 @@ export default function Layout() {
             {activeView === 'performance' && <Performance />}
             {activeView === 'visits' && <Visits />}
             {activeView === 'sprints' && <SprintManager />}
-            {activeView === 'team' && <Team />}
-            {activeView === 'log' && <SystemLog />}
-            {activeView === 'settings' && <Settings />}
+            {activeView === 'members' && <ProjectMembers />}
             {/* Deep link task (đủ /tasks/<id> hoặc rút gọn /t/<mã>): modal đè lên view nền. */}
             {taskMatch && <TaskDeepLink match={taskMatch} fallbackPath={pathFor(activeView)} />}
           </Suspense>

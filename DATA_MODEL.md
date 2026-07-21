@@ -158,6 +158,30 @@ kết thúc). `bot/skills/weekly_report.py` ghi 2 ô:
 
 ---
 
+## `project_members` (ai ở trong dự án)
+
+Danh sách **tường minh** người thuộc một dự án (migration `0052`). Trước đây "thành viên của
+dự án" chỉ suy gián tiếp từ task; giờ admin **chọn người** (từ roster toàn web `profiles`) để
+cho vào dự án. Bảng N-N thuần, không có id riêng — khoá chính là cặp `(project_id, user_id)`.
+
+| Field        | Type        | Notes                                                         |
+|--------------|-------------|---------------------------------------------------------------|
+| `project_id` | uuid (PK)   | → `projects.id`, `on delete cascade`                          |
+| `user_id`    | uuid (PK)   | → `profiles.id`, `on delete cascade`                          |
+| `added_at`   | timestamptz | mặc định `now()`                                              |
+| `added_by`   | uuid \| null| → `profiles.id` (`on delete set null`) — ai đã thêm người này |
+
+- **RLS**: `select` mở cho mọi user đã đăng nhập (roster dự án không nhạy cảm); `insert`/`delete`
+  chỉ `is_admin()` (đã bao owner). Realtime bật + `replica identity full` để event DELETE mang
+  đủ cột cho bộ lọc `project_id=eq.<id>`.
+- **Backfill** (chạy trong migration): gieo mỗi dự án bằng tất cả người đã dính task của nó
+  (assignee + reporter + watchers), miễn còn hồ sơ thật — dự án đang chạy không trống trơn.
+- Web: tab **Thành viên** trong dự án (`ProjectMembers` + `useProjectMembers`); thêm/gỡ qua
+  `lib/projectMemberWrites.ts`. Roster TOÀN BỘ (tạo/sửa hồ sơ, vai trò) nằm ở khu quản trị
+  NGOÀI dự án (`GlobalAdmin`, mở từ trang chọn dự án).
+
+---
+
 ## `features/{featureId}` & `feature_labels/{labelId}`
 
 A feature: a unit of product work **inside a project**. A task optionally attaches to one

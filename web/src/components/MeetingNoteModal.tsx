@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { buildDeptNotes, buildMeetingNote, type NoteScope } from '../lib/meetingNote';
-import { taskPath, taskShortPath } from '../lib/router';
+import { APP_BASE_URL, taskPath, taskShortPath } from '../lib/router';
 import type { DeptTaskGroup } from '../lib/taskGrouping';
 import type { Task } from '../types';
 
@@ -12,13 +12,6 @@ interface MeetingNoteModalProps {
 
 /** Discord: 1 tin nhắn tối đa 2000 ký tự — khúc nào vượt sẽ bị cắt/không gửi được. */
 const DISCORD_LIMIT = 2000;
-
-/**
- * Link trong note phải trỏ về WEB THẬT, không phải localhost lúc dev. Lấy từ VITE_APP_URL
- * nếu có (đặt được cho preview/đổi domain), mặc định domain production NGẮN. Bỏ dấu '/' cuối
- * để khỏi ghép thành '//tasks'.
- */
-const APP_BASE_URL = (import.meta.env.VITE_APP_URL || 'https://m-plan.easygoing.vn').replace(/\/+$/, '');
 
 /** Sentinel cho nút "Copy tất cả" (phân biệt với key của các bộ phận). */
 const ALL_KEY = '__all__';

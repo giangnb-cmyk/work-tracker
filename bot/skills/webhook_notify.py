@@ -21,14 +21,20 @@ def is_configured() -> bool:
     return bool((os.getenv(_URL_ENV) or "").strip())
 
 
-def post(content: str, user_ids=None) -> bool:
-    """Post 1 tin vào webhook, CHỈ ping các id trong user_ids. True nếu Discord trả 2xx."""
+def post(content: str = "", user_ids=None, embeds=None) -> bool:
+    """Post 1 tin vào webhook, CHỈ ping các id trong user_ids. True nếu Discord trả 2xx.
+
+    embeds: list embed Discord (thẻ đẹp có màu, tiêu đề bấm được…). Ping phải nằm ở
+    content NGOÀI embed — mention trong embed không tạo thông báo.
+    """
     url = (os.getenv(_URL_ENV) or "").strip()
     if not url:
         return False
     # allowed_mentions.parse=[] để '@everyone'/role trong text không vô tình ping cả kênh.
     users = [str(u) for u in (user_ids or []) if u]
-    payload = {"content": content, "allowed_mentions": {"parse": [], "users": users}}
+    payload = {"content": content or "", "allowed_mentions": {"parse": [], "users": users}}
+    if embeds:
+        payload["embeds"] = embeds
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"

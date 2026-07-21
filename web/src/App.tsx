@@ -5,13 +5,17 @@ import { SprintProvider, useSprintContext } from './contexts/SprintContext';
 import { NotifyProvider } from './contexts/NotifyContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
+import GlobalAdmin from './components/GlobalAdmin';
 import RolePicker from './components/RolePicker';
 import ProjectSelect from './components/ProjectSelect';
 import ErrorCenter from './components/ErrorCenter';
+import { isGlobalAdminView, useRoute } from './lib/router';
 
 /** Inside the providers: pick a project first, then show the workspace. */
 function ProjectGate() {
   const { projectsLoading, selectedProjectId, selectedProject } = useSprintContext();
+  const { isAdmin } = useAuth();
+  const route = useRoute();
 
   if (projectsLoading) {
     return (
@@ -20,6 +24,9 @@ function ProjectGate() {
       </div>
     );
   }
+  // Khu quản trị toàn-web (Thành viên / Cấu hình / Hệ thống) sống NGOÀI dự án — mở được
+  // ngay cả khi chưa chọn dự án. Chỉ admin; người thường rơi tiếp xuống các nhánh dưới.
+  if (isGlobalAdminView(route.view) && isAdmin) return <GlobalAdmin />;
   // No project chosen (or the stored one was deleted) → show the landing selector.
   if (!selectedProjectId || !selectedProject) return <ProjectSelect />;
   return <Layout />;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
+import { navigate } from '../lib/router';
 import { formatDate } from '../lib/format';
 import Avatar from './Avatar';
 import ProjectModal from './ProjectModal';
@@ -24,6 +25,20 @@ export default function ProjectSelect() {
           <span>Work Tracker</span>
         </div>
         <div className="row" style={{ gap: '0.6rem' }}>
+          {/* Việc bao quát cả web — mở ngoài dự án. Chỉ admin; người thường không thấy. */}
+          {isAdmin && (
+            <div className="row global-admin-links" style={{ gap: '0.4rem' }}>
+              <button className="btn-sm" onClick={() => navigate('/team')} title="Toàn bộ thành viên đã vào web">
+                👥 Thành viên
+              </button>
+              <button className="btn-sm" onClick={() => navigate('/settings')} title="Cấu hình đăng nhập web">
+                ⚙️ Cấu hình
+              </button>
+              <button className="btn-sm" onClick={() => navigate('/log')} title="Nhật ký hệ thống">
+                🖥️ Hệ thống
+              </button>
+            </div>
+          )}
           <Avatar name={profile?.displayName ?? ''} photoURL={profile?.photoURL} size="sm" />
           <span className="muted" style={{ fontSize: '0.85rem' }}>{profile?.displayName}</span>
           <button className="btn-sm btn-signout" onClick={signOut}>Đăng xuất</button>

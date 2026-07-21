@@ -8,10 +8,20 @@ import { useSyncExternalStore } from 'react';
 
 /** Mọi tab của app. Path hợp lệ = '/' + id (riêng board có alias đẹp /sprint). */
 export const ALL_VIEWS = [
-  'dashboard', 'board', 'mytasks', 'features', 'backlog', 'bugs', 'timeline',
+  'dashboard', 'board', 'mytasks', 'features', 'backlog', 'bugs', 'timeline', 'members',
   'performance', 'visits', 'sprints', 'team', 'log', 'settings',
 ] as const;
 export type ViewId = (typeof ALL_VIEWS)[number];
+
+/**
+ * View sống NGOÀI một dự án — mở từ trang chọn dự án, dựng trong khung riêng (GlobalAdmin),
+ * không nằm trong sidebar dự án. Bao quát cả web nên không gắn với dự án đang chọn.
+ * (Khác `members` — đó là roster CỦA dự án, nằm trong sidebar dự án.)
+ */
+export const GLOBAL_ADMIN_VIEWS: readonly ViewId[] = ['team', 'settings', 'log'];
+export function isGlobalAdminView(view: ViewId): boolean {
+  return GLOBAL_ADMIN_VIEWS.includes(view);
+}
 
 /** Alias path → ViewId (đường "đẹp" người dùng gõ/chia sẻ). */
 const PATH_ALIASES: Record<string, ViewId> = { sprint: 'board' };
@@ -51,6 +61,22 @@ export function taskPath(taskId: string, projectId?: string | null): string {
  */
 export function taskShortPath(shortCode: string): string {
   return `/t/${shortCode}`;
+}
+
+/**
+ * Domain CHÍNH TẮC cho link GỬI RA NGOÀI (Discord, note họp…). KHÔNG dùng
+ * `window.location.origin`: web mở được ở nhiều origin (vercel preview, localhost) nên link
+ * chia sẻ phải trỏ về một domain cố định. Đặt qua `VITE_APP_URL` khi cần (⚠️ nhúng lúc BUILD,
+ * đổi phải redeploy), mặc định là domain production NGẮN.
+ */
+export const APP_BASE_URL = (import.meta.env.VITE_APP_URL || 'https://m-plan.easygoing.vn').replace(/\/+$/, '');
+
+/**
+ * URL TUYỆT ĐỐI chia sẻ được của một task — ưu tiên link rút gọn `/t/<code>`; chưa có
+ * short_code (task cũ) thì lùi về `/tasks/<uuid>`. Ghép với {@link APP_BASE_URL}.
+ */
+export function taskShareUrl(shortCode: string | null | undefined, taskId: string): string {
+  return shortCode ? `${APP_BASE_URL}/t/${shortCode}` : `${APP_BASE_URL}/tasks/${taskId}`;
 }
 
 function parse(): Route {

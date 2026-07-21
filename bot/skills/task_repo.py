@@ -380,8 +380,13 @@ def tasks_by_ids(client, ids) -> list:
 
 def insert_task(client, fields: dict) -> str:
     """Chen task moi tu dict camelCase. Tra ve id (uuid) vua tao."""
+    return insert_task_row(client, fields)["id"]
+
+
+def insert_task_row(client, fields: dict) -> dict:
+    """Chen task moi, tra ve NGUYEN row vua tao (co ca short_code DB sinh cho link /t/<code>)."""
     res = client.table(TASKS).insert(_to_row(fields)).execute()
-    return res.data[0]["id"]
+    return res.data[0]
 
 
 def update_task(client, task_id: str, fields: dict) -> None:

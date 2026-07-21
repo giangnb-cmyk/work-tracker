@@ -2,6 +2,7 @@
 // Looks up the involved members' Discord ids, then asks the server to post.
 
 import { supabase } from '../supabase';
+import { taskShareUrl } from './router';
 import { PRIORITY_LABEL } from '../types';
 import type { Task, TaskPriority } from '../types';
 import type { Timestamp } from './time';
@@ -53,6 +54,8 @@ export async function notifyTaskDone(task: Task, sprintName?: string): Promise<v
 /** Dữ liệu tối thiểu để báo "task mới" — createTask có sẵn id + các field này. */
 export interface CreatedInfo {
   taskId: string;
+  /** Mã ngắn DB sinh — dựng link rút gọn `/t/<code>`. Chưa có thì lùi về `/tasks/<id>`. */
+  shortCode: string | null;
   title: string;
   assigneeId: string | null;
   assigneeName: string;
@@ -113,7 +116,8 @@ export async function notifyTaskCreated(info: CreatedInfo): Promise<void> {
         sprintName,
         priorityLabel: PRIORITY_LABEL[info.priority],
         dueLabel,
-        url: `${window.location.origin}/tasks/${info.taskId}`,
+        // Link RÚT GỌN trên domain chính tắc (không phải origin hiện tại) — xem taskShareUrl.
+        url: taskShareUrl(info.shortCode, info.taskId),
         mentionIds: assigneeDiscordId ? [assigneeDiscordId] : [],
       }),
     });

@@ -43,40 +43,58 @@ function buildContent(p: DonePayload): { content: string; users: string[] } {
   return { content: lines.join('\n'), users };
 }
 
+/** Indigo accent (#6366f1) của design system — dùng làm màu viền embed "task mới". */
+const CREATED_COLOR = 0x6366f1;
+
+interface Embed {
+  author?: { name: string };
+  title?: string;
+  url?: string;
+  color?: number;
+  description?: string;
+}
+
 /**
- * Build the "task created" message. Header giống buildContent để web và bot báo đồng nhất;
- * các dòng ngữ cảnh chỉ hiện khi có dữ liệu.
+ * Dựng thông báo "task mới" dạng EMBED: tên task là TIÊU ĐỀ BẤM ĐƯỢC (link rút gọn), mỗi
+ * thông tin một DÒNG trong description. Ping để ở `content` NGOÀI embed — mention trong embed
+ * không báo. Cùng khuôn với bot (task_ops._notify_created) để web và bot trông giống nhau.
  */
-function buildCreatedContent(p: CreatedPayload): { content: string; users: string[] } {
+function buildCreatedMessage(p: CreatedPayload): { content: string; embeds: Embed[]; users: string[] } {
   const users = (p.mentionIds ?? []).filter(Boolean);
-  const lines = ['🆕 Task mới:', `## ${p.title}`];
-  const who: string[] = [];
-  if (p.creatorName) who.push(`Người tạo: ${p.creatorName}`);
-  who.push(`Giao cho: ${p.assigneeName || 'chưa giao'}`);
-  lines.push(who.join(' · '));
-  const ctx: string[] = [];
-  if (p.projectName) ctx.push(`Dự án ${p.projectName}`);
-  if (p.sprintName) ctx.push(`Sprint ${p.sprintName}`);
-  if (p.featureName) ctx.push(`Feature ${p.featureName}`);
-  if (p.priorityLabel) ctx.push(`Ưu tiên ${p.priorityLabel}`);
-  if (ctx.length) lines.push(ctx.join(' · '));
-  if (p.dueLabel) lines.push(`Hạn: ${p.dueLabel}`);
-  if (p.url) lines.push(p.url);
-  if (users.length > 0) lines.push(users.map((id) => `<@${id}>`).join(' '));
-  return { content: lines.join('\n'), users };
+  const lines = [
+    `👤 **Người tạo:** ${p.creatorName || '—'}`,
+    `🎯 **Giao cho:** ${p.assigneeName || 'chưa giao'}`,
+    `⚡ **Ưu tiên:** ${p.priorityLabel || '—'}`,
+    `📦 **Dự án:** ${p.projectName || '—'}`,
+    `🧩 **Feature:** ${p.featureName || '—'}`,
+    `🏃 **Sprint:** ${p.sprintName || 'Backlog'}`,
+  ];
+  if (p.dueLabel) lines.push(`📅 **Hạn:** ${p.dueLabel}`);
+
+  const embed: Embed = {
+    author: { name: '🆕 Task mới' },
+    title: p.title,
+    color: CREATED_COLOR,
+    description: lines.join('\n'),
+  };
+  if (p.url) embed.url = p.url; // tên task bấm được → mở link rút gọn
+  const content = users.length > 0 ? users.map((id) => `<@${id}>`).join(' ') : '';
+  return { content, embeds: [embed], users };
 }
 
 /** Gửi 1 tin qua webhook, ping đúng các id trong `users`. Không bao giờ throw ra caller. */
-async function postWebhook(content: string, users: string[]): Promise<boolean> {
+async function postWebhook(content: string, users: string[], embeds?: Embed[]): Promise<boolean> {
   if (!DISCORD_ENABLED) return false;
   try {
+    const body: Record<string, unknown> = {
+      content,
+      allowed_mentions: { parse: [], users }, // ping only the listed users
+    };
+    if (embeds && embeds.length > 0) body.embeds = embeds;
     const res = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content,
-        allowed_mentions: { parse: [], users }, // ping only the listed users
-      }),
+      body: JSON.stringify(body),
     });
     return res.ok;
   } catch (err) {
@@ -93,6 +111,6 @@ export async function postDone(p: DonePayload): Promise<boolean> {
 
 /** Send a "task created" message. Returns true on 2xx. Never throws to the caller. */
 export async function postCreated(p: CreatedPayload): Promise<boolean> {
-  const { content, users } = buildCreatedContent(p);
-  return postWebhook(content, users);
+  const { content, embeds, users } = buildCreatedMessage(p);
+  return postWebhook(content, users, embeds);
 }

@@ -140,9 +140,9 @@ def _watcher_fields(client, token: str):
     return ids, names
 
 
-def _print_task_link(task_id: str) -> None:
-    """In link web cua task de nguoi dung bam thang vao. Im lang neu chua cau hinh."""
-    url = web_link.task_url(task_id)
+def _print_task_link(task_id: str, short_code=None) -> None:
+    """In link RUT GON cua task de nguoi dung bam thang vao. Im lang neu chua cau hinh."""
+    url = web_link.task_short_url(short_code, task_id)
     if url:
         print(f"Link: {url}")
 
@@ -208,7 +208,10 @@ def cmd_create(args):
         "watcherNames": watcher_names,
         "attachments": link_atts,
     }
-    task_id = repo.insert_task(client, task_doc)  # Postgres la nguon su that -> ghi truoc, Notion sau
+    # Postgres la nguon su that -> ghi truoc, Notion sau. Lay ca short_code DB sinh de dung link rut gon.
+    created_row = repo.insert_task_row(client, task_doc)
+    task_id = created_row["id"]
+    short_code = created_row.get("short_code")
 
     where = "backlog" if sprint_id is None else args.sprint
     who = assignee_name or "chưa giao"
@@ -220,7 +223,7 @@ def cmd_create(args):
         f"project: {project['name']}, sprint: {where}{feat}{watch}, "
         f"hạn: {due_dt:%d/%m} — {due_from})."
     )
-    _print_task_link(task_id)
+    _print_task_link(task_id, short_code)
     for att in link_atts:
         print(f"Đã gắn tài liệu: {att['name']} — {att['url']}")
     # Noi ra khi da tu sua tieu de, de nguoi dung biet ma kiem lai — dung im lang.
@@ -229,16 +232,17 @@ def cmd_create(args):
     print(_sync_create(client, task_id, task_doc, assignee_id, project.get("notionProjectId")))
     # Bao webhook Discord co task moi (best-effort, khong in ra reply de khoi nhieu).
     try:
-        _notify_created(client, task_id, task_doc, project, feature, sprint)
+        _notify_created(client, task_id, short_code, task_doc, project, feature, sprint)
     except Exception as e:  # loi resolve/gui KHONG duoc lam hong lenh tao task
         print(f"(Không gửi được thông báo webhook task mới: {e})", file=sys.stderr)
 
 
-def _notify_created(client, task_id, task_doc, project, feature, sprint) -> None:
-    """Bao webhook Discord co task moi, ping nguoi duoc giao neu ho da link discord_id.
+def _notify_created(client, task_id, short_code, task_doc, project, feature, sprint) -> None:
+    """Bao webhook Discord co task moi dang EMBED (the dep, tieu de bam duoc = link rut gon).
 
-    Best-effort: thieu DISCORD_WEBHOOK_URL thi bo qua. Cung dinh dang voi web
-    (_discord.buildCreatedContent) de bot va web bao giong nhau.
+    Ping nguoi duoc giao (neu da link discord_id) o content NGOAI embed — mention trong
+    embed khong tao thong bao. Best-effort: thieu DISCORD_WEBHOOK_URL thi bo qua. Cung khuon
+    voi web (_discord.buildCreatedMessage) de bot va web bao giong nhau.
     """
     if not webhook_notify.is_configured():
         return
@@ -248,29 +252,31 @@ def _notify_created(client, task_id, task_doc, project, feature, sprint) -> None
     assignee_prof = repo.get_profile(client, assignee_id) if assignee_id else None
     assignee_did = assignee_prof.get("discordId") if assignee_prof else None
 
-    lines = ["🆕 Task mới:", f"## {task_doc.get('title', '')}"]
-    who = []
-    if creator_name:
-        who.append(f"Người tạo: {creator_name}")
-    who.append(f"Giao cho: {task_doc.get('assigneeName') or 'chưa giao'}")
-    lines.append(" · ".join(who))
-    ctx = [f"Dự án {project['name']}", f"Sprint {sprint['name']}" if sprint else "Sprint backlog"]
-    if feature:
-        ctx.append(f"Feature {feature['name']}")
     prio = _PRIORITY_LABEL.get(task_doc.get("priority"))
-    if prio:
-        ctx.append(f"Ưu tiên {prio}")
-    lines.append(" · ".join(ctx))
+    lines = [
+        f"👤 **Người tạo:** {creator_name or '—'}",
+        f"🎯 **Giao cho:** {task_doc.get('assigneeName') or 'chưa giao'}",
+        f"⚡ **Ưu tiên:** {prio or '—'}",
+        f"📦 **Dự án:** {project['name']}",
+        f"🧩 **Feature:** {feature['name'] if feature else '—'}",
+        f"🏃 **Sprint:** {sprint['name'] if sprint else 'Backlog'}",
+    ]
     due = task_doc.get("dueDate")
     if due:
-        lines.append(f"Hạn: {due:%d/%m}")
-    url = web_link.task_url(task_id)
-    if url:
-        lines.append(url)
-    if assignee_did:
-        lines.append(f"<@{assignee_did}>")
+        lines.append(f"📅 **Hạn:** {due:%d/%m}")
 
-    webhook_notify.post("\n".join(lines), [assignee_did] if assignee_did else [])
+    embed = {
+        "author": {"name": "🆕 Task mới"},
+        "title": task_doc.get("title", ""),
+        "color": 0x6366F1,  # indigo accent (design system), song song web
+        "description": "\n".join(lines),  # moi thong tin mot dong
+    }
+    url = web_link.task_short_url(short_code, task_id)
+    if url:
+        embed["url"] = url  # ten task bam duoc -> mo link rut gon
+
+    content = f"<@{assignee_did}>" if assignee_did else ""
+    webhook_notify.post(content, [assignee_did] if assignee_did else [], embeds=[embed])
 
 
 def _sync_create(client, task_id, task_doc, assignee_id, notion_project_id) -> str:

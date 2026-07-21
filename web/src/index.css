@@ -2524,3 +2524,34 @@ table.data-table { width: 100%; border-collapse: collapse; }
 
 .log-meta { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.4rem; font-size: 0.75rem; }
 .log-actor { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* ============================================================================
+   Khu quản trị NGOÀI dự án (GlobalAdmin) + bộ chọn người vào dự án
+   ========================================================================== */
+.global-admin { min-height: 100vh; display: flex; flex-direction: column; }
+.global-admin-top {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: 0.9rem 1.5rem;
+  background: var(--glass); backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.global-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 1; }
+.global-admin-body { width: 100%; max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
+
+/* Bộ chọn thành viên (ProjectMemberPicker) — danh sách cuộn, mỗi dòng một người. */
+.picker-list {
+  max-height: 340px; overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
+  background: rgba(15, 23, 42, 0.4);
+}
+.picker-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.75rem; cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.picker-row:last-child { border-bottom: none; }
+.picker-row:hover { background: rgba(255, 255, 255, 0.04); }
+.picker-row.on { background: rgba(99, 102, 241, 0.14); }
+.picker-row input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px; }
+.picker-name { font-size: 0.9rem; color: var(--text); }
