@@ -2620,6 +2620,8 @@ table.data-table { width: 100%; border-collapse: collapse; }
 
 /* Đầu mỗi bảng: tiêu đề + nút thêm. */
 .cost-section-head { align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+/* Đếm người ngay cạnh tiêu đề "Lương nhân sự" (thay cho card Nhân sự đã bỏ). */
+.cost-headcount { font-size: 0.85rem; font-weight: 600; margin-left: 0.75rem; color: var(--text); }
 .cost-section-sub { font-size: 0.82rem; margin-top: 0.2rem; max-width: 62ch; }
 
 /* Ô chọn dự án ở khu quản trị (Thành viên + Chi phí) — bỏ margin của .field khi nằm trong

@@ -117,7 +117,6 @@ export default function CostManagement({ projectId }: { projectId: string }) {
     return rows;
   }, [memberships, memberById, compByMember]);
 
-  const headcount = employees.length;
   // Cửa sổ tính = [tháng hiện tại, +N) — xem anchorMonth (đã từng neo nhầm vào người vào
   // sớm nhất làm cả bảng về 0 ₫).
   const anchor = anchorMonth();
@@ -130,6 +129,11 @@ export default function CostManagement({ projectId }: { projectId: string }) {
   );
   const projection = useMemo(() => projectionTotal(projections, months), [projections, months]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // Tổng SUẤT tuyển thêm trong dự chi — hiện cạnh số người thật ở bảng lương.
+  const hireCount = useMemo(
+    () => projections.filter((p) => p.kind === 'hire').reduce((s, p) => s + p.headCount, 0),
+    [projections],
+  );
 
   const loading = costsLoading || mLoading || compLoading;
 
@@ -146,7 +150,6 @@ export default function CostManagement({ projectId }: { projectId: string }) {
       <MonthSlider months={months} onChange={changeMonths} />
 
       <CostSummary
-        headcount={headcount}
         months={months}
         salary={salary}
         oneTime={overhead.oneTime}
@@ -183,6 +186,7 @@ export default function CostManagement({ projectId }: { projectId: string }) {
         employees={employees}
         itemById={itemById}
         memberItemIds={memberItemIds}
+        hireCount={hireCount}
         anchor={anchor}
         months={months}
         onPick={(e) => setPicker({ kind: 'member', employee: e })}

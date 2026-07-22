@@ -8,6 +8,8 @@ interface Props {
   itemById: Map<string, CostItem>;
   /** memberId → các khoản chi phí đã gán cho người đó. */
   memberItemIds: Map<string, string[]>;
+  /** Tổng SUẤT tuyển thêm ở Dự chi (Σ head_count các dòng hire) — đếm cạnh số người thật. */
+  hireCount: number;
   anchor: number;
   months: number;
   /** Bấm một hàng → mở popup gán khoản chi phí cho người đó. */
@@ -19,11 +21,17 @@ interface Props {
  * khoản thiết bị/vận hành cho người đó (mô hình 0056). Cột TB&VH = tổng khoản đã gán,
  * khoản theo năm chia theo số tháng người đó làm việc trong cửa sổ.
  */
-export default function EmployeeCostTable({ employees, itemById, memberItemIds, anchor, months, onPick }: Props) {
+export default function EmployeeCostTable({ employees, itemById, memberItemIds, hireCount, anchor, months, onPick }: Props) {
   return (
     <div className="glass section" style={{ padding: '1.25rem' }}>
       <div className="cost-section-head">
-        <h3>Lương nhân sự</h3>
+        <h3>
+          Lương nhân sự
+          <span className="cost-headcount">
+            👥 {employees.length} người
+            {hireCount > 0 && <span className="muted"> · dự tuyển thêm {hireCount} (dự chi)</span>}
+          </span>
+        </h3>
         <p className="muted cost-section-sub">
           Lương/ngày lấy từ tab <strong>Thành viên</strong> (mở chi tiết người để sửa). Bấm một hàng để
           <strong> gán khoản thiết bị/vận hành</strong> cho người đó.

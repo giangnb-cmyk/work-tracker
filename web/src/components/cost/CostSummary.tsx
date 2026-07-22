@@ -1,7 +1,6 @@
 import { formatVnd } from '../../lib/format';
 
 interface Props {
-  headcount: number;
   months: number;
   salary: number;
   oneTime: number;
@@ -16,13 +15,13 @@ interface Card {
   highlight?: boolean;
 }
 
-/** Dải thẻ tổng hợp của tab Chi phí. `grandTotal` = lương + ban đầu + vận hành + dự chi. */
-export default function CostSummary({ headcount, months, salary, oneTime, annual, projection }: Props) {
+/** Dải thẻ tổng hợp của tab Chi phí. `grandTotal` = lương + ban đầu + vận hành + dự chi.
+ *  Số NGƯỜI không nằm ở đây — hiện ở đầu bảng "Lương nhân sự" (kèm số dự tuyển). */
+export default function CostSummary({ months, salary, oneTime, annual, projection }: Props) {
   const grandTotal = salary + oneTime + annual + projection;
   const span = `${months} tháng`;
 
   const cards: Card[] = [
-    { icon: '👥', label: 'Nhân sự', value: `${headcount} người` },
     { icon: '💵', label: `Tổng lương · ${span}`, value: formatVnd(salary) },
     { icon: '🖥️', label: 'Chi phí ban đầu (1 lần)', value: formatVnd(oneTime) },
     { icon: '🔌', label: `Chi phí vận hành · ${span}`, value: formatVnd(annual) },
