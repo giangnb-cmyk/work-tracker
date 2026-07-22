@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSprintContext } from '../../contexts/SprintContext';
+import { useProjectMembers } from '../../hooks/useProjectMembers';
 import { usePeriodReviews } from '../../hooks/usePeriodReviews';
 import { enqueueMemberReview, fetchMemberReviewRequest } from '../../lib/memberReviewWrites';
 import { periodLabel, periodRange } from '../../lib/period';
@@ -81,15 +82,24 @@ function PeriodMemberRow({
   );
 }
 
-/** Chọn kỳ (tháng/quý) → mỗi người một dòng: bấm "Phân tích AI" để bot tổng hợp từ ghi chú sprint. */
-export default function PeriodReviewPanel() {
+/**
+ * Chọn kỳ (tháng/quý) → mỗi thành viên CỦA DỰ ÁN một dòng: bấm "Phân tích AI" để bot tổng hợp từ
+ * ghi chú sprint. Members từ SprintContext, lọc theo project_members (như SprintNotesPanel).
+ */
+export default function PeriodReviewPanel({ projectId }: { projectId: string | null }) {
   const { isAdmin, profile } = useAuth();
   const { members } = useSprintContext();
+  const { memberships } = useProjectMembers(projectId);
   const now = new Date();
   const [kind, setKind] = useState<PeriodKind>('month');
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [quarter, setQuarter] = useState(Math.floor(now.getMonth() / 3) + 1);
+
+  const projectMembers = useMemo(() => {
+    const ids = new Set(memberships.map((m) => m.userId));
+    return members.filter((m) => ids.has(m.uid));
+  }, [members, memberships]);
 
   const index = kind === 'month' ? month : quarter;
   const { start, end } = periodRange(kind, year, index);
@@ -127,11 +137,13 @@ export default function PeriodReviewPanel() {
         AI đọc các ghi chú sprint <strong>giao</strong> với {periodLabel(kind, start)} và viết bản đánh giá tổng hợp cho từng người.
       </p>
 
-      {members.length === 0 ? (
-        <p className="muted">Chưa có thành viên nào.</p>
+      {!projectId ? (
+        <p className="muted">Chọn một dự án ở góc trên.</p>
+      ) : projectMembers.length === 0 ? (
+        <p className="muted">Dự án chưa có thành viên nào.</p>
       ) : (
         <div className="review-grid">
-          {members.map((m) => (
+          {projectMembers.map((m) => (
             <PeriodMemberRow
               key={m.uid}
               member={m}

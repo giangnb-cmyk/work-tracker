@@ -18,7 +18,7 @@ export type ViewId = (typeof ALL_VIEWS)[number];
  * không nằm trong sidebar dự án. Bao quát cả web nên không gắn với dự án đang chọn.
  * (Khác `members` — đó là roster CỦA dự án, nằm trong sidebar dự án.)
  */
-export const GLOBAL_ADMIN_VIEWS: readonly ViewId[] = ['team', 'visits', 'settings', 'log', 'costs'];
+export const GLOBAL_ADMIN_VIEWS: readonly ViewId[] = ['team', 'reviews', 'visits', 'settings', 'log', 'costs'];
 export function isGlobalAdminView(view: ViewId): boolean {
   return GLOBAL_ADMIN_VIEWS.includes(view);
 }

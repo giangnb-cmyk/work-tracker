@@ -272,7 +272,8 @@ thành viên (📈 Lịch sử lương).
 ## `member_sprint_notes` (đánh giá thành viên theo sprint)
 
 Ghi chú có cấu trúc cho MỘT người trong MỘT sprint (tuần) — migration `0059`. Hiện ở tab **Đánh
-giá** (`Reviews`, admin-only, view id `reviews`) và tab **Ghi chú** trong `MemberModal`. Nhạy cảm
+giá** (`Reviews`, view id `reviews`) trong **khu quản trị chung NGOÀI dự án** (`GlobalAdmin`, cạnh
+Thành viên/Chi phí — dữ liệu toàn cục theo người) và tab **Ghi chú** trong `MemberModal`. Nhạy cảm
 (đánh giá của quản lý) → RLS **admin-only cho CẢ ĐỌC lẫn GHI** (`is_admin()` bao owner), y như
 `member_compensation`. Một dòng DÙNG CHUNG cho mỗi `(member_id, sprint_id)` (khoá upsert), sửa-đè;
 `updated_by` = người sửa cuối (KHÔNG lưu tác giả gốc — upsert ghi đè mọi cột truyền vào).

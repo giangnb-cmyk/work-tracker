@@ -10,17 +10,19 @@ const Visits = lazyView(() => import('./Visits'));
 const Settings = lazyView(() => import('./Settings'));
 const SystemLog = lazyView(() => import('./SystemLog'));
 const CostAdmin = lazyView(() => import('./CostAdmin'));
+const Reviews = lazyView(() => import('./Reviews'));
 
 const TABS: { id: ViewId; label: string; icon: string }[] = [
   { id: 'team', label: 'Thành viên', icon: '👥' },
+  { id: 'reviews', label: 'Đánh giá', icon: '📝' },
   { id: 'costs', label: 'Chi phí', icon: '💰' },
   { id: 'visits', label: 'Truy cập', icon: '👣' },
   { id: 'settings', label: 'Cấu hình', icon: '⚙️' },
   { id: 'log', label: 'Hệ thống', icon: '🖥️' },
 ];
 
-function isTab(v: ViewId): v is 'team' | 'costs' | 'visits' | 'settings' | 'log' {
-  return v === 'team' || v === 'costs' || v === 'visits' || v === 'settings' || v === 'log';
+function isTab(v: ViewId): v is 'team' | 'reviews' | 'costs' | 'visits' | 'settings' | 'log' {
+  return v === 'team' || v === 'reviews' || v === 'costs' || v === 'visits' || v === 'settings' || v === 'log';
 }
 
 /**
@@ -74,6 +76,7 @@ export default function GlobalAdmin() {
             fallback={<div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>}
           >
             {active === 'team' && <Team />}
+            {active === 'reviews' && <Reviews />}
             {active === 'costs' && <CostAdmin />}
             {active === 'visits' && <Visits />}
             {active === 'settings' && <Settings />}

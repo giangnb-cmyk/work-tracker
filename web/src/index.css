@@ -2791,14 +2791,12 @@ table.data-table { width: 100%; border-collapse: collapse; }
   gap: 1rem;
   margin-top: 1rem;
 }
-.member-note-card,
 .period-review {
   padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
 }
-.mnc-head,
 .pr-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .mnc-head-name {
   font-weight: 600;
@@ -2808,11 +2806,30 @@ table.data-table { width: 100%; border-collapse: collapse; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mnc-field { display: flex; flex-direction: column; gap: 0.28rem; margin: 0; }
-.mnc-field > span { font-size: 0.74rem; color: var(--muted); font-weight: 600; }
-.mnc-textarea { min-height: 52px; }
-.mnc-foot { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.1rem; }
-.mnc-saved { font-size: 0.76rem; color: var(--green); font-weight: 600; }
+
+/* Danh sách người để ghi chú theo sprint (bấm 1 dòng → popup MemberNoteModal). */
+.note-list { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 1rem; }
+.note-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.note-list-row:hover { background: rgba(99, 102, 241, 0.1); border-color: var(--primary); }
+.nlr-name { font-weight: 600; white-space: nowrap; }
+.nlr-preview { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.4rem; overflow: hidden; }
+.nlr-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.84rem; }
+.nlr-empty { flex: 1; font-size: 0.82rem; font-style: italic; }
+.nlr-caret { color: var(--muted); font-size: 0.85rem; }
+.mnm-title { display: flex; align-items: center; gap: 0.6rem; }
 
 .pr-summary {
   white-space: pre-wrap;
