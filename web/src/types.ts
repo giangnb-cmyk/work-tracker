@@ -300,6 +300,86 @@ export interface Project {
   createdBy: string;
 }
 
+/* ===========================================================================
+   Chi phí dự án (tab "Chi phí" — phần Quản trị). Xem migration 0053.
+   Ngày để dạng chuỗi 'YYYY-MM-DD' (date-only) — tính theo THÁNG nên không cần giờ,
+   và tránh lệch múi giờ khi Timestamp làm tròn về UTC.
+   =========================================================================== */
+
+/** Lương thực tế của một thành viên trong dự án (1 dòng / thành viên). */
+export interface CostEmployee {
+  id: string;
+  projectId: string;
+  /** profiles.id — người này phải là thành viên của dự án. */
+  memberId: string;
+  monthlySalary: number;
+  startDate: string | null; // 'YYYY-MM-DD'
+  endDate: string | null; // 'YYYY-MM-DD' — null = còn đang làm
+  sortOrder: number;
+  createdAt?: Timestamp;
+  createdBy: string;
+}
+
+/** one_time = chi phí ban đầu 1 lần; annual = chi phí theo năm. */
+export type CostItemKind = 'one_time' | 'annual';
+
+export const COST_ITEM_KINDS: CostItemKind[] = ['one_time', 'annual'];
+export const COST_ITEM_KIND_LABEL: Record<CostItemKind, string> = {
+  one_time: 'Ban đầu (1 lần)',
+  annual: 'Theo năm',
+};
+
+/** Một khoản chi phí thiết bị/vận hành. `perEmployee` = nhân theo số nhân sự. */
+export interface CostItem {
+  id: string;
+  projectId: string;
+  name: string;
+  amount: number;
+  kind: CostItemKind;
+  perEmployee: boolean;
+  sortOrder: number;
+  createdAt?: Timestamp;
+  createdBy: string;
+}
+
+/** Nhịp phát sinh của một khoản dự chi trong khoảng tháng đang xem. */
+export type CostCadence = 'monthly' | 'one_time' | 'annual';
+
+export const COST_CADENCES: CostCadence[] = ['monthly', 'one_time', 'annual'];
+export const COST_CADENCE_LABEL: Record<CostCadence, string> = {
+  monthly: 'Hàng tháng',
+  one_time: '1 lần',
+  annual: 'Hàng năm',
+};
+
+/** hire = tuyển thêm nhân sự; outsource = thuê ngoài. */
+export type CostProjectionKind = 'hire' | 'outsource';
+
+export const COST_PROJECTION_KINDS: CostProjectionKind[] = ['hire', 'outsource'];
+export const COST_PROJECTION_KIND_LABEL: Record<CostProjectionKind, string> = {
+  hire: 'Tuyển thêm',
+  outsource: 'Outsource',
+};
+export const COST_PROJECTION_KIND_ICON: Record<CostProjectionKind, string> = {
+  hire: '🧑‍💼',
+  outsource: '🌐',
+};
+
+/** Một dòng DỰ CHI (what-if): tuyển thêm vị trí X lương Y, hoặc một khoản outsource. */
+export interface CostProjection {
+  id: string;
+  projectId: string;
+  kind: CostProjectionKind;
+  label: string;
+  amount: number;
+  cadence: CostCadence;
+  /** Số người / số suất (mặc định 1). */
+  headCount: number;
+  sortOrder: number;
+  createdAt?: Timestamp;
+  createdBy: string;
+}
+
 export type BugStatus = 'open' | 'fixing' | 'pending' | 'deployed' | 'done';
 
 export const BUG_STATUSES: BugStatus[] = ['open', 'fixing', 'pending', 'deployed', 'done'];

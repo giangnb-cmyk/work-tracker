@@ -2568,3 +2568,79 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .picker-row.on { background: rgba(99, 102, 241, 0.14); }
 .picker-row input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px; }
 .picker-name { font-size: 0.9rem; color: var(--text); }
+
+/* ============================================================================
+   Chi phí (tab Quản trị) — slider tháng, thẻ tổng, bảng sửa-trên-ô
+   ========================================================================== */
+.cost-slider { padding: 1.25rem 1.5rem; }
+.cost-slider-head { align-items: flex-start; gap: 1rem; }
+.cost-slider-title { font-size: 1rem; font-weight: 600; }
+.cost-slider-sub { font-size: 0.8rem; margin-top: 0.15rem; max-width: 46ch; }
+.cost-slider-readout { white-space: nowrap; text-align: right; }
+.cost-slider-months { font-size: 1.9rem; font-weight: 700; color: var(--primary); }
+.cost-slider-unit { font-size: 0.95rem; color: var(--text); }
+.cost-slider-years { font-size: 0.85rem; }
+.cost-range-ticks { font-size: 0.72rem; margin-top: 0.1rem; }
+
+.cost-range {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none; margin: 0.9rem 0 0.35rem; cursor: pointer;
+}
+.cost-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); border: 3px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.22), 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: pointer; transition: transform 0.12s ease;
+}
+.cost-range::-webkit-slider-thumb:hover { transform: scale(1.12); }
+.cost-range::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); border: 3px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.22); cursor: pointer;
+}
+.cost-range::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
+
+/* Thẻ tổng: thẻ TỔNG CỘNG nổi bật bằng viền + nền indigo nhạt. */
+.cost-summary { margin-top: 1.25rem; }
+.cost-stat-value { font-size: 1.15rem; }
+.cost-stat-total {
+  border: 1px solid rgba(99, 102, 241, 0.55);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(56, 189, 248, 0.08));
+}
+.cost-stat-total .cost-stat-value { color: var(--primary); font-size: 1.3rem; }
+
+/* Đầu mỗi bảng: tiêu đề + nút thêm. */
+.cost-section-head { align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+.cost-section-sub { font-size: 0.82rem; margin-top: 0.2rem; max-width: 60ch; }
+.cost-add-member { width: min(280px, 60vw); }
+
+/* Bảng chi phí: ô nhập gọn, cột số canh phải. */
+.cost-table td { vertical-align: middle; }
+.cost-num-col { text-align: right; }
+.cost-center-col { text-align: center; }
+.cost-table .input { padding: 0.4rem 0.55rem; font-size: 0.85rem; }
+.cost-money { text-align: right; max-width: 160px; margin-left: auto; }
+.cost-date { max-width: 155px; }
+.cost-kind-select { width: auto; min-width: 130px; padding: 0.4rem 0.55rem; }
+.cost-count-input { max-width: 80px; text-align: center; margin: 0 auto; }
+
+.cost-check { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.cost-check input[type="checkbox"] { accent-color: var(--primary); width: 17px; height: 17px; cursor: pointer; }
+.cost-check-x { font-size: 0.78rem; }
+
+.cost-kind-badge { font-size: 0.75rem; white-space: nowrap; }
+.cost-kind-hire { background: rgba(99, 102, 241, 0.16); color: #c7d2fe; }
+.cost-kind-outsource { background: rgba(56, 189, 248, 0.16); color: #bae6fd; }
+
+/* Dòng tổng cuối bảng dự chi. */
+.cost-foot-row td { border-top: 2px solid var(--border); border-bottom: none; padding-top: 0.9rem; }
+.cost-foot-label { text-align: right; color: var(--muted); font-size: 0.82rem; }
+.cost-foot-total { font-weight: 700; color: var(--primary); }
+
+@media (max-width: 640px) {
+  .cost-add-member { width: 100%; }
+  .cost-section-head { flex-direction: column; }
+}

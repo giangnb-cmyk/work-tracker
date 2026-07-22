@@ -182,6 +182,66 @@ cho vào dự án. Bảng N-N thuần, không có id riêng — khoá chính là
 
 ---
 
+## `project_cost_employees` / `project_cost_items` / `project_cost_projections` (Chi phí dự án)
+
+Dữ liệu tab **Chi phí** (khu Quản trị của dự án — migration `0053`). Chỉ **web** dùng; bot
+không đụng. Vì chứa **lương** (nhạy cảm) nên RLS khoá **admin-only cho CẢ ĐỌC lẫn GHI** — chặt
+hơn các bảng khác vốn mở đọc. Cả ba bật realtime + `replica identity full` (event DELETE mang
+đủ `project_id` cho bộ lọc `project_id=eq.<id>`). Không seed dữ liệu lúc migration — seed theo
+dự án bằng nút "Thêm mẫu" trong UI.
+
+**`project_cost_employees`** — lương thực tế, mỗi thành viên dự án MỘT dòng:
+
+| Field            | Type         | Notes                                                       |
+|------------------|--------------|-------------------------------------------------------------|
+| `id`             | uuid (PK)    | `gen_random_uuid()`                                         |
+| `project_id`     | uuid         | → `projects.id`, `on delete cascade`                       |
+| `member_id`      | uuid         | → `profiles.id`, `on delete cascade`; `unique(project_id, member_id)` |
+| `monthly_salary` | numeric      | lương/tháng (VND)                                          |
+| `start_date`     | date \| null | ngày vào dự án                                             |
+| `end_date`       | date \| null | ngày rời; null = còn đang làm                              |
+| `sort_order`     | int          | thứ tự hiển thị                                            |
+| `created_at`     | timestamptz  | `now()`                                                    |
+| `created_by`     | uuid \| null | → `profiles.id` (`on delete set null`)                     |
+
+**`project_cost_items`** — chi phí thiết bị/vận hành:
+
+| Field          | Type         | Notes                                                       |
+|----------------|--------------|-------------------------------------------------------------|
+| `id`           | uuid (PK)    | `gen_random_uuid()`                                         |
+| `project_id`   | uuid         | → `projects.id`, `on delete cascade`                       |
+| `name`         | text         | tên khoản (Bộ PC, Văn phòng…)                             |
+| `amount`       | numeric      | số tiền (VND)                                              |
+| `kind`         | text         | `one_time` (ban đầu 1 lần) \| `annual` (theo năm)          |
+| `per_employee` | boolean      | true = nhân với số nhân sự (headcount)                     |
+| `sort_order`   | int          | thứ tự                                                     |
+| `created_at`   | timestamptz  | `now()`                                                    |
+| `created_by`   | uuid \| null | → `profiles.id` (`on delete set null`)                     |
+
+**`project_cost_projections`** — DỰ CHI (what-if): tuyển thêm + outsource:
+
+| Field        | Type         | Notes                                                        |
+|--------------|--------------|--------------------------------------------------------------|
+| `id`         | uuid (PK)    | `gen_random_uuid()`                                          |
+| `project_id` | uuid         | → `projects.id`, `on delete cascade`                        |
+| `kind`       | text         | `hire` (tuyển thêm) \| `outsource` (thuê ngoài)             |
+| `label`      | text         | vị trí/mô tả (VD "Dev Unity")                               |
+| `amount`     | numeric      | số tiền (VND) — nghĩa tuỳ `cadence`                         |
+| `cadence`    | text         | `monthly` (×tháng) \| `one_time` (×1) \| `annual` (×tháng/12)|
+| `head_count` | int          | số người/số suất (mặc định 1)                              |
+| `sort_order` | int          | thứ tự                                                      |
+| `created_at` | timestamptz  | `now()`                                                    |
+| `created_by` | uuid \| null | → `profiles.id` (`on delete set null`)                     |
+
+- **Tính toán** (thuần, `web/src/lib/projectCost.ts`): cửa sổ = `horizon` tháng kể từ ngày
+  start sớm nhất (slider chọn số tháng). Tổng lương cộng theo TỪNG THÁNG (mỗi tháng cộng người
+  còn active). `one_time` đếm 1 lần; `annual`/`cadence=annual` chia đều `× horizon/12`;
+  `cadence=monthly` `× horizon`. `per_employee`/`head_count` nhân thêm.
+- **Web**: `CostManagement` + `components/cost/*` + hook `useProjectCosts` + `lib/costWrites.ts`.
+  Admin-only ở nav (nhóm "Quản trị" trong `Sidebar`) khớp với RLS.
+
+---
+
 ## `features/{featureId}` & `feature_labels/{labelId}`
 
 A feature: a unit of product work **inside a project**. A task optionally attaches to one

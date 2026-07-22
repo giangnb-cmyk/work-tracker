@@ -10,6 +10,9 @@ import type {
   AuditEntry,
   Bug,
   BugLabel,
+  CostEmployee,
+  CostItem,
+  CostProjection,
   Feature,
   FeatureLabel,
   Project,
@@ -107,6 +110,49 @@ export function rowToBugLabel(r: Row): BugLabel {
     color: r.color ?? '#6366f1',
     icon: r.icon ?? '',
     discordTagId: r.discord_tag_id ?? null,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? '',
+  };
+}
+
+export function rowToCostEmployee(r: Row): CostEmployee {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    memberId: r.member_id,
+    monthlySalary: Number(r.monthly_salary ?? 0),
+    startDate: r.start_date ?? null,
+    endDate: r.end_date ?? null,
+    sortOrder: r.sort_order ?? 0,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? '',
+  };
+}
+
+export function rowToCostItem(r: Row): CostItem {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name ?? '',
+    amount: Number(r.amount ?? 0),
+    kind: r.kind ?? 'annual',
+    perEmployee: Boolean(r.per_employee),
+    sortOrder: r.sort_order ?? 0,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? '',
+  };
+}
+
+export function rowToCostProjection(r: Row): CostProjection {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    kind: r.kind ?? 'hire',
+    label: r.label ?? '',
+    amount: Number(r.amount ?? 0),
+    cadence: r.cadence ?? 'monthly',
+    headCount: r.head_count ?? 1,
+    sortOrder: r.sort_order ?? 0,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };
