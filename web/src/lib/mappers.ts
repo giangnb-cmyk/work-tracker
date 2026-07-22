@@ -11,6 +11,7 @@ import type {
   Bug,
   BugLabel,
   CostItem,
+  CostMemberItems,
   CostProjection,
   MemberComp,
   Feature,
@@ -131,7 +132,6 @@ export function rowToCostItem(r: Row): CostItem {
     name: r.name ?? '',
     amount: Number(r.amount ?? 0),
     kind: r.kind ?? 'annual',
-    perEmployee: Boolean(r.per_employee),
     sortOrder: r.sort_order ?? 0,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
@@ -147,9 +147,18 @@ export function rowToCostProjection(r: Row): CostProjection {
     amount: Number(r.amount ?? 0),
     cadence: r.cadence ?? 'monthly',
     headCount: r.head_count ?? 1,
+    itemIds: r.item_ids ?? [],
     sortOrder: r.sort_order ?? 0,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
+  };
+}
+
+export function rowToCostMemberItems(r: Row): CostMemberItems {
+  return {
+    projectId: r.project_id,
+    memberId: r.member_id,
+    itemIds: r.item_ids ?? [],
   };
 }
 

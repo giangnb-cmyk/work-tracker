@@ -60,31 +60,91 @@ export function salaryTotal(employees: SalaryLine[], anchor: number, horizon: nu
   return employees.reduce((sum, e) => sum + e.monthlySalary * activeMonths(e, anchor, horizon), 0);
 }
 
-/**
- * Chi phí thiết bị/vận hành trong `horizon` tháng, tách rõ:
- * - `oneTime`: khoản ban đầu (đếm 1 lần, không phụ thuộc số tháng).
- * - `annual`: khoản theo năm, chia đều theo tháng (× horizon/12).
- * `per_employee` nhân khoản với số nhân sự (headcount).
- */
-export function overheadTotal(
-  items: CostItem[],
-  headcount: number,
-  horizon: number,
-): { oneTime: number; annual: number; total: number } {
-  let oneTime = 0;
-  let annual = 0;
-  for (const it of items) {
-    const base = it.amount * (it.perEmployee ? headcount : 1);
-    if (it.kind === 'one_time') oneTime += base;
-    else annual += base * (horizon / 12);
-  }
-  return { oneTime, annual, total: oneTime + annual };
+export interface OverheadInput {
+  items: CostItem[];
+  /** Nhân sự của dự án (đủ start/end để tính số tháng làm việc trong cửa sổ). */
+  employees: (SalaryLine & { memberId: string })[];
+  /** memberId → các khoản đã gán (popup multi-select). */
+  memberItemIds: Map<string, string[]>;
+  projections: CostProjection[];
+  anchor: number;
+  horizon: number;
 }
 
-/** Thành tiền MỘT khoản chi phí thiết bị/vận hành trong `months` tháng (cho hiển thị dòng). */
-export function overheadItemTotal(item: CostItem, headcount: number, months: number): number {
-  const base = item.amount * (item.perEmployee ? headcount : 1);
-  return item.kind === 'one_time' ? base : base * (months / 12);
+export interface OverheadResult {
+  oneTime: number;
+  annual: number;
+  total: number;
+  /** Thành tiền TỪNG khoản (đã gộp mọi lượt gán; chưa gán = 1 lần cho dự án). */
+  perItem: Map<string, number>;
+  /** Số "suất" đang gán mỗi khoản (người thật + head_count dự chi) — cột "Đang gán". */
+  perItemCount: Map<string, number>;
+}
+
+/**
+ * Chi phí thiết bị/vận hành theo mô hình GÁN THEO NGƯỜI (migration 0056):
+ * - Khoản gán cho nhân sự: one_time đếm 1 lần/người; annual × (số tháng người đó LÀM VIỆC
+ *   trong cửa sổ / 12) — người vào giữa chừng không gánh nguyên năm.
+ * - Khoản gán cho dòng dự chi: × head_count; annual tính đủ cửa sổ (× horizon/12) vì dự chi
+ *   không có ngày vào/ra.
+ * - Khoản KHÔNG gán cho ai (Văn phòng, Điện…): chi phí chung — 1 lần, hoặc annual × horizon/12.
+ */
+export function overheadTotal(inp: OverheadInput): OverheadResult {
+  const { items, employees, memberItemIds, projections, anchor, horizon } = inp;
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const perItem = new Map(items.map((i) => [i.id, 0]));
+  const perItemCount = new Map(items.map((i) => [i.id, 0]));
+  let oneTime = 0;
+  let annual = 0;
+
+  const add = (item: CostItem, amount: number, seats: number) => {
+    perItem.set(item.id, (perItem.get(item.id) ?? 0) + amount);
+    perItemCount.set(item.id, (perItemCount.get(item.id) ?? 0) + seats);
+    if (item.kind === 'one_time') oneTime += amount;
+    else annual += amount;
+  };
+
+  for (const emp of employees) {
+    const months = activeMonths(emp, anchor, horizon);
+    for (const id of memberItemIds.get(emp.memberId) ?? []) {
+      const it = byId.get(id);
+      if (!it) continue; // khoản đã xoá còn sót id trong mảng — bỏ qua
+      add(it, it.kind === 'one_time' ? it.amount : it.amount * (months / 12), 1);
+    }
+  }
+
+  for (const p of projections) {
+    for (const id of p.itemIds ?? []) {
+      const it = byId.get(id);
+      if (!it) continue;
+      const each = it.kind === 'one_time' ? it.amount : it.amount * (horizon / 12);
+      add(it, each * p.headCount, p.headCount);
+    }
+  }
+
+  // Khoản chưa gán ai = chi phí CHUNG của dự án, tính một suất như trước 0056.
+  for (const it of items) {
+    if ((perItemCount.get(it.id) ?? 0) === 0) {
+      add(it, it.kind === 'one_time' ? it.amount : it.amount * (horizon / 12), 0);
+    }
+  }
+
+  return { oneTime, annual, total: oneTime + annual, perItem, perItemCount };
+}
+
+/** Tổng thiết bị/vận hành của MỘT người trong `months` tháng làm việc (hiện ở bảng lương). */
+export function overheadForEmployee(
+  itemIds: string[],
+  itemById: Map<string, CostItem>,
+  months: number,
+): number {
+  let sum = 0;
+  for (const id of itemIds) {
+    const it = itemById.get(id);
+    if (!it) continue;
+    sum += it.kind === 'one_time' ? it.amount : it.amount * (months / 12);
+  }
+  return sum;
 }
 
 /** Hệ số nhân theo nhịp trong `months` tháng: monthly→months, annual→months/12, one_time→1. */

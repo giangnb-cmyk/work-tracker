@@ -2641,12 +2641,18 @@ table.data-table { width: 100%; border-collapse: collapse; }
   white-space: nowrap;
 }
 .cost-table .input { padding: 0.4rem 0.55rem; font-size: 0.85rem; }
-.cost-money { text-align: right; max-width: 160px; margin-left: auto; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
-/* Trong modal chi tiết thành viên, ô lương chiếm hết bề ngang field (bỏ giới hạn của .cost-money). */
-.cost-money-block { max-width: none; margin-left: 0; }
-.cost-date { max-width: 155px; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
+/* Ô tiền KHOÁ CỨNG bề rộng (width + min-width, không phải max-width): cột đã width:1% thì
+   bề rộng cột = min-content của ô — input co giãn được là cột teo còn vài chục px, số
+   "30.000.000" hiện thành "30.0". min-width giữ đáy cho thuật toán bề rộng bảng. */
+.cost-money { width: 160px; min-width: 160px; text-align: right; margin-left: auto; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
+/* Trong modal chi tiết thành viên, ô lương chiếm hết bề ngang field (bỏ khoá của .cost-money). */
+.cost-money-block { width: 100%; min-width: 0; margin-left: 0; }
+/* Ô TÊN thì ngược lại: cap để không nuốt hết hàng — cột tên là cột mềm duy nhất, để input
+   100% là nó phình full khung, đè bẹp chỗ nhìn của cột tiền. */
+.cost-name { max-width: 430px; }
+.cost-date { width: 150px; min-width: 150px; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
 .cost-kind-select { width: auto; min-width: 130px; padding: 0.4rem 0.55rem; }
-.cost-count-input { max-width: 80px; text-align: center; margin: 0 auto; }
+.cost-count-input { width: 70px; min-width: 70px; text-align: center; margin: 0 auto; }
 
 .cost-check { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
 .cost-check input[type="checkbox"] { accent-color: var(--primary); width: 17px; height: 17px; cursor: pointer; }
@@ -2655,6 +2661,22 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .cost-kind-badge { font-size: 0.75rem; white-space: nowrap; }
 .cost-kind-hire { background: rgba(99, 102, 241, 0.16); color: #c7d2fe; }
 .cost-kind-outsource { background: rgba(56, 189, 248, 0.16); color: #bae6fd; }
+
+/* Màn "Lương" của tab Thành viên (khu quản trị): tiêu đề nhóm + hàng bấm được. */
+.tsal-group-head {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 0.6rem 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tsal-row { cursor: pointer; }
+
+/* Popup gán khoản chi phí (ItemPickerModal) — tái dùng .picker-row của ProjectMemberPicker. */
+.cost-picker-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: 10px; margin-bottom: 0.5rem; }
+.cost-picker-meta { margin-left: auto; font-size: 0.78rem; white-space: nowrap; }
+.cost-gear-chip { font-size: 0.75rem; white-space: nowrap; }
 
 /* Dòng tổng cuối bảng dự chi. */
 .cost-foot-row td { border-top: 2px solid var(--border); border-bottom: none; padding-top: 0.9rem; }

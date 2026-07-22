@@ -11,18 +11,23 @@ import {
   deleteCostItem,
   deleteCostProjection,
   seedDefaultCostItems,
+  setMemberItems,
   updateCostItem,
   updateCostProjection,
   type CostItemPatch,
   type CostProjectionPatch,
 } from '../lib/costWrites';
 import { anchorMonth, overheadTotal, projectionTotal, salaryTotal } from '../lib/projectCost';
-import type { CostEmployeeRow, CostProjectionKind } from '../types';
+import { COST_PROJECTION_KIND_LABEL, type CostEmployeeRow, type CostProjection, type CostProjectionKind } from '../types';
 import CostSummary from './cost/CostSummary';
 import EmployeeCostTable from './cost/EmployeeCostTable';
+import ItemPickerModal from './cost/ItemPickerModal';
 import MonthSlider from './cost/MonthSlider';
 import OverheadTable from './cost/OverheadTable';
 import ProjectionTable from './cost/ProjectionTable';
+
+/** Popup gán khoản chi phí đang mở cho ai: một nhân sự, hoặc một dòng dự chi. */
+type PickerTarget = { kind: 'member'; employee: CostEmployeeRow } | { kind: 'projection'; projection: CostProjection };
 
 const MONTHS_KEY = 'cost-horizon-months';
 const DEFAULT_MONTHS = 12;
@@ -47,12 +52,15 @@ export default function CostManagement({ projectId }: { projectId: string }) {
   const {
     items: serverItems,
     projections: serverProjections,
+    memberItemIds,
     refetchItems,
     refetchProjections,
+    refetchMemberItems,
     loading: costsLoading,
   } = useProjectCosts(projectId);
   const { memberships, loading: mLoading } = useProjectMembers(projectId);
   const { byMember: compByMember, loading: compLoading } = useMemberComp();
+  const [picker, setPicker] = useState<PickerTarget | null>(null);
 
   // Ghi lạc quan: tick/gõ là UI đổi NGAY, ghi chạy nền — không đợi vòng realtime (~1s).
   const { rows: items, mutate: mutateItems, create: createItems } = useOptimisticList(serverItems, refetchItems);
@@ -112,8 +120,14 @@ export default function CostManagement({ projectId }: { projectId: string }) {
   const headcount = employees.length;
   const anchor = useMemo(() => anchorMonth(employees), [employees]);
   const salary = useMemo(() => salaryTotal(employees, anchor, months), [employees, anchor, months]);
-  const overhead = useMemo(() => overheadTotal(items, headcount, months), [items, headcount, months]);
+  // Thiết bị/vận hành theo mô hình GÁN THEO NGƯỜI (0056): khoản gán ai tính theo người đó
+  // (annual chia theo tháng làm việc), khoản chưa gán tính một suất chung.
+  const overhead = useMemo(
+    () => overheadTotal({ items, employees, memberItemIds, projections, anchor, horizon: months }),
+    [items, employees, memberItemIds, projections, anchor, months],
+  );
   const projection = useMemo(() => projectionTotal(projections, months), [projections, months]);
+  const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
   const loading = costsLoading || mLoading || compLoading;
 
@@ -140,12 +154,13 @@ export default function CostManagement({ projectId }: { projectId: string }) {
 
       {error && <p className="error-text">{error}</p>}
 
-      <EmployeeCostTable employees={employees} anchor={anchor} months={months} />
-
+      {/* Danh mục chi phí đứng TRÊN bảng lương (yêu cầu): xem danh mục trước, rồi xuống
+          bảng lương bấm từng người để gán. */}
       <OverheadTable
         items={items}
-        headcount={headcount}
         months={months}
+        totalByItem={overhead.perItem}
+        countByItem={overhead.perItemCount}
         onAdd={() =>
           runOp(() => createItems(() => addCostItem(projectId, createdBy)), 'Thêm khoản chi phí thất bại (cần quyền admin).')}
         onSeed={() =>
@@ -160,6 +175,15 @@ export default function CostManagement({ projectId }: { projectId: string }) {
             () => mutateItems((prev) => prev.filter((it) => it.id !== id), () => deleteCostItem(id)),
             'Gỡ khoản chi phí thất bại (cần quyền admin).',
           )}
+      />
+
+      <EmployeeCostTable
+        employees={employees}
+        itemById={itemById}
+        memberItemIds={memberItemIds}
+        anchor={anchor}
+        months={months}
+        onPick={(e) => setPicker({ kind: 'member', employee: e })}
       />
 
       <ProjectionTable
@@ -178,7 +202,42 @@ export default function CostManagement({ projectId }: { projectId: string }) {
             () => mutateProjections((prev) => prev.filter((p) => p.id !== id), () => deleteCostProjection(id)),
             'Gỡ dự chi thất bại (cần quyền admin).',
           )}
+        onPickItems={(p) => setPicker({ kind: 'projection', projection: p })}
       />
+
+      {picker?.kind === 'member' && (
+        <ItemPickerModal
+          title={picker.employee.name}
+          hint="Khoản “Ban đầu” tính 1 lần; khoản “Theo năm” tự chia theo số tháng người này làm việc trong khoảng đang xem."
+          items={items}
+          selectedIds={memberItemIds.get(picker.employee.memberId) ?? []}
+          onChange={(ids) =>
+            runOp(
+              () => setMemberItems(projectId, picker.employee.memberId, ids, createdBy).then(refetchMemberItems),
+              'Gán chi phí cho nhân sự thất bại (cần quyền admin).',
+            )}
+          onClose={() => setPicker(null)}
+        />
+      )}
+
+      {picker?.kind === 'projection' && (
+        <ItemPickerModal
+          title={picker.projection.label || COST_PROJECTION_KIND_LABEL[picker.projection.kind]}
+          hint={`Mỗi SUẤT (${picker.projection.headCount} người) nhận một bộ khoản đã chọn; khoản “Theo năm” tính đủ khoảng đang xem.`}
+          items={items}
+          selectedIds={picker.projection.itemIds}
+          onChange={(ids) =>
+            runOp(
+              () =>
+                mutateProjections(
+                  (prev) => prev.map((p) => (p.id === picker.projection.id ? { ...p, itemIds: ids } : p)),
+                  () => updateCostProjection(picker.projection.id, { itemIds: ids }),
+                ),
+              'Gán chi phí cho dự chi thất bại (cần quyền admin).',
+            )}
+          onClose={() => setPicker(null)}
+        />
+      )}
     </>
   );
 }

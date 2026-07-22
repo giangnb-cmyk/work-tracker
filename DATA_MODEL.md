@@ -206,7 +206,7 @@ các thành viên của dự án (`project_members`) → "pick người là có 
 > Bảng cũ `project_cost_employees` (0053, lương theo-dự-án) đã bị **drop ở 0054**, thay bằng
 > `member_compensation` toàn cục theo yêu cầu "tập trung 1 chỗ ở chi tiết thành viên".
 
-**`project_cost_items`** — chi phí thiết bị/vận hành:
+**`project_cost_items`** — DANH MỤC chi phí thiết bị/vận hành (mô hình gán theo người, 0056):
 
 | Field          | Type         | Notes                                                       |
 |----------------|--------------|-------------------------------------------------------------|
@@ -215,10 +215,20 @@ các thành viên của dự án (`project_members`) → "pick người là có 
 | `name`         | text         | tên khoản (Bộ PC, Văn phòng…)                             |
 | `amount`       | numeric      | số tiền (VND)                                              |
 | `kind`         | text         | `one_time` (ban đầu 1 lần) \| `annual` (theo năm)          |
-| `per_employee` | boolean      | true = nhân với số nhân sự (headcount)                     |
 | `sort_order`   | int          | thứ tự                                                     |
 | `created_at`   | timestamptz  | `now()`                                                    |
 | `created_by`   | uuid \| null | → `profiles.id` (`on delete set null`)                     |
+
+> `per_employee` (0053) đã **bỏ ở 0056** — thay bằng gán đích danh qua bảng dưới.
+
+**`project_cost_member_items`** — khoản nào gán cho NGƯỜI nào (popup multi-select ở bảng lương):
+
+| Field        | Type         | Notes                                                          |
+|--------------|--------------|----------------------------------------------------------------|
+| `project_id` | uuid (PK)    | → `projects.id`, `on delete cascade`                          |
+| `member_id`  | uuid (PK)    | → `profiles.id`, `on delete cascade`                          |
+| `item_ids`   | uuid[]       | ids vào `project_cost_items`; id khoản đã xoá còn sót → phía đọc lọc |
+| `updated_at` / `updated_by` | timestamptz / uuid \| null | ai sửa lần cuối                  |
 
 **`project_cost_projections`** — DỰ CHI (what-if): tuyển thêm + outsource:
 
@@ -231,14 +241,17 @@ các thành viên của dự án (`project_members`) → "pick người là có 
 | `amount`     | numeric      | số tiền (VND) — nghĩa tuỳ `cadence`                         |
 | `cadence`    | text         | `monthly` (×tháng) \| `one_time` (×1) \| `annual` (×tháng/12)|
 | `head_count` | int          | số người/số suất (mặc định 1)                              |
+| `item_ids`   | uuid[]       | khoản thiết bị/vận hành kèm MỖI suất (0056)                |
 | `sort_order` | int          | thứ tự                                                      |
 | `created_at` | timestamptz  | `now()`                                                    |
 | `created_by` | uuid \| null | → `profiles.id` (`on delete set null`)                     |
 
 - **Tính toán** (thuần, `web/src/lib/projectCost.ts`): cửa sổ = `horizon` tháng kể từ ngày
   start sớm nhất (slider chọn số tháng). Tổng lương cộng theo TỪNG THÁNG (mỗi tháng cộng người
-  còn active). `one_time` đếm 1 lần; `annual`/`cadence=annual` chia đều `× horizon/12`;
-  `cadence=monthly` `× horizon`. `per_employee`/`head_count` nhân thêm.
+  còn active). Thiết bị/vận hành (`overheadTotal`): khoản GÁN cho nhân sự → `one_time` 1
+  lần/người, `annual` × (số tháng người đó làm việc trong cửa sổ / 12); gán cho dự chi →
+  × `head_count`, `annual` × horizon/12; khoản KHÔNG gán ai → một suất chung (1 lần /
+  × horizon/12). Dự chi tiền mặt: `amount × head_count × hệ số cadence`.
 - **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`). **Lương** điền một chỗ ở chi tiết
   thành viên (`MemberModal`, tab Thành viên), ghi qua `upsertMemberComp`. Tab **Chi phí**
   (`CostAdmin` → `CostManagement` + `components/cost/*`) chọn dự án qua `useAdminCostProject`,

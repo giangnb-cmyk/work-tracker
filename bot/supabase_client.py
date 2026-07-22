@@ -7,8 +7,40 @@ Service-role BO QUA row level security -> moi kiem tra quyen phai lam trong code
 import os
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from supabase import create_client, Client
+
+# ---------------------------------------------------------------------------
+# Vá lỗi socket keep-alive chết (httpx/HTTP2): bot poll 60s một nhịp, giữa hai nhịp
+# connection trong pool bị server đóng vì rảnh; request kế tiếp tái dùng socket chết ->
+# httpx.RemoteProtocolError/ReadError nổ ở _receive_response, traceback dài spam log
+# ("Đẩy nhãn lên Discord lỗi" nhưng thật ra là cú GỌI SUPABASE chết ở tầng mạng).
+#
+# httpx tự loại connection hỏng khỏi pool sau lỗi, nên THỬ LẠI MỘT LẦN là ăn kết nối
+# mới và chạy tiếp. Chỉ thử lại khi an toàn:
+#   - GET/HEAD (select cua postgrest): idempotent, lặp thoải mái.
+#   - Mọi method nếu là ConnectError: chưa gửi được gì tới server, lặp vô hại.
+# KHÔNG thử lại POST/PATCH/DELETE chết giữa chừng — server có thể ĐÃ xử lý, lặp là
+# double-insert. Các vòng poll tự chạy lại nhịp sau nên write hỏng không mất việc.
+# Vá ở httpx.Client.send (một chỗ) thay vì rải retry khắp call site — bài học cũ:
+# luật phải giữ thì chặn ở gốc, không nhắc từng nơi.
+# ---------------------------------------------------------------------------
+_orig_send = httpx.Client.send
+
+
+def _send_with_retry(self, request, **kwargs):
+    try:
+        return _orig_send(self, request, **kwargs)
+    except httpx.ConnectError:
+        return _orig_send(self, request, **kwargs)  # chưa tới server — lặp an toàn
+    except httpx.TransportError:
+        if request.method not in ("GET", "HEAD"):
+            raise
+        return _orig_send(self, request, **kwargs)
+
+
+httpx.Client.send = _send_with_retry
 
 # WHY: skill chay standalone (`python skills/task_ops.py ...`, run-*.bat) KHONG qua
 # bot.py nen chua ai nap .env. Nap ngay tai noi duy nhat can 2 bien nay -> moi skill

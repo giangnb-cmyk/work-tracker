@@ -89,6 +89,38 @@ export function formatVnd(n: number): string {
   return `${Math.round(n).toLocaleString('vi-VN')} ₫`;
 }
 
+/** 'YYYY-MM-DD' → 'DD/MM/YYYY' (— nếu rỗng/sai định dạng). */
+export function formatIsoDate(s: string | null | undefined): string {
+  if (!s) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
+}
+
+/**
+ * Thâm niên kiểu lịch: "1 năm 1 tháng 21 ngày" (có năm) / "3 tháng 28 ngày" (chưa đủ năm —
+ * giữ cả "0 tháng 17 ngày" cho khớp bảng Notion cũ). Từ `start` đến `end` (mặc định hôm
+ * nay). start rỗng / tương lai / sai định dạng → '—'.
+ */
+export function tenureVi(start: string | null | undefined, end?: string | null): string {
+  if (!start) return '—';
+  const s = new Date(`${start}T00:00:00`);
+  const e = end ? new Date(`${end}T00:00:00`) : new Date();
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || e < s) return '—';
+  let years = e.getFullYear() - s.getFullYear();
+  let months = e.getMonth() - s.getMonth();
+  let days = e.getDate() - s.getDate();
+  if (days < 0) {
+    months -= 1;
+    // Mượn số ngày của THÁNG TRƯỚC mốc cuối (ngày 0 = ngày chót tháng trước).
+    days += new Date(e.getFullYear(), e.getMonth(), 0).getDate();
+  }
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  return years > 0 ? `${years} năm ${months} tháng ${days} ngày` : `${months} tháng ${days} ngày`;
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 0) return '?';

@@ -22,10 +22,12 @@ interface Props {
     patch: { label?: string; amount?: number; cadence?: CostCadence; headCount?: number },
   ) => void;
   onDelete: (id: string) => void;
+  /** Mở popup gán khoản thiết bị/vận hành cho dòng dự chi này (mỗi suất một bộ). */
+  onPickItems: (p: CostProjection) => void;
 }
 
 /** Bảng DỰ CHI (what-if): tuyển thêm vị trí X lương Y + các khoản Outsource. */
-export default function ProjectionTable({ projections, months, onAdd, onUpdate, onDelete }: Props) {
+export default function ProjectionTable({ projections, months, onAdd, onUpdate, onDelete, onPickItems }: Props) {
   const total = projectionTotal(projections, months);
 
   return (
@@ -69,6 +71,7 @@ export default function ProjectionTable({ projections, months, onAdd, onUpdate, 
                     value={p.label}
                     onCommit={(v) => onUpdate(p.id, { label: v })}
                     placeholder={p.kind === 'hire' ? 'VD: Dev Unity' : 'VD: Dựng mô hình 3D'}
+                    className="cost-name"
                     ariaLabel="Mô tả dự chi"
                   />
                 </td>
@@ -98,7 +101,16 @@ export default function ProjectionTable({ projections, months, onAdd, onUpdate, 
                 </td>
                 <td className="cost-num-col mono">{formatVnd(projectionLineTotal(p, months))}</td>
                 <td className="cost-tight">
-                  <button className="btn-sm btn-danger" onClick={() => onDelete(p.id)}>Gỡ</button>
+                  <div className="row-actions">
+                    <button
+                      className="btn-sm"
+                      onClick={() => onPickItems(p)}
+                      title="Gán khoản thiết bị / vận hành cho mỗi suất"
+                    >
+                      🖥️ {p.itemIds.length || '+'}
+                    </button>
+                    <button className="btn-sm btn-danger" onClick={() => onDelete(p.id)}>Gỡ</button>
+                  </div>
                 </td>
               </tr>
             ))}

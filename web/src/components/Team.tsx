@@ -1,12 +1,19 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
+import { useMemberComp } from '../hooks/useMemberComp';
+import { useStoredView } from '../hooks/useStoredView';
 import { deleteMember } from '../lib/memberWrites';
 import Avatar from './Avatar';
 import MemberModal from './MemberModal';
+import TeamSalary from './TeamSalary';
 import ConfirmDialog from './ConfirmDialog';
 import { formatDate } from '../lib/format';
 import { JOB_ROLE_LABEL, MEMBER_PERMS, USER_ROLE_LABEL, type TeamMember } from '../types';
+
+/** Hai màn của tab Thành viên: hồ sơ (như cũ) và lương/thâm niên (admin-only). */
+type TeamView = 'roster' | 'salary';
+const TEAM_VIEWS: readonly TeamView[] = ['roster', 'salary'];
 
 const PERM_LABEL: Record<string, string> = Object.fromEntries(MEMBER_PERMS.map((p) => [p.id, p.label]));
 
@@ -14,6 +21,11 @@ const PERM_LABEL: Record<string, string> = Object.fromEntries(MEMBER_PERMS.map((
 export default function Team() {
   const { isAdmin } = useAuth();
   const { members, membersLoading } = useSprintContext();
+  const [view, selectView] = useStoredView<TeamView>('teamAdminView', TEAM_VIEWS, 'roster');
+  // Màn Lương chỉ dành cho admin (RLS member_compensation cũng chặn đọc) — member kẹt
+  // localStorage 'salary' thì rơi về hồ sơ. Chỉ mở socket comp khi thật sự đứng ở màn Lương.
+  const salaryView = isAdmin && view === 'salary';
+  const { byMember: compByMember, loading: compLoading } = useMemberComp(salaryView);
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<TeamMember | null>(null);
@@ -43,13 +55,31 @@ export default function Team() {
       <div className="view-header row between">
         <div>
           <h1>Thành viên</h1>
-          <p>{members.length} thành viên. Discord ID dùng để mention khi task hoàn thành.</p>
+          <p>
+            {members.length} thành viên.{' '}
+            {salaryView
+              ? 'Bấm một hàng để mở hồ sơ và sửa lương / ngày vào–ra.'
+              : 'Discord ID dùng để mention khi task hoàn thành.'}
+          </p>
         </div>
-        {isAdmin && (
-          <button className="btn-primary" onClick={() => setAdding(true)}>+ Thêm thành viên</button>
-        )}
+        <div className="row" style={{ gap: '0.6rem', alignItems: 'center' }}>
+          {isAdmin && (
+            <div className="seg-toggle">
+              <button className={`seg${view === 'roster' ? ' on' : ''}`} onClick={() => selectView('roster')}>Hồ sơ</button>
+              <button className={`seg${view === 'salary' ? ' on' : ''}`} onClick={() => selectView('salary')}>Lương</button>
+            </div>
+          )}
+          {isAdmin && (
+            <button className="btn-primary" onClick={() => setAdding(true)}>+ Thêm thành viên</button>
+          )}
+        </div>
       </div>
 
+      {salaryView && (
+        <TeamSalary members={members} compByMember={compByMember} loading={compLoading} onEdit={setEditing} />
+      )}
+
+      {!salaryView && (
       <div className="glass table-container" style={{ padding: '0.5rem' }}>
         <table className="data-table">
           <thead>
@@ -105,6 +135,7 @@ export default function Team() {
           </tbody>
         </table>
       </div>
+      )}
 
       {!isAdmin && (
         <p className="muted" style={{ fontSize: '0.8rem', marginTop: '1rem' }}>

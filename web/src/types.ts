@@ -336,17 +336,27 @@ export const COST_ITEM_KIND_LABEL: Record<CostItemKind, string> = {
   annual: 'Theo năm',
 };
 
-/** Một khoản chi phí thiết bị/vận hành. `perEmployee` = nhân theo số nhân sự. */
+/**
+ * Một khoản chi phí thiết bị/vận hành — DANH MỤC để gán cho từng người/dòng dự chi
+ * (migration 0056). Khoản KHÔNG gán cho ai (Văn phòng, Điện…) tính một lần cho cả dự án.
+ */
 export interface CostItem {
   id: string;
   projectId: string;
   name: string;
   amount: number;
   kind: CostItemKind;
-  perEmployee: boolean;
   sortOrder: number;
   createdAt?: Timestamp;
   createdBy: string;
+}
+
+/** Các khoản chi phí đã gán cho MỘT người trong dự án (project_cost_member_items). */
+export interface CostMemberItems {
+  projectId: string;
+  memberId: string;
+  /** ids vào project_cost_items — id khoản đã xoá có thể còn sót, phía đọc tự lọc. */
+  itemIds: string[];
 }
 
 /** Nhịp phát sinh của một khoản dự chi trong khoảng tháng đang xem. */
@@ -382,6 +392,8 @@ export interface CostProjection {
   cadence: CostCadence;
   /** Số người / số suất (mặc định 1). */
   headCount: number;
+  /** Khoản thiết bị/vận hành đi kèm mỗi suất (ids vào project_cost_items, 0056). */
+  itemIds: string[];
   sortOrder: number;
   createdAt?: Timestamp;
   createdBy: string;

@@ -49,7 +49,6 @@ export interface CostItemPatch {
   name?: string;
   amount?: number;
   kind?: CostItemKind;
-  perEmployee?: boolean;
 }
 
 export async function updateCostItem(id: string, patch: CostItemPatch): Promise<void> {
@@ -57,8 +56,27 @@ export async function updateCostItem(id: string, patch: CostItemPatch): Promise<
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.amount !== undefined) row.amount = patch.amount;
   if (patch.kind !== undefined) row.kind = patch.kind;
-  if (patch.perEmployee !== undefined) row.per_employee = patch.perEmployee;
   const { error } = await supabase.from('project_cost_items').update(row).eq('id', id);
+  if (error) throw error;
+}
+
+/** Đặt danh sách khoản chi phí GÁN cho một người trong dự án (thay nguyên mảng — 0056). */
+export async function setMemberItems(
+  projectId: string,
+  memberId: string,
+  itemIds: string[],
+  updatedBy: string | null,
+): Promise<void> {
+  const { error } = await supabase.from('project_cost_member_items').upsert(
+    {
+      project_id: projectId,
+      member_id: memberId,
+      item_ids: itemIds,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy,
+    },
+    { onConflict: 'project_id,member_id' },
+  );
   if (error) throw error;
 }
 
@@ -127,6 +145,7 @@ export interface CostProjectionPatch {
   amount?: number;
   cadence?: CostCadence;
   headCount?: number;
+  itemIds?: string[];
 }
 
 export async function updateCostProjection(id: string, patch: CostProjectionPatch): Promise<void> {
@@ -135,6 +154,7 @@ export async function updateCostProjection(id: string, patch: CostProjectionPatc
   if (patch.amount !== undefined) row.amount = patch.amount;
   if (patch.cadence !== undefined) row.cadence = patch.cadence;
   if (patch.headCount !== undefined) row.head_count = patch.headCount;
+  if (patch.itemIds !== undefined) row.item_ids = patch.itemIds;
   const { error } = await supabase.from('project_cost_projections').update(row).eq('id', id);
   if (error) throw error;
 }

@@ -2,10 +2,10 @@
 // đây nữa: nó là thuộc tính toàn cục của người (member_compensation, xem useMemberComp) và
 // bảng chi phí ghép với thành viên dự án ở CostManagement.
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { supabase } from '../supabase';
-import { rowToCostItem, rowToCostProjection } from '../lib/mappers';
-import type { CostItem, CostProjection } from '../types';
+import { rowToCostItem, rowToCostMemberItems, rowToCostProjection } from '../lib/mappers';
+import type { CostItem, CostMemberItems, CostProjection } from '../types';
 import { useLiveQuery } from './useLiveQuery';
 
 export function useProjectCosts(projectId: string | null) {
@@ -51,13 +51,39 @@ export function useProjectCosts(projectId: string | null) {
     enabled,
   });
 
+  const memberItemsFetcher = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('project_cost_member_items')
+      .select('*')
+      .eq('project_id', pid);
+    if (error) throw error;
+    return (data ?? []).map(rowToCostMemberItems);
+  }, [pid]);
+
+  const { data: memberItemRows, loading: memberItemsLoading, refetch: refetchMemberItems } =
+    useLiveQuery<CostMemberItems>({
+      table: 'project_cost_member_items',
+      fetcher: memberItemsFetcher,
+      filter,
+      deps: [pid],
+      enabled,
+    });
+
+  /** memberId → các khoản chi phí đã gán (tra trong bảng lương + tính tổng). */
+  const memberItemIds = useMemo(
+    () => new Map(memberItemRows.map((r) => [r.memberId, r.itemIds])),
+    [memberItemRows],
+  );
+
   // refetch* để lớp ghi lạc quan (useOptimisticList) chốt lại sự thật server ngay sau khi
   // ghi, thay vì đợi realtime dội về + debounce.
   return {
     items,
     projections,
+    memberItemIds,
     refetchItems,
     refetchProjections,
-    loading: itemsLoading || projectionsLoading,
+    refetchMemberItems,
+    loading: itemsLoading || projectionsLoading || memberItemsLoading,
   };
 }
