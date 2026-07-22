@@ -4,7 +4,9 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { navigate } from '../lib/router';
 import { formatDate } from '../lib/format';
 import Avatar from './Avatar';
+import MemberPreviewBar from './MemberPreviewBar';
 import ProjectModal from './ProjectModal';
+import { EyeIcon } from './icons';
 import type { Project } from '../types';
 
 /**
@@ -12,19 +14,33 @@ import type { Project } from '../types';
  * main workspace (Layout); the top-left icon there returns here.
  */
 export default function ProjectSelect() {
-  const { profile, isAdmin, isOwner, signOut } = useAuth();
+  const { profile, isAdmin, isOwner, isRealAdmin, viewAsMember, setViewAsMember, signOut } = useAuth();
   const { projects, projectsLoading, selectProject } = useSprintContext();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
 
   return (
     <div className="project-select">
+      {/* Đang xem thử như thành viên thì thanh báo + nút thoát hiện cả ở NGOÀI dự án —
+          không có nó, admin bật xem thử rồi quay ra trang này là mất luôn lối về. */}
+      <MemberPreviewBar />
       <header className="project-select-top">
         <div className="logo">
           <img className="mark-img" src="/IconGame.png" alt="" />
           <span>Work Tracker</span>
         </div>
         <div className="row" style={{ gap: '0.6rem' }}>
+          {/* Cùng bộ đôi với Sidebar trong dự án: bật ở đây, thoát ở MemberPreviewBar. */}
+          {isRealAdmin && !viewAsMember && (
+            <button
+              className="btn-sm preview-toggle-inline"
+              onClick={() => setViewAsMember(true)}
+              title="Xem giao diện đúng như một thành viên thường nhìn thấy"
+            >
+              <EyeIcon size={15} />
+              Xem như thành viên
+            </button>
+          )}
           {/* Một cửa vào khu quản trị (thành viên toàn web, cấu hình, hệ thống) — bao quát
               cả web nên sống NGOÀI dự án, mở thành trang riêng. Chỉ admin thấy nút này. */}
           {isAdmin && (

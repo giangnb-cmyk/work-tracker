@@ -1140,6 +1140,8 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
   display: flex; align-items: center; justify-content: center; gap: 0.4rem;
   width: 100%; margin-top: 0.4rem;
 }
+/* Biến thể cho hàng ngang (header trang chọn dự án) — không chiếm full width như ở sidebar. */
+.preview-toggle-inline { display: inline-flex; align-items: center; gap: 0.4rem; }
 
 /* Mục tiêu sprint — treatment "nổi bật" của design system (Pacing Cards):
    gradient indigo + viền indigo, không phải thẻ glass thường. */
@@ -2734,11 +2736,20 @@ table.data-table { width: 100%; border-collapse: collapse; }
 /* Input date gốc: ẩn nhưng vẫn render để mượn lịch (showPicker neo vào vị trí này). */
 .date-input-native { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+/* Tab Lương: chữ to lên + MỌI ô nhập đồng đều — ô tiền (MoneyInput) mặc định mang style
+   compact của bảng chi phí (font 0.85rem, canh phải, khoá 160px), đứng trong form cạnh các
+   ô ngày là lệch cả cỡ chữ lẫn hướng canh. Trong comp-card ép về một chuẩn. */
+.modal.member-modal .field > span,
+.modal.member-modal .field-label { font-size: 0.85rem; }
+.comp-card .input { font-size: 1rem; padding: 0.6rem 0.75rem; }
+.comp-card .cost-money { text-align: left; }
+.comp-card-title { font-size: 1rem; }
+
 /* Lịch sử lương — mỗi dòng: ngày · cũ → mới (↑ xanh / ↓ đỏ). */
 .comp-history { border-top: 1px dashed var(--border); margin-top: 0.9rem; padding-top: 0.7rem; }
-.comp-history-title { font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 0.4rem; }
-.comp-hist-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; padding: 0.15rem 0; }
-.comp-hist-date { font-size: 0.75rem; min-width: 78px; }
+.comp-history-title { font-size: 0.82rem; font-weight: 600; color: var(--muted); margin-bottom: 0.45rem; }
+.comp-hist-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; padding: 0.2rem 0; }
+.comp-hist-date { font-size: 0.84rem; min-width: 92px; }
 .comp-up { color: var(--green); }
 .comp-down { color: var(--red); }
 

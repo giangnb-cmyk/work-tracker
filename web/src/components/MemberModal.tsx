@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
 import { fetchCompHistory, upsertMemberComp } from '../lib/costWrites';
-import { formatIsoDate, formatVnd, todayIso } from '../lib/format';
+import { formatDate, formatIsoDate, formatVnd, todayIso } from '../lib/format';
 import DateInput from './DateInput';
 import MoneyInput from './cost/MoneyInput';
 import type { CompChange } from '../types';
@@ -256,11 +256,13 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
                 {history.map((h) => {
                   const up = h.oldSalary != null && h.newSalary > h.oldSalary;
                   const first = h.oldSalary == null;
-                  const recorded = h.changedAt ? h.changedAt.toDate().toLocaleDateString('vi-VN') : '';
+                  // formatDate (2 chữ số) thay vì toLocaleDateString trần: "22/7/2026" đứng
+                  // cạnh "20/07/2026" là lệch cột ngay.
+                  const recorded = formatDate(h.changedAt);
                   return (
-                    <div key={h.id} className="comp-hist-row" title={recorded ? `Ghi nhận ngày ${recorded}` : undefined}>
+                    <div key={h.id} className="comp-hist-row" title={recorded !== '—' ? `Ghi nhận ngày ${recorded}` : undefined}>
                       <span className="muted mono comp-hist-date">
-                        {h.effectiveFrom ? formatIsoDate(h.effectiveFrom) : recorded || '—'}
+                        {h.effectiveFrom ? formatIsoDate(h.effectiveFrom) : recorded}
                       </span>
                       {first ? (
                         <span className="muted">điền lần đầu →</span>
