@@ -21,23 +21,18 @@ function monthIndex(date: string | null | undefined): number | null {
   return Number(m[1]) * 12 + (Number(m[2]) - 1);
 }
 
-/** Tháng hiện tại dưới dạng chỉ số tuyệt đối (mốc mặc định khi chưa ai điền ngày). */
-function currentMonthIndex(): number {
+/**
+ * Mốc bắt đầu cửa sổ tính = THÁNG HIỆN TẠI; slider N tháng = chi phí N tháng TỚI
+ * [tháng này, tháng này + N).
+ *
+ * Trước đây neo vào ngày start SỚM NHẤT trong danh sách — sai thực tế và đã cắn: một người
+ * vào từ 2022 là cả cửa sổ trôi về 2022, mọi người vào 2025–2026 rơi ra ngoài và cả bảng
+ * hiện "Số tháng 0 · 0 ₫" trừ đúng người cũ nhất. Người vào TRƯỚC tháng này vẫn tính đủ N
+ * tháng (activeMonths giao khoảng); người vào GIỮA cửa sổ chỉ tính từ tháng họ vào.
+ */
+export function anchorMonth(): number {
   const d = new Date();
   return d.getFullYear() * 12 + d.getMonth();
-}
-
-/**
- * Mốc bắt đầu cửa sổ tính lương = ngày start SỚM NHẤT trong danh sách nhân viên; nếu chưa
- * ai điền start thì lấy đầu tháng hiện tại. Cửa sổ xem là [anchor, anchor + horizon).
- */
-export function anchorMonth(employees: SalaryLine[]): number {
-  let min: number | null = null;
-  for (const e of employees) {
-    const mi = monthIndex(e.startDate);
-    if (mi != null && (min == null || mi < min)) min = mi;
-  }
-  return min ?? currentMonthIndex();
 }
 
 /**

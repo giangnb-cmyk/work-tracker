@@ -254,9 +254,9 @@ thành viên (📈 Lịch sử lương).
 | `created_at` | timestamptz  | `now()`                                                    |
 | `created_by` | uuid \| null | → `profiles.id` (`on delete set null`)                     |
 
-- **Tính toán** (thuần, `web/src/lib/projectCost.ts`): cửa sổ = `horizon` tháng kể từ ngày
-  start sớm nhất (slider chọn số tháng). Tổng lương cộng theo TỪNG THÁNG (mỗi tháng cộng người
-  còn active). Thiết bị/vận hành (`overheadTotal`): khoản GÁN cho nhân sự → `one_time` 1
+- **Tính toán** (thuần, `web/src/lib/projectCost.ts`): cửa sổ = `horizon` tháng kể từ THÁNG
+  HIỆN TẠI (slider chọn số tháng — dự trù N tháng tới; từng neo nhầm vào người vào sớm nhất
+  làm cả bảng 0 ₫). Tổng lương cộng theo TỪNG THÁNG (mỗi tháng cộng người còn active). Thiết bị/vận hành (`overheadTotal`): khoản GÁN cho nhân sự → `one_time` 1
   lần/người, `annual` × (số tháng người đó làm việc trong cửa sổ / 12); gán cho dự chi →
   × `head_count`, `annual` × horizon/12; khoản KHÔNG gán ai → một suất chung (1 lần /
   × horizon/12). Dự chi tiền mặt: `amount × head_count × hệ số cadence`.

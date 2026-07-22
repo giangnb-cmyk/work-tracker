@@ -2711,6 +2711,9 @@ table.data-table { width: 100%; border-collapse: collapse; }
 /* grid-2 trong modal thành viên: bỏ margin của field (grid đã có gap) — cùng bài feat-modal. */
 .modal.member-modal .grid-2 { gap: 0.85rem 1rem; margin-bottom: 0.85rem; }
 .modal.member-modal .grid-2 > .field { margin-bottom: 0; }
+/* Tab nhỏ trong modal + thân tab giữ chiều cao tối thiểu để chuyển tab đỡ giật khung. */
+.mm-tabs { margin-bottom: 1rem; }
+.mm-tab-body { min-height: 300px; }
 
 /* DateInput — dd/mm/yyyy trên mọi trình duyệt (xem components/DateInput.tsx). */
 .date-input { position: relative; display: flex; align-items: center; }

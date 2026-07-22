@@ -47,6 +47,9 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
   const [history, setHistory] = useState<CompChange[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Modal tách 3 tab nhỏ (Thông tin | Quyền | Lương) — một cột dài quá; state các tab vẫn
+  // sống chung nên chuyển tab không mất gì, nút Lưu lưu tất cả.
+  const [tab, setTab] = useState<'info' | 'perms' | 'salary'>('info');
 
   // Nạp lương hiện có + lịch sử của người đang sửa (chỉ admin đọc được — RLS). Một lần.
   useEffect(() => {
@@ -134,71 +137,96 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
       <div className="modal member-modal" onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? '👤 Sửa thành viên' : '👤 Thêm thành viên'}</h2>
 
-        <label className="field">
-          <span>Tên hiển thị *</span>
-          <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoFocus />
-        </label>
-        <div className="grid-2">
-          <label className="field">
-            <span>Email</span>
-            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ten@easygoing.vn" />
-          </label>
-          <label className="field">
-            <span>Chuyên môn</span>
-            <select className="select" value={jobRole} onChange={(e) => setJobRole(e.target.value as JobRole)}>
-              {JOB_ROLES.map((r) => (
-                <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Vai trò</span>
-            {canSetRole ? (
-              // Owner không tự đưa mình vào ô này — chỉ cấp/gỡ admin cho người khác.
-              <select className="select" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
-                <option value="member">Thành viên</option>
-                <option value="admin">Admin</option>
-              </select>
-            ) : (
-              <select className="select" value={role} disabled title="Chỉ owner đổi được vai trò">
-                <option value={role}>{USER_ROLE_LABEL[role]}</option>
-              </select>
-            )}
-          </label>
-          <label className="field">
-            <span>Discord User ID</span>
-            <input className="input mono" value={discordId} onChange={(e) => setDiscordId(e.target.value)} placeholder="123456789012345678" />
-          </label>
+        <div className="seg-toggle mm-tabs">
+          <button type="button" className={`seg${tab === 'info' ? ' on' : ''}`} onClick={() => setTab('info')}>Thông tin</button>
+          <button type="button" className={`seg${tab === 'perms' ? ' on' : ''}`} onClick={() => setTab('perms')}>Quyền</button>
+          {isAdmin && (
+            <button type="button" className={`seg${tab === 'salary' ? ' on' : ''}`} onClick={() => setTab('salary')}>💰 Lương</button>
+          )}
         </div>
-        {role === 'member' && (
-          <div className="field">
-            <span className="field-label">Quyền thêm</span>
-            <div className="perm-list">
-              {MEMBER_PERMS.map((p) => (
-                <label key={p.id} className="perm-row">
-                  <input
-                    type="checkbox"
-                    checked={perms.includes(p.id)}
-                    onChange={(e) =>
-                      setPerms((prev) => (e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id)))
-                    }
-                  />
-                  <span>
-                    {p.label}
-                    <small className="muted"> — {p.hint}</small>
-                  </span>
-                </label>
-              ))}
+
+        <div className="mm-tab-body">
+        {tab === 'info' && (
+          <>
+            <label className="field">
+              <span>Tên hiển thị *</span>
+              <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoFocus />
+            </label>
+            <div className="grid-2">
+              <label className="field">
+                <span>Email</span>
+                <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ten@easygoing.vn" />
+              </label>
+              <label className="field">
+                <span>Chuyên môn</span>
+                <select className="select" value={jobRole} onChange={(e) => setJobRole(e.target.value as JobRole)}>
+                  {JOB_ROLES.map((r) => (
+                    <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Discord User ID</span>
+                <input className="input mono" value={discordId} onChange={(e) => setDiscordId(e.target.value)} placeholder="123456789012345678" />
+              </label>
+              <label className="field">
+                <span>Notion User ID (tuỳ chọn)</span>
+                <input className="input mono" value={notionUserId} onChange={(e) => setNotionUserId(e.target.value)} />
+              </label>
             </div>
-          </div>
+            <div className="hint-box">
+              💡 Discord User ID (không phải username): bật Developer Mode trong Discord → chuột phải
+              vào người đó → Copy User ID. Dùng để mention khi task hoàn thành.
+            </div>
+          </>
         )}
 
-        <label className="field">
-          <span>Notion User ID (tuỳ chọn)</span>
-          <input className="input mono" value={notionUserId} onChange={(e) => setNotionUserId(e.target.value)} />
-        </label>
+        {tab === 'perms' && (
+          <>
+            <label className="field">
+              <span>Vai trò</span>
+              {canSetRole ? (
+                // Owner không tự đưa mình vào ô này — chỉ cấp/gỡ admin cho người khác.
+                <select className="select" value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+                  <option value="member">Thành viên</option>
+                  <option value="admin">Admin</option>
+                </select>
+              ) : (
+                <select className="select" value={role} disabled title="Chỉ owner đổi được vai trò">
+                  <option value={role}>{USER_ROLE_LABEL[role]}</option>
+                </select>
+              )}
+            </label>
+            {role === 'member' ? (
+              <div className="field">
+                <span className="field-label">Quyền thêm</span>
+                <div className="perm-list">
+                  {MEMBER_PERMS.map((p) => (
+                    <label key={p.id} className="perm-row">
+                      <input
+                        type="checkbox"
+                        checked={perms.includes(p.id)}
+                        onChange={(e) =>
+                          setPerms((prev) => (e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id)))
+                        }
+                      />
+                      <span>
+                        {p.label}
+                        <small className="muted"> — {p.hint}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="muted" style={{ fontSize: '0.82rem' }}>
+                Admin / Owner có đủ mọi quyền — không cần cấp quyền lẻ.
+              </p>
+            )}
+          </>
+        )}
 
-        {isAdmin && (
+        {tab === 'salary' && isAdmin && (
           <div className="comp-card">
             <div className="comp-card-title">
               💰 Lương &amp; thời gian làm việc
@@ -250,10 +278,8 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
           </div>
         )}
 
-        <div className="hint-box">
-          💡 Discord User ID (không phải username): bật Developer Mode trong Discord → chuột phải
-          vào người đó → Copy User ID. Dùng để mention khi task hoàn thành.
         </div>
+
         {error && <p className="error-text">{error}</p>}
 
         <div className="modal-actions">

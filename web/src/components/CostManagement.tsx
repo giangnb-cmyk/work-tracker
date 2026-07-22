@@ -118,7 +118,9 @@ export default function CostManagement({ projectId }: { projectId: string }) {
   }, [memberships, memberById, compByMember]);
 
   const headcount = employees.length;
-  const anchor = useMemo(() => anchorMonth(employees), [employees]);
+  // Cửa sổ tính = [tháng hiện tại, +N) — xem anchorMonth (đã từng neo nhầm vào người vào
+  // sớm nhất làm cả bảng về 0 ₫).
+  const anchor = anchorMonth();
   const salary = useMemo(() => salaryTotal(employees, anchor, months), [employees, anchor, months]);
   // Thiết bị/vận hành theo mô hình GÁN THEO NGƯỜI (0056): khoản gán ai tính theo người đó
   // (annual chia theo tháng làm việc), khoản chưa gán tính một suất chung.
