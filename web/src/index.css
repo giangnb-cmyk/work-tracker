@@ -2612,16 +2612,16 @@ table.data-table { width: 100%; border-collapse: collapse; }
 }
 .cost-stat-total .cost-stat-value { color: var(--primary); font-size: 1.3rem; }
 
-/* Thẻ "Lương nhân sự" phải nổi lên trên các thẻ .glass phía dưới: mỗi .glass có
-   backdrop-filter → một stacking context riêng, nên dropdown "Thêm từ thành viên" tràn ra
-   ngoài thẻ sẽ bị thẻ kế tiếp (DOM sau) vẽ đè lên. z-index của panel không vượt được ranh
-   giới đó — phải nâng chính cái thẻ này. */
-.cost-emp-card { position: relative; z-index: 3; }
-
 /* Đầu mỗi bảng: tiêu đề + nút thêm. */
 .cost-section-head { align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
-.cost-section-sub { font-size: 0.82rem; margin-top: 0.2rem; max-width: 60ch; }
-.cost-add-member { width: min(280px, 60vw); }
+.cost-section-sub { font-size: 0.82rem; margin-top: 0.2rem; max-width: 62ch; }
+
+/* Ô chọn dự án ở khu quản trị (Thành viên + Chi phí) — bỏ margin của .field khi nằm trong
+   hàng tiêu đề, và cho chiều rộng đủ đọc tên dự án. */
+.cost-project-picker { margin-bottom: 0; min-width: 220px; }
+.cost-project-picker .select { width: 100%; }
+.cost-salary-block { margin-top: 2.5rem; }
+.cost-salary-head { align-items: flex-end; gap: 1rem; margin-bottom: 1rem; }
 
 /* Bảng chi phí: ô nhập gọn, cột số canh phải. */
 .cost-table td { vertical-align: middle; }
@@ -2647,6 +2647,7 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .cost-foot-total { font-weight: 700; color: var(--primary); }
 
 @media (max-width: 640px) {
-  .cost-add-member { width: 100%; }
-  .cost-section-head { flex-direction: column; }
+  .cost-project-picker { width: 100%; }
+  .cost-section-head,
+  .cost-salary-head { flex-direction: column; align-items: stretch; }
 }

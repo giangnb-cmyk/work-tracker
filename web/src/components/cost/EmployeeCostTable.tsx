@@ -1,59 +1,34 @@
-import { useMemo } from 'react';
 import { activeMonths } from '../../lib/projectCost';
 import { formatVnd } from '../../lib/format';
 import type { CostEmployee, TeamMember } from '../../types';
 import Avatar from '../Avatar';
-import SearchableSelect from '../SearchableSelect';
-import MoneyInput from './MoneyInput';
 
 interface Props {
   employees: CostEmployee[];
   memberById: Map<string, TeamMember>;
-  /** Thành viên dự án CHƯA có trong bảng lương — nguồn cho ô "Thêm từ thành viên". */
-  available: TeamMember[];
   anchor: number;
   months: number;
-  onAdd: (memberId: string) => void;
-  onUpdate: (id: string, patch: { monthlySalary?: number; startDate?: string | null; endDate?: string | null }) => void;
-  onDelete: (id: string) => void;
 }
 
-/** Bảng lương thực tế: mỗi dòng là một thành viên dự án + lương/tháng + ngày vào/ra. */
-export default function EmployeeCostTable({
-  employees,
-  memberById,
-  available,
-  anchor,
-  months,
-  onAdd,
-  onUpdate,
-  onDelete,
-}: Props) {
-  const options = useMemo(
-    () =>
-      available
-        .map((m) => ({ value: m.uid, label: m.displayName || m.email || m.uid }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'vi')),
-    [available],
-  );
+/** 'YYYY-MM-DD' → 'DD/MM/YYYY' (— nếu rỗng). */
+function fmtDate(d: string | null): string {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
 
+/**
+ * Bảng lương của dự án — CHỈ ĐỌC. Lương/ngày được điền ở tab Thành viên (khu quản trị);
+ * ở đây chỉ hiển thị và cộng vào tổng theo số tháng đang chọn.
+ */
+export default function EmployeeCostTable({ employees, memberById, anchor, months }: Props) {
   return (
-    <div className="glass section cost-emp-card" style={{ padding: '1.25rem' }}>
-      <div className="row between cost-section-head">
-        <div>
-          <h3>Lương nhân sự</h3>
-          <p className="muted cost-section-sub">Chọn người từ thành viên dự án rồi điền lương/tháng và ngày vào — ra.</p>
-        </div>
-        <div className="cost-add-member">
-          <SearchableSelect
-            value=""
-            onChange={(v) => v && onAdd(v)}
-            options={options}
-            placeholder={options.length ? '+ Thêm từ thành viên' : 'Đã thêm hết thành viên'}
-            disabled={options.length === 0}
-            panel="overlay"
-          />
-        </div>
+    <div className="glass section" style={{ padding: '1.25rem' }}>
+      <div className="cost-section-head">
+        <h3>Lương nhân sự</h3>
+        <p className="muted cost-section-sub">
+          Số liệu lấy từ tab <strong>Thành viên</strong> — vào đó để điền/sửa lương và ngày vào–ra.
+        </p>
       </div>
 
       <div className="table-container">
@@ -66,7 +41,6 @@ export default function EmployeeCostTable({
               <th>Kết thúc</th>
               <th className="cost-num-col">Số tháng</th>
               <th className="cost-num-col">Thành tiền ({months} tháng)</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -82,40 +56,19 @@ export default function EmployeeCostTable({
                       {name}
                     </div>
                   </td>
-                  <td className="cost-num-col">
-                    <MoneyInput
-                      value={e.monthlySalary}
-                      onCommit={(n) => onUpdate(e.id, { monthlySalary: n })}
-                      ariaLabel={`Lương của ${name}`}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      className="input cost-date"
-                      value={e.startDate ?? ''}
-                      onChange={(ev) => onUpdate(e.id, { startDate: ev.target.value || null })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="date"
-                      className="input cost-date"
-                      value={e.endDate ?? ''}
-                      onChange={(ev) => onUpdate(e.id, { endDate: ev.target.value || null })}
-                    />
-                  </td>
+                  <td className="cost-num-col mono">{formatVnd(e.monthlySalary)}</td>
+                  <td className="muted mono" style={{ fontSize: '0.82rem' }}>{fmtDate(e.startDate)}</td>
+                  <td className="muted mono" style={{ fontSize: '0.82rem' }}>{fmtDate(e.endDate)}</td>
                   <td className="cost-num-col mono muted">{active}</td>
                   <td className="cost-num-col mono">{formatVnd(e.monthlySalary * active)}</td>
-                  <td>
-                    <button className="btn-sm btn-danger" onClick={() => onDelete(e.id)}>Gỡ</button>
-                  </td>
                 </tr>
               );
             })}
             {employees.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty">Chưa có nhân sự nào. Bấm “+ Thêm từ thành viên”.</td>
+                <td colSpan={6} className="empty">
+                  Chưa ai được điền lương cho dự án này. Vào tab <strong>Thành viên</strong> để điền.
+                </td>
               </tr>
             )}
           </tbody>

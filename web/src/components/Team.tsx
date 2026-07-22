@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
+import { useAdminCostProject } from '../hooks/useAdminCostProject';
 import { deleteMember } from '../lib/memberWrites';
 import Avatar from './Avatar';
 import MemberModal from './MemberModal';
 import ConfirmDialog from './ConfirmDialog';
+import AdminProjectPicker from './cost/AdminProjectPicker';
+import MemberSalaryTable from './cost/MemberSalaryTable';
 import { formatDate } from '../lib/format';
 import { JOB_ROLE_LABEL, MEMBER_PERMS, USER_ROLE_LABEL, type TeamMember } from '../types';
 
@@ -13,7 +16,8 @@ const PERM_LABEL: Record<string, string> = Object.fromEntries(MEMBER_PERMS.map((
 /** Team roster. Admins can add/edit/delete members; members see it read-only. */
 export default function Team() {
   const { isAdmin } = useAuth();
-  const { members, membersLoading } = useSprintContext();
+  const { members, membersLoading, projects } = useSprintContext();
+  const [costProjectId, setCostProjectId] = useAdminCostProject(projects);
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<TeamMember | null>(null);
@@ -105,6 +109,28 @@ export default function Team() {
           </tbody>
         </table>
       </div>
+
+      {isAdmin && (
+        <div className="section cost-salary-block">
+          <div className="row between cost-salary-head">
+            <div>
+              <h3>Lương &amp; thời gian theo dự án</h3>
+              <p className="muted cost-section-sub">
+                Điền lương/tháng và ngày vào–ra của từng người theo dự án. Chỉ admin &amp; owner thấy; số liệu
+                feed thẳng vào tab <strong>Chi phí</strong>.
+              </p>
+            </div>
+            <div className="cost-project-picker-wrap">
+              <AdminProjectPicker projects={projects} value={costProjectId} onChange={setCostProjectId} />
+            </div>
+          </div>
+          {costProjectId ? (
+            <MemberSalaryTable key={costProjectId} projectId={costProjectId} />
+          ) : (
+            <div className="glass empty">Chưa có dự án nào.</div>
+          )}
+        </div>
+      )}
 
       {!isAdmin && (
         <p className="muted" style={{ fontSize: '0.8rem', marginTop: '1rem' }}>

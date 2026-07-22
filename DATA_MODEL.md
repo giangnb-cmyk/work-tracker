@@ -237,8 +237,11 @@ dự án bằng nút "Thêm mẫu" trong UI.
   start sớm nhất (slider chọn số tháng). Tổng lương cộng theo TỪNG THÁNG (mỗi tháng cộng người
   còn active). `one_time` đếm 1 lần; `annual`/`cadence=annual` chia đều `× horizon/12`;
   `cadence=monthly` `× horizon`. `per_employee`/`head_count` nhân thêm.
-- **Web**: `CostManagement` + `components/cost/*` + hook `useProjectCosts` + `lib/costWrites.ts`.
-  Admin-only ở nav (nhóm "Quản trị" trong `Sidebar`) khớp với RLS.
+- **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`), chọn dự án qua `useAdminCostProject`
+  (không dùng dự án đang mở của app). Tab **Chi phí** (`CostAdmin` → `CostManagement` +
+  `components/cost/*`, hook `useProjectCosts`) hiện tổng/slider/thiết bị/dự chi. **Lương** điền
+  ở tab **Thành viên** (`Team` → `MemberSalaryTable`, ghi qua `upsertCostEmployee`); bảng lương
+  trong tab Chi phí chỉ đọc. `lib/costWrites.ts` cho mọi ghi. Admin-only ở cả nav lẫn RLS.
 
 ---
 
