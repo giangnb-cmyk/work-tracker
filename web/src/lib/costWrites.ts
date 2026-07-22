@@ -3,7 +3,8 @@
 // Postgres snake_case, chuyển ngay tại đây.
 
 import { supabase } from '../supabase';
-import type { CostCadence, CostItemKind, CostProjectionKind } from '../types';
+import { rowToCostItem, rowToCostProjection } from './mappers';
+import type { CostCadence, CostItem, CostItemKind, CostProjection, CostProjectionKind } from '../types';
 
 /* ----------------------------- Lương nhân sự (toàn cục) ----------------------------- */
 
@@ -33,11 +34,15 @@ export async function upsertMemberComp(
 
 /* --------------------------- Chi phí thiết bị/vận hành --------------------------- */
 
-export async function addCostItem(projectId: string, createdBy: string | null): Promise<void> {
-  const { error } = await supabase
+/** Trả về dòng vừa tạo (có id thật) để UI gắn ngay — phục vụ ghi lạc quan (useOptimisticList). */
+export async function addCostItem(projectId: string, createdBy: string | null): Promise<CostItem> {
+  const { data, error } = await supabase
     .from('project_cost_items')
-    .insert({ project_id: projectId, name: '', amount: 0, kind: 'annual', created_by: createdBy });
+    .insert({ project_id: projectId, name: '', amount: 0, kind: 'annual', created_by: createdBy })
+    .select('*')
+    .single();
   if (error) throw error;
+  return rowToCostItem(data);
 }
 
 export interface CostItemPatch {
@@ -78,7 +83,7 @@ const DEFAULT_COST_ITEMS: { name: string; amount: number; kind: CostItemKind }[]
 export async function seedDefaultCostItems(
   projectId: string,
   createdBy: string | null,
-): Promise<void> {
+): Promise<CostItem[]> {
   const rows = DEFAULT_COST_ITEMS.map((it, i) => ({
     project_id: projectId,
     name: it.name,
@@ -87,27 +92,34 @@ export async function seedDefaultCostItems(
     sort_order: i,
     created_by: createdBy,
   }));
-  const { error } = await supabase.from('project_cost_items').insert(rows);
+  const { data, error } = await supabase.from('project_cost_items').insert(rows).select('*');
   if (error) throw error;
+  return (data ?? []).map(rowToCostItem);
 }
 
 /* -------------------------------- Dự chi (what-if) ------------------------------- */
 
+/** Trả về dòng vừa tạo để UI gắn ngay — phục vụ ghi lạc quan (useOptimisticList). */
 export async function addCostProjection(
   projectId: string,
   kind: CostProjectionKind,
   createdBy: string | null,
-): Promise<void> {
-  const { error } = await supabase.from('project_cost_projections').insert({
-    project_id: projectId,
-    kind,
-    label: '',
-    amount: 0,
-    cadence: kind === 'hire' ? 'monthly' : 'one_time',
-    head_count: 1,
-    created_by: createdBy,
-  });
+): Promise<CostProjection> {
+  const { data, error } = await supabase
+    .from('project_cost_projections')
+    .insert({
+      project_id: projectId,
+      kind,
+      label: '',
+      amount: 0,
+      cadence: kind === 'hire' ? 'monthly' : 'one_time',
+      head_count: 1,
+      created_by: createdBy,
+    })
+    .select('*')
+    .single();
   if (error) throw error;
+  return rowToCostProjection(data);
 }
 
 export interface CostProjectionPatch {

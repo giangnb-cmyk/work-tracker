@@ -2629,6 +2629,16 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .data-table td.cost-num-col { text-align: right; }
 .data-table th.cost-center-col,
 .data-table td.cost-center-col { text-align: center; }
+/* Cột số/điều khiển CO THEO NỘI DUNG (width:1% + nowrap). Không khoá thì bảng 100% rải
+   khoảng trống thừa đều cho MỌI cột: tiêu đề dính mép trái, ô nhập dính mép phải cùng một
+   cột, ở giữa hở toác — nhìn như lệch dù alignment đã đúng. Khoá lại thì chỗ thừa dồn hết
+   vào cột tên (cột mềm duy nhất), tiêu đề nằm sát ngay trên nội dung. */
+.cost-table th.cost-num-col, .cost-table td.cost-num-col,
+.cost-table th.cost-center-col, .cost-table td.cost-center-col,
+.cost-table th.cost-tight, .cost-table td.cost-tight {
+  width: 1%;
+  white-space: nowrap;
+}
 .cost-table .input { padding: 0.4rem 0.55rem; font-size: 0.85rem; }
 .cost-money { text-align: right; max-width: 160px; margin-left: auto; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
 /* Trong modal chi tiết thành viên, ô lương chiếm hết bề ngang field (bỏ giới hạn của .cost-money). */

@@ -35,7 +35,7 @@ export function useProjectCosts(projectId: string | null) {
     return (data ?? []).map(rowToCostProjection);
   }, [pid]);
 
-  const { data: items, loading: itemsLoading } = useLiveQuery<CostItem>({
+  const { data: items, loading: itemsLoading, refetch: refetchItems } = useLiveQuery<CostItem>({
     table: 'project_cost_items',
     fetcher: itemsFetcher,
     filter,
@@ -43,7 +43,7 @@ export function useProjectCosts(projectId: string | null) {
     enabled,
   });
 
-  const { data: projections, loading: projectionsLoading } = useLiveQuery<CostProjection>({
+  const { data: projections, loading: projectionsLoading, refetch: refetchProjections } = useLiveQuery<CostProjection>({
     table: 'project_cost_projections',
     fetcher: projectionsFetcher,
     filter,
@@ -51,9 +51,13 @@ export function useProjectCosts(projectId: string | null) {
     enabled,
   });
 
+  // refetch* để lớp ghi lạc quan (useOptimisticList) chốt lại sự thật server ngay sau khi
+  // ghi, thay vì đợi realtime dội về + debounce.
   return {
     items,
     projections,
+    refetchItems,
+    refetchProjections,
     loading: itemsLoading || projectionsLoading,
   };
 }

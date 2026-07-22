@@ -47,19 +47,19 @@ export default function ProjectionTable({ projections, months, onAdd, onUpdate, 
         <table className="data-table cost-table">
           <thead>
             <tr>
-              <th>Loại</th>
+              <th className="cost-tight">Loại</th>
               <th>Vị trí / Mô tả</th>
               <th className="cost-num-col">Số tiền</th>
-              <th>Nhịp</th>
+              <th className="cost-tight">Nhịp</th>
               <th className="cost-center-col">Số người</th>
               <th className="cost-num-col">Thành tiền ({months} tháng)</th>
-              <th></th>
+              <th className="cost-tight"></th>
             </tr>
           </thead>
           <tbody>
             {projections.map((p) => (
               <tr key={p.id}>
-                <td>
+                <td className="cost-tight">
                   <span className={`badge cost-kind-badge cost-kind-${p.kind}`}>
                     {COST_PROJECTION_KIND_ICON[p.kind]} {COST_PROJECTION_KIND_LABEL[p.kind]}
                   </span>
@@ -75,7 +75,7 @@ export default function ProjectionTable({ projections, months, onAdd, onUpdate, 
                 <td className="cost-num-col">
                   <MoneyInput value={p.amount} onCommit={(n) => onUpdate(p.id, { amount: n })} ariaLabel={`Số tiền ${p.label}`} />
                 </td>
-                <td>
+                <td className="cost-tight">
                   <select
                     className="select cost-kind-select"
                     value={p.cadence}
@@ -97,7 +97,7 @@ export default function ProjectionTable({ projections, months, onAdd, onUpdate, 
                   />
                 </td>
                 <td className="cost-num-col mono">{formatVnd(projectionLineTotal(p, months))}</td>
-                <td>
+                <td className="cost-tight">
                   <button className="btn-sm btn-danger" onClick={() => onDelete(p.id)}>Gỡ</button>
                 </td>
               </tr>

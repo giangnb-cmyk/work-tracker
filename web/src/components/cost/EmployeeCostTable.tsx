@@ -37,8 +37,8 @@ export default function EmployeeCostTable({ employees, anchor, months }: Props) 
             <tr>
               <th>Nhân viên</th>
               <th className="cost-num-col">Lương / tháng</th>
-              <th>Bắt đầu</th>
-              <th>Kết thúc</th>
+              <th className="cost-tight">Bắt đầu</th>
+              <th className="cost-tight">Kết thúc</th>
               <th className="cost-num-col">Số tháng</th>
               <th className="cost-num-col">Thành tiền ({months} tháng)</th>
             </tr>
@@ -55,8 +55,8 @@ export default function EmployeeCostTable({ employees, anchor, months }: Props) 
                     </div>
                   </td>
                   <td className="cost-num-col mono">{formatVnd(e.monthlySalary)}</td>
-                  <td className="muted mono" style={{ fontSize: '0.82rem' }}>{fmtDate(e.startDate)}</td>
-                  <td className="muted mono" style={{ fontSize: '0.82rem' }}>{fmtDate(e.endDate)}</td>
+                  <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{fmtDate(e.startDate)}</td>
+                  <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{fmtDate(e.endDate)}</td>
                   <td className="cost-num-col mono muted">{active}</td>
                   <td className="cost-num-col mono">{formatVnd(e.monthlySalary * active)}</td>
                 </tr>

@@ -42,10 +42,10 @@ export default function OverheadTable({ items, headcount, months, onAdd, onSeed,
             <tr>
               <th>Khoản mục</th>
               <th className="cost-num-col">Số tiền</th>
-              <th>Loại</th>
+              <th className="cost-tight">Loại</th>
               <th className="cost-center-col">× đầu người</th>
               <th className="cost-num-col">Thành tiền ({months} tháng)</th>
-              <th></th>
+              <th className="cost-tight"></th>
             </tr>
           </thead>
           <tbody>
@@ -62,7 +62,7 @@ export default function OverheadTable({ items, headcount, months, onAdd, onSeed,
                 <td className="cost-num-col">
                   <MoneyInput value={it.amount} onCommit={(n) => onUpdate(it.id, { amount: n })} ariaLabel={`Số tiền ${it.name}`} />
                 </td>
-                <td>
+                <td className="cost-tight">
                   <select
                     className="select cost-kind-select"
                     value={it.kind}
@@ -85,7 +85,7 @@ export default function OverheadTable({ items, headcount, months, onAdd, onSeed,
                   </label>
                 </td>
                 <td className="cost-num-col mono">{formatVnd(overheadItemTotal(it, headcount, months))}</td>
-                <td>
+                <td className="cost-tight">
                   <button className="btn-sm btn-danger" onClick={() => onDelete(it.id)}>Gỡ</button>
                 </td>
               </tr>

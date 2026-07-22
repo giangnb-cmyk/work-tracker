@@ -4,6 +4,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectCosts } from '../hooks/useProjectCosts';
 import { useProjectMembers } from '../hooks/useProjectMembers';
 import { useMemberComp } from '../hooks/useMemberComp';
+import { useOptimisticList } from '../hooks/useOptimisticList';
 import {
   addCostItem,
   addCostProjection,
@@ -43,9 +44,23 @@ function readMonths(): number {
 export default function CostManagement({ projectId }: { projectId: string }) {
   const { profile } = useAuth();
   const { members } = useSprintContext();
-  const { items, projections, loading: costsLoading } = useProjectCosts(projectId);
+  const {
+    items: serverItems,
+    projections: serverProjections,
+    refetchItems,
+    refetchProjections,
+    loading: costsLoading,
+  } = useProjectCosts(projectId);
   const { memberships, loading: mLoading } = useProjectMembers(projectId);
   const { byMember: compByMember, loading: compLoading } = useMemberComp();
+
+  // Ghi lạc quan: tick/gõ là UI đổi NGAY, ghi chạy nền — không đợi vòng realtime (~1s).
+  const { rows: items, mutate: mutateItems, create: createItems } = useOptimisticList(serverItems, refetchItems);
+  const {
+    rows: projections,
+    mutate: mutateProjections,
+    create: createProjections,
+  } = useOptimisticList(serverProjections, refetchProjections);
 
   const [months, setMonths] = useState(readMonths);
   const [error, setError] = useState<string | null>(null);
@@ -131,18 +146,38 @@ export default function CostManagement({ projectId }: { projectId: string }) {
         items={items}
         headcount={headcount}
         months={months}
-        onAdd={() => runOp(() => addCostItem(projectId, createdBy), 'Thêm khoản chi phí thất bại (cần quyền admin).')}
-        onSeed={() => runOp(() => seedDefaultCostItems(projectId, createdBy), 'Thêm mẫu chi phí thất bại (cần quyền admin).')}
-        onUpdate={(id, patch: CostItemPatch) => runOp(() => updateCostItem(id, patch), 'Cập nhật chi phí thất bại (cần quyền admin).')}
-        onDelete={(id) => runOp(() => deleteCostItem(id), 'Gỡ khoản chi phí thất bại (cần quyền admin).')}
+        onAdd={() =>
+          runOp(() => createItems(() => addCostItem(projectId, createdBy)), 'Thêm khoản chi phí thất bại (cần quyền admin).')}
+        onSeed={() =>
+          runOp(() => createItems(() => seedDefaultCostItems(projectId, createdBy)), 'Thêm mẫu chi phí thất bại (cần quyền admin).')}
+        onUpdate={(id, patch: CostItemPatch) =>
+          runOp(
+            () => mutateItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)), () => updateCostItem(id, patch)),
+            'Cập nhật chi phí thất bại (cần quyền admin).',
+          )}
+        onDelete={(id) =>
+          runOp(
+            () => mutateItems((prev) => prev.filter((it) => it.id !== id), () => deleteCostItem(id)),
+            'Gỡ khoản chi phí thất bại (cần quyền admin).',
+          )}
       />
 
       <ProjectionTable
         projections={projections}
         months={months}
-        onAdd={(kind: CostProjectionKind) => runOp(() => addCostProjection(projectId, kind, createdBy), 'Thêm dự chi thất bại (cần quyền admin).')}
-        onUpdate={(id, patch: CostProjectionPatch) => runOp(() => updateCostProjection(id, patch), 'Cập nhật dự chi thất bại (cần quyền admin).')}
-        onDelete={(id) => runOp(() => deleteCostProjection(id), 'Gỡ dự chi thất bại (cần quyền admin).')}
+        onAdd={(kind: CostProjectionKind) =>
+          runOp(() => createProjections(() => addCostProjection(projectId, kind, createdBy)), 'Thêm dự chi thất bại (cần quyền admin).')}
+        onUpdate={(id, patch: CostProjectionPatch) =>
+          runOp(
+            () =>
+              mutateProjections((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)), () => updateCostProjection(id, patch)),
+            'Cập nhật dự chi thất bại (cần quyền admin).',
+          )}
+        onDelete={(id) =>
+          runOp(
+            () => mutateProjections((prev) => prev.filter((p) => p.id !== id), () => deleteCostProjection(id)),
+            'Gỡ dự chi thất bại (cần quyền admin).',
+          )}
       />
     </>
   );
