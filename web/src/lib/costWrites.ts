@@ -3,7 +3,7 @@
 // Postgres snake_case, chuyển ngay tại đây.
 
 import { supabase } from '../supabase';
-import { rowToCostItem, rowToCostProjection } from './mappers';
+import { rowToCompChange, rowToCostItem, rowToCostProjection } from './mappers';
 import type { CostCadence, CostItem, CostItemKind, CostProjection, CostProjectionKind } from '../types';
 
 /* ----------------------------- Lương nhân sự (toàn cục) ----------------------------- */
@@ -30,6 +30,21 @@ export async function upsertMemberComp(
   if (patch.endDate !== undefined) row.end_date = patch.endDate || null;
   const { error } = await supabase.from('member_compensation').upsert(row, { onConflict: 'member_id' });
   if (error) throw error;
+}
+
+/**
+ * Lịch sử đổi lương của một người (mới nhất trước, tối đa `limit`). Bảng do trigger 0057
+ * ghi — client chỉ đọc; RLS admin-only nên member gọi vào nhận rỗng.
+ */
+export async function fetchCompHistory(memberId: string, limit = 12) {
+  const { data, error } = await supabase
+    .from('member_comp_history')
+    .select('*')
+    .eq('member_id', memberId)
+    .order('changed_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(rowToCompChange);
 }
 
 /* --------------------------- Chi phí thiết bị/vận hành --------------------------- */

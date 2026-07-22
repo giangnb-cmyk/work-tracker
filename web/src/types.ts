@@ -351,6 +351,16 @@ export interface CostItem {
   createdBy: string;
 }
 
+/** Một lần đổi lương (member_comp_history — trigger 0057 ghi, client chỉ đọc). */
+export interface CompChange {
+  id: string;
+  memberId: string;
+  /** null = điền lương lần đầu. */
+  oldSalary: number | null;
+  newSalary: number;
+  changedAt: Timestamp | null;
+}
+
 /** Các khoản chi phí đã gán cho MỘT người trong dự án (project_cost_member_items). */
 export interface CostMemberItems {
   projectId: string;

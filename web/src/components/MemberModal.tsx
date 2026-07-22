@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
-import { upsertMemberComp } from '../lib/costWrites';
+import { fetchCompHistory, upsertMemberComp } from '../lib/costWrites';
+import { formatVnd } from '../lib/format';
 import MoneyInput from './cost/MoneyInput';
+import type { CompChange } from '../types';
 import {
   JOB_ROLES,
   MEMBER_PERMS,
@@ -37,10 +39,12 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
   const [salary, setSalary] = useState(0);
   const [workStart, setWorkStart] = useState('');
   const [workEnd, setWorkEnd] = useState('');
+  // Lịch sử đổi lương (trigger 0057 ghi) — hiện ngay dưới ô lương.
+  const [history, setHistory] = useState<CompChange[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Nạp lương hiện có của người đang sửa (chỉ admin đọc được — RLS). Một lần, không cần realtime.
+  // Nạp lương hiện có + lịch sử của người đang sửa (chỉ admin đọc được — RLS). Một lần.
   useEffect(() => {
     if (!member?.uid || !isAdmin) return;
     let alive = true;
@@ -55,6 +59,11 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
         setWorkStart((data.start_date as string | null) ?? '');
         setWorkEnd((data.end_date as string | null) ?? '');
       });
+    fetchCompHistory(member.uid)
+      .then((h) => {
+        if (alive) setHistory(h);
+      })
+      .catch((err) => console.error('Tải lịch sử lương thất bại', err));
     return () => {
       alive = false;
     };
@@ -104,18 +113,26 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{isEdit ? 'Sửa thành viên' : 'Thêm thành viên'}</h2>
+      <div className="modal member-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>{isEdit ? '👤 Sửa thành viên' : '👤 Thêm thành viên'}</h2>
 
         <label className="field">
           <span>Tên hiển thị *</span>
           <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoFocus />
         </label>
-        <label className="field">
-          <span>Email</span>
-          <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ten@easygoing.vn" />
-        </label>
         <div className="grid-2">
+          <label className="field">
+            <span>Email</span>
+            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ten@easygoing.vn" />
+          </label>
+          <label className="field">
+            <span>Chuyên môn</span>
+            <select className="select" value={jobRole} onChange={(e) => setJobRole(e.target.value as JobRole)}>
+              {JOB_ROLES.map((r) => (
+                <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+              ))}
+            </select>
+          </label>
           <label className="field">
             <span>Vai trò</span>
             {canSetRole ? (
@@ -132,7 +149,7 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
           </label>
           <label className="field">
             <span>Discord User ID</span>
-            <input className="input" value={discordId} onChange={(e) => setDiscordId(e.target.value)} placeholder="ví dụ 123456789012345678" />
+            <input className="input mono" value={discordId} onChange={(e) => setDiscordId(e.target.value)} placeholder="123456789012345678" />
           </label>
         </div>
         {role === 'member' && (
@@ -159,44 +176,61 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
         )}
 
         <label className="field">
-          <span>Chuyên môn</span>
-          <select className="select" value={jobRole} onChange={(e) => setJobRole(e.target.value as JobRole)}>
-            {JOB_ROLES.map((r) => (
-              <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
           <span>Notion User ID (tuỳ chọn)</span>
-          <input className="input" value={notionUserId} onChange={(e) => setNotionUserId(e.target.value)} />
+          <input className="input mono" value={notionUserId} onChange={(e) => setNotionUserId(e.target.value)} />
         </label>
 
         {isAdmin && (
-          <div className="field cost-comp-block">
-            <span className="field-label">
-              💰 Lương &amp; thời gian làm việc <small className="muted">— chỉ admin &amp; owner thấy; dùng để tính chi phí dự án</small>
-            </span>
-            <div className="grid-2">
-              <label className="field" style={{ marginBottom: 0 }}>
+          <div className="comp-card">
+            <div className="comp-card-title">
+              💰 Lương &amp; thời gian làm việc
+              <span className="muted comp-card-sub">chỉ admin &amp; owner thấy — nguồn cho tab Chi phí</span>
+            </div>
+            <div className="comp-grid">
+              <label className="field">
                 <span>Lương / tháng</span>
                 <MoneyInput value={salary} onCommit={setSalary} className="cost-money-block" ariaLabel="Lương tháng" />
               </label>
-              <label className="field" style={{ marginBottom: 0 }}>
+              <label className="field">
                 <span>Ngày bắt đầu</span>
                 <input type="date" className="input" value={workStart} onChange={(e) => setWorkStart(e.target.value)} />
               </label>
-              <label className="field" style={{ marginBottom: 0 }}>
-                <span>Ngày kết thúc <small className="muted">(để trống nếu còn làm)</small></span>
+              <label className="field">
+                <span>Ngày kết thúc <small className="muted">(trống = còn làm)</small></span>
                 <input type="date" className="input" value={workEnd} onChange={(e) => setWorkEnd(e.target.value)} />
               </label>
             </div>
+            {history.length > 0 && (
+              <div className="comp-history">
+                <div className="comp-history-title">📈 Lịch sử lương</div>
+                {history.map((h) => {
+                  const up = h.oldSalary != null && h.newSalary > h.oldSalary;
+                  const first = h.oldSalary == null;
+                  return (
+                    <div key={h.id} className="comp-hist-row">
+                      <span className="muted mono comp-hist-date">
+                        {h.changedAt ? h.changedAt.toDate().toLocaleDateString('vi-VN') : '—'}
+                      </span>
+                      {first ? (
+                        <span className="muted">điền lần đầu →</span>
+                      ) : (
+                        <span className="mono muted">{formatVnd(h.oldSalary ?? 0)} →</span>
+                      )}
+                      <span className={`mono ${first ? '' : up ? 'comp-up' : 'comp-down'}`}>
+                        {formatVnd(h.newSalary)}{!first && (up ? ' ↑' : ' ↓')}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
-          💡 Discord User ID (không phải username): bật Developer Mode trong Discord → chuột phải vào người đó → Copy User ID.
-          Dùng để mention khi task hoàn thành.
-        </p>
+        <div className="hint-box">
+          💡 Discord User ID (không phải username): bật Developer Mode trong Discord → chuột phải
+          vào người đó → Copy User ID. Dùng để mention khi task hoàn thành.
+        </div>
         {error && <p className="error-text">{error}</p>}
 
         <div className="modal-actions">
