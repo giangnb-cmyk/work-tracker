@@ -14,6 +14,7 @@ import StatusToggle from './task/StatusToggle';
 import RefImagesSection from './task/RefImagesSection';
 import TaskActivity from './TaskActivity';
 import ConfirmDialog from './ConfirmDialog';
+import DateInput from './DateInput';
 import SearchableSelect from './SearchableSelect';
 import AutoGrowTextarea from './AutoGrowTextarea';
 import { FileIcon, PaperclipIcon } from './icons';
@@ -398,7 +399,7 @@ export default function TaskModal({
                 </div>
                 <label className="tm-field">
                   <span>Hạn chót</span>
-                  <input className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} disabled={!canEditOwn} />
+                  <DateInput value={due} onChange={setDue} disabled={!canEditOwn} ariaLabel="Hạn chót task" />
                 </label>
                 <label className="tm-field">
                   <span>Story points</span>

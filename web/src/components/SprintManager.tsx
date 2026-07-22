@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSprintContext } from '../contexts/SprintContext';
 import ConfirmDialog from './ConfirmDialog';
+import DateInput from './DateInput';
 import SprintEditModal from './SprintEditModal';
 import { formatDate } from '../lib/format';
 import type { Sprint, SprintStatus } from '../types';
@@ -78,11 +79,11 @@ export default function SprintManager() {
           </label>
           <label className="field">
             <span>Bắt đầu</span>
-            <input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            <DateInput value={start} onChange={setStart} ariaLabel="Ngày bắt đầu sprint" />
           </label>
           <label className="field">
             <span>Kết thúc</span>
-            <input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+            <DateInput value={end} onChange={setEnd} ariaLabel="Ngày kết thúc sprint" />
           </label>
         </div>
         <button className="btn-primary" onClick={handleCreate} disabled={saving || !name.trim()}>

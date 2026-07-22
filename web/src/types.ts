@@ -358,6 +358,8 @@ export interface CompChange {
   /** null = điền lương lần đầu. */
   oldSalary: number | null;
   newSalary: number;
+  /** Ngày ÁP DỤNG mức mới ('YYYY-MM-DD', 0058); null = không ghi → dùng changedAt. */
+  effectiveFrom: string | null;
   changedAt: Timestamp | null;
 }
 

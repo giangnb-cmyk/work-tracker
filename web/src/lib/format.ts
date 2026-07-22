@@ -89,6 +89,12 @@ export function formatVnd(n: number): string {
   return `${Math.round(n).toLocaleString('vi-VN')} ₫`;
 }
 
+/** Hôm nay theo GIỜ MÁY dạng 'YYYY-MM-DD' (toISOString là UTC — lệch ngày lúc sáng sớm VN). */
+export function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** 'YYYY-MM-DD' → 'DD/MM/YYYY' (— nếu rỗng/sai định dạng). */
 export function formatIsoDate(s: string | null | undefined): string {
   if (!s) return '—';

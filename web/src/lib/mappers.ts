@@ -169,6 +169,7 @@ export function rowToCompChange(r: Row): CompChange {
     memberId: r.member_id,
     oldSalary: r.old_salary == null ? null : Number(r.old_salary),
     newSalary: Number(r.new_salary ?? 0),
+    effectiveFrom: r.effective_from ?? null,
     changedAt: Timestamp.fromISO(r.changed_at),
   };
 }

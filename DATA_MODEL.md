@@ -206,11 +206,13 @@ các thành viên của dự án (`project_members`) → "pick người là có 
 > Bảng cũ `project_cost_employees` (0053, lương theo-dự-án) đã bị **drop ở 0054**, thay bằng
 > `member_compensation` toàn cục theo yêu cầu "tập trung 1 chỗ ở chi tiết thành viên".
 
-**`member_comp_history`** — lịch sử ĐỔI LƯƠNG (0057): `id, member_id→profiles, old_salary
-(null = điền lần đầu), new_salary, changed_at, changed_by`. Do **trigger**
-`log_member_comp_change` (SECURITY DEFINER) trên `member_compensation` ghi — mọi đường ghi
-đều bị bắt, chỉ ghi khi mức lương THẬT SỰ đổi; client chỉ đọc (RLS select admin-only, không
-có policy ghi). Hiện ở chi tiết thành viên (📈 Lịch sử lương).
+**`member_comp_history`** — lịch sử ĐỔI LƯƠNG (0057/0058): `id, member_id→profiles,
+old_salary (null = điền lần đầu), new_salary, effective_from (ngày ÁP DỤNG mức mới — khác
+changed_at là lúc bấm Lưu), changed_at, changed_by`. Do **trigger** `log_member_comp_change`
+(SECURITY DEFINER) trên `member_compensation` ghi — mọi đường ghi đều bị bắt, chỉ ghi khi mức
+lương THẬT SỰ đổi; client chỉ đọc (RLS select admin-only, không có policy ghi).
+`member_compensation.effective_from` giữ ngày áp dụng của mức HIỆN TẠI. Hiện ở chi tiết
+thành viên (📈 Lịch sử lương).
 
 **`project_cost_items`** — DANH MỤC chi phí thiết bị/vận hành (mô hình gán theo người, 0056):
 

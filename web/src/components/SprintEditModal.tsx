@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Timestamp } from '../lib/time';
+import DateInput from './DateInput';
 import type { Sprint } from '../types';
 
 interface SprintEditModalProps {
@@ -58,11 +59,11 @@ export default function SprintEditModal({ sprint, onSave, onClose }: SprintEditM
           </label>
           <label className="field">
             <span>Bắt đầu</span>
-            <input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            <DateInput value={start} onChange={setStart} ariaLabel="Ngày bắt đầu sprint" />
           </label>
           <label className="field">
             <span>Kết thúc</span>
-            <input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+            <DateInput value={end} onChange={setEnd} ariaLabel="Ngày kết thúc sprint" />
           </label>
         </div>
 

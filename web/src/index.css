@@ -2266,7 +2266,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
 }
 .drp-main { display: flex; flex-direction: column; gap: 0.6rem; }
 .drp-inputs { display: flex; align-items: center; gap: 0.45rem; }
-.drp-date { color-scheme: dark; font-size: 0.82rem; padding: 0.35rem 0.5rem; width: 8.4rem; }
+/* .drp-date giờ nằm trên WRAPPER của DateInput (không còn là input trần) — style chữ/padding
+   phải trỏ vào ô text bên trong. */
+.drp-date { width: 8.4rem; }
+.drp-date .date-input-text { font-size: 0.82rem; padding: 0.35rem 0.5rem; }
 .drp-head { display: flex; align-items: center; justify-content: space-between; }
 .drp-month-label {
   background: none; border: none; color: var(--text); font-weight: 600;
@@ -2698,11 +2701,35 @@ table.data-table { width: 100%; border-collapse: collapse; }
   flex-wrap: wrap;
 }
 .comp-card-sub { font-size: 0.74rem; font-weight: 400; }
-.comp-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0.75rem; }
+/* 2×2 + căn ĐÁY từng ô: label dài ngắn khác nhau (xuống dòng) mà không căn đáy là ô nhập
+   hàng bên tụt lệch nhau — đúng cái "lệch tùm lum" đã bị. */
+.comp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1rem; align-items: end; }
 .comp-grid > .field { margin-bottom: 0; }
 @media (max-width: 560px) {
   .comp-grid { grid-template-columns: 1fr; }
 }
+/* grid-2 trong modal thành viên: bỏ margin của field (grid đã có gap) — cùng bài feat-modal. */
+.modal.member-modal .grid-2 { gap: 0.85rem 1rem; margin-bottom: 0.85rem; }
+.modal.member-modal .grid-2 > .field { margin-bottom: 0; }
+
+/* DateInput — dd/mm/yyyy trên mọi trình duyệt (xem components/DateInput.tsx). */
+.date-input { position: relative; display: flex; align-items: center; }
+.date-input .date-input-text { width: 100%; padding-right: 2.1rem; }
+.date-input-btn {
+  position: absolute;
+  right: 0.35rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.55;
+  padding: 0.15rem;
+  line-height: 1;
+}
+.date-input-btn:hover { opacity: 1; }
+.date-input-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+/* Input date gốc: ẩn nhưng vẫn render để mượn lịch (showPicker neo vào vị trí này). */
+.date-input-native { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 /* Lịch sử lương — mỗi dòng: ngày · cũ → mới (↑ xanh / ↓ đỏ). */
 .comp-history { border-top: 1px dashed var(--border); margin-top: 0.9rem; padding-top: 0.7rem; }

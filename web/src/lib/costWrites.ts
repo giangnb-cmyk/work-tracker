@@ -12,6 +12,8 @@ export interface MemberCompPatch {
   monthlySalary?: number;
   startDate?: string | null;
   endDate?: string | null;
+  /** Ngày ÁP DỤNG mức lương hiện tại ("tăng từ hôm nào") — trigger chép vào lịch sử. */
+  effectiveFrom?: string | null;
 }
 
 /**
@@ -28,6 +30,7 @@ export async function upsertMemberComp(
   if (patch.monthlySalary !== undefined) row.monthly_salary = patch.monthlySalary;
   if (patch.startDate !== undefined) row.start_date = patch.startDate || null;
   if (patch.endDate !== undefined) row.end_date = patch.endDate || null;
+  if (patch.effectiveFrom !== undefined) row.effective_from = patch.effectiveFrom || null;
   const { error } = await supabase.from('member_compensation').upsert(row, { onConflict: 'member_id' });
   if (error) throw error;
 }

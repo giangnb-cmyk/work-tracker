@@ -13,6 +13,7 @@ import {
   startOfDay,
   toInputDate,
 } from '../lib/dateRange';
+import DateInput from './DateInput';
 
 interface Props {
   value: DateRange;
@@ -95,8 +96,11 @@ export default function DateRangePicker({ value, onChange, presets = PRESETS, al
   }
 
   function onInputChange(which: 'from' | 'to', raw: string) {
-    const ms = parseInputDate(raw);
+    let ms = parseInputDate(raw);
     if (ms === null) return;
+    // Trước đây chặn tương lai bằng `max` của <input type="date">; giờ gõ tay qua DateInput
+    // nên tự kẹp ở đây (tab Truy cập khoá tương lai, Timeline thì allowFuture).
+    if (!allowFuture) ms = Math.min(ms, todayEndMs);
     const from = which === 'from' ? ms : value.fromMs;
     const to = which === 'to' ? ms : value.toMs;
     commit(Math.min(from, to), Math.max(from, to));
@@ -129,20 +133,21 @@ export default function DateRangePicker({ value, onChange, presets = PRESETS, al
         <div className="drp-panel glass">
           <div className="drp-main">
             <div className="drp-inputs">
-              <input
-                type="date"
-                className="input drp-date"
+              {/* withPicker=false: panel này đã có lịch riêng ngay dưới — thêm nút 📅 nữa là thừa. */}
+              <DateInput
                 value={toInputDate(value.fromMs)}
-                max={allowFuture ? undefined : toInputDate(todayEndMs)}
-                onChange={(e) => onInputChange('from', e.target.value)}
+                onChange={(iso) => onInputChange('from', iso)}
+                className="drp-date"
+                withPicker={false}
+                ariaLabel="Từ ngày"
               />
               <span className="muted">–</span>
-              <input
-                type="date"
-                className="input drp-date"
+              <DateInput
                 value={toInputDate(value.toMs)}
-                max={allowFuture ? undefined : toInputDate(todayEndMs)}
-                onChange={(e) => onInputChange('to', e.target.value)}
+                onChange={(iso) => onInputChange('to', iso)}
+                className="drp-date"
+                withPicker={false}
+                ariaLabel="Đến ngày"
               />
             </div>
 

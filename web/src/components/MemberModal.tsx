@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
 import { fetchCompHistory, upsertMemberComp } from '../lib/costWrites';
-import { formatVnd } from '../lib/format';
+import { formatIsoDate, formatVnd, todayIso } from '../lib/format';
+import DateInput from './DateInput';
 import MoneyInput from './cost/MoneyInput';
 import type { CompChange } from '../types';
 import {
@@ -37,6 +38,9 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
   const [notionUserId, setNotionUserId] = useState(member?.notionUserId ?? '');
   // Lương + thời gian làm việc (bảng member_compensation, toàn cục). Nạp riêng vì admin-only.
   const [salary, setSalary] = useState(0);
+  /** Mức lương đã nạp từ DB — để biết ô lương có VỪA bị đổi hay không (auto điền Áp dụng từ). */
+  const [loadedSalary, setLoadedSalary] = useState(0);
+  const [applyFrom, setApplyFrom] = useState('');
   const [workStart, setWorkStart] = useState('');
   const [workEnd, setWorkEnd] = useState('');
   // Lịch sử đổi lương (trigger 0057 ghi) — hiện ngay dưới ô lương.
@@ -50,12 +54,15 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
     let alive = true;
     void supabase
       .from('member_compensation')
-      .select('monthly_salary, start_date, end_date')
+      .select('monthly_salary, start_date, end_date, effective_from')
       .eq('member_id', member.uid)
       .maybeSingle()
       .then(({ data }) => {
         if (!alive || !data) return;
-        setSalary(Number(data.monthly_salary ?? 0));
+        const s = Number(data.monthly_salary ?? 0);
+        setSalary(s);
+        setLoadedSalary(s);
+        setApplyFrom((data.effective_from as string | null) ?? '');
         setWorkStart((data.start_date as string | null) ?? '');
         setWorkEnd((data.end_date as string | null) ?? '');
       });
@@ -68,6 +75,12 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
       alive = false;
     };
   }, [member?.uid, isAdmin]);
+
+  /** Gõ mức lương MỚI: tự điền "Áp dụng từ" = hôm nay (đổi tay được) — đây là chỗ tăng lương. */
+  function changeSalary(n: number) {
+    setSalary(n);
+    if (n !== loadedSalary) setApplyFrom(todayIso());
+  }
 
   async function handleSave() {
     if (!displayName.trim()) {
@@ -97,7 +110,12 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
       if (isAdmin) {
         await upsertMemberComp(
           uid,
-          { monthlySalary: salary, startDate: workStart || null, endDate: workEnd || null },
+          {
+            monthlySalary: salary,
+            startDate: workStart || null,
+            endDate: workEnd || null,
+            effectiveFrom: applyFrom || null,
+          },
           profile?.uid ?? null,
         );
       }
@@ -188,16 +206,20 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
             </div>
             <div className="comp-grid">
               <label className="field">
-                <span>Lương / tháng</span>
-                <MoneyInput value={salary} onCommit={setSalary} className="cost-money-block" ariaLabel="Lương tháng" />
+                <span>Lương / tháng <small className="muted">— gõ mức MỚI vào đây để tăng/đổi</small></span>
+                <MoneyInput value={salary} onCommit={changeSalary} className="cost-money-block" ariaLabel="Lương tháng" />
               </label>
               <label className="field">
-                <span>Ngày bắt đầu</span>
-                <input type="date" className="input" value={workStart} onChange={(e) => setWorkStart(e.target.value)} />
+                <span>Áp dụng từ <small className="muted">— tăng từ hôm nào</small></span>
+                <DateInput value={applyFrom} onChange={setApplyFrom} ariaLabel="Ngày áp dụng mức lương" />
               </label>
               <label className="field">
-                <span>Ngày kết thúc <small className="muted">(trống = còn làm)</small></span>
-                <input type="date" className="input" value={workEnd} onChange={(e) => setWorkEnd(e.target.value)} />
+                <span>Ngày bắt đầu làm</span>
+                <DateInput value={workStart} onChange={setWorkStart} ariaLabel="Ngày bắt đầu làm" />
+              </label>
+              <label className="field">
+                <span>Ngày nghỉ <small className="muted">— trống = còn làm</small></span>
+                <DateInput value={workEnd} onChange={setWorkEnd} ariaLabel="Ngày nghỉ" />
               </label>
             </div>
             {history.length > 0 && (
@@ -206,10 +228,11 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
                 {history.map((h) => {
                   const up = h.oldSalary != null && h.newSalary > h.oldSalary;
                   const first = h.oldSalary == null;
+                  const recorded = h.changedAt ? h.changedAt.toDate().toLocaleDateString('vi-VN') : '';
                   return (
-                    <div key={h.id} className="comp-hist-row">
+                    <div key={h.id} className="comp-hist-row" title={recorded ? `Ghi nhận ngày ${recorded}` : undefined}>
                       <span className="muted mono comp-hist-date">
-                        {h.changedAt ? h.changedAt.toDate().toLocaleDateString('vi-VN') : '—'}
+                        {h.effectiveFrom ? formatIsoDate(h.effectiveFrom) : recorded || '—'}
                       </span>
                       {first ? (
                         <span className="muted">điền lần đầu →</span>
