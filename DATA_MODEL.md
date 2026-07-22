@@ -269,6 +269,33 @@ thành viên (📈 Lịch sử lương).
 
 ---
 
+## `member_sprint_notes` (đánh giá thành viên theo sprint)
+
+Ghi chú có cấu trúc cho MỘT người trong MỘT sprint (tuần) — migration `0059`. Hiện ở tab **Đánh
+giá** (`Reviews`, admin-only, view id `reviews`) và tab **Ghi chú** trong `MemberModal`. Nhạy cảm
+(đánh giá của quản lý) → RLS **admin-only cho CẢ ĐỌC lẫn GHI** (`is_admin()` bao owner), y như
+`member_compensation`. Một dòng DÙNG CHUNG cho mỗi `(member_id, sprint_id)` (khoá upsert), sửa-đè;
+`updated_by` = người sửa cuối (KHÔNG lưu tác giả gốc — upsert ghi đè mọi cột truyền vào).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid (PK) | `gen_random_uuid()` |
+| `member_id` | uuid | → `profiles.id`, `on delete cascade` (người được đánh giá) |
+| `sprint_id` | uuid | → `sprints.id`, `on delete cascade` |
+| `overview` | text | Tổng quan ("tuần này thế nào") |
+| `highlights` | text | Điểm nổi bật |
+| `concerns` | text | Điểm cần lưu ý |
+| `rating` | smallint \| null | 1..5 (CHECK); null = chưa chấm. Nhãn: `NOTE_RATINGS` trong `web/src/types.ts` |
+| `updated_at` / `updated_by` | timestamptz / uuid \| null | writer set inline (không trigger như `member_compensation`) |
+| `created_at` | timestamptz | `now()` |
+
+- **RLS**: 4 policy admin-only (select/insert/update/delete). Realtime + `replica identity full`.
+- **Web**: hook `useSprintNotes(sprintId)` (live, `byMember` Map, `enabled=isAdmin`); ghi qua
+  `upsertMemberSprintNote` / `deleteMemberSprintNote` (`lib/memberReviewWrites.ts`); lịch sử theo
+  người qua `fetchMemberNotes` (embed `sprints`). **Bot chỉ ĐỌC** (tổng hợp AI — xem dưới).
+
+---
+
 ## `features/{featureId}` & `feature_labels/{labelId}`
 
 A feature: a unit of product work **inside a project**. A task optionally attaches to one
@@ -581,6 +608,32 @@ sau đó ghi lại `status` (`pending → done | error`) + `result`. Cùng khuô
 
 ---
 
+## `member_review_requests` & `member_period_reviews` (tổng hợp đánh giá AI)
+
+Tổng hợp AI theo **tháng/quý** từ `member_sprint_notes` — migration `0060`. Cùng khuôn hàng-đợi
+`member_dm_requests` (`0025`): web (tab Đánh giá, nút **Phân tích AI**) insert 1 dòng
+`member_review_requests`; bot (service-role) quét mỗi `bug_sync_poll_seconds`, đọc ghi chú trong
+kỳ, gọi **Claude CLI** (`bot.ask_claude_text` + `skills/member_review.py`) viết đánh giá, ghi
+`member_period_reviews`, rồi cập nhật `status`/`result`. RLS admin-only.
+
+**`member_review_requests`** `{ id, target_user_id→profiles, period_kind (month|quarter),
+period_start, period_end (date — web tính sẵn), force (bool — chạy lại dù đã có), requested_by,
+status (pending|done|error), result, created_at, processed_at }`. Insert + select `is_admin()`.
+
+**`member_period_reviews`** (kết quả bền, dùng cho hiển thị + idempotency) `{ id, member_id→profiles,
+period_kind, period_start, period_end, summary (văn bản AI), source_note_count, model, status
+(done|empty), generated_by, generated_at }`, unique `(member_id, period_kind, period_start)`. RLS
+**chỉ select `is_admin()`** — KHÔNG có policy ghi cho client, chỉ bot service-role ghi (như
+`member_comp_history`). Web đọc live qua `usePeriodReviews`.
+
+> **Quy ước gán sprint vào kỳ = GIAO khung thời gian**: ghi chú thuộc kỳ nếu sprint của nó giao
+> `[period_start, period_end]` (`start_date <= period_end AND end_date >= period_start`; sprint
+> thiếu ngày bị loại). Web tính `period_start/end` (`lib/period.ts`) nên bot KHÔNG làm toán ranh
+> giới. `force=false` + đã có review → bot bỏ qua (khỏi tốn LLM); kỳ rỗng → lưu `status='empty'`.
+> Cố ý KHÔNG đăng ký trong `bot/hints.py` — chỉ chạy qua nút web, dữ liệu nhạy cảm (không cho `@bot` gọi).
+
+---
+
 ## `api_keys` (khoá cho app ngoài) & Edge Function `member-tasks`
 
 `{ id, name, key_hash, enabled, created_at, last_used_at }` — migration `0043`.
@@ -675,4 +728,6 @@ TaskStatus   = todo | in_progress | review | done
 TaskPriority = low | medium | high | urgent
 SprintStatus = planning | active | completed
 UserRole     = admin | member
+PeriodKind   = month | quarter          (member_review_*, migration 0060)
+NoteRating   = 1 | 2 | 3 | 4 | 5        (member_sprint_notes.rating; nhãn NOTE_RATINGS ở types.ts)
 ```

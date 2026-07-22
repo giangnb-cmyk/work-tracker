@@ -530,3 +530,56 @@ export type NewTaskInput = Pick<
   subtasks: Subtask[];
   watcherIds: string[];
 };
+
+/* ===========================================================================
+   Đánh giá thành viên theo SPRINT (tab "Đánh giá" — admin). Xem migration 0059/0060.
+   Nhạy cảm (đánh giá của quản lý) → admin-only cả đọc lẫn ghi, như member_compensation.
+   =========================================================================== */
+
+export type PeriodKind = 'month' | 'quarter';
+
+/** Ghi chú có cấu trúc cho MỘT người trong MỘT sprint (một dòng dùng chung, sửa-đè). */
+export interface MemberSprintNote {
+  id: string;
+  memberId: string;
+  sprintId: string;
+  overview: string; // Tổng quan ("tuần này thế nào")
+  highlights: string; // Điểm nổi bật
+  concerns: string; // Điểm cần lưu ý
+  rating: number | null; // 1..5, null = chưa chấm
+  updatedBy: string | null;
+  updatedAt?: Timestamp;
+  createdAt?: Timestamp;
+  /** Chỉ có khi select kèm embed sprints(...) — dùng cho lịch sử trong MemberModal. */
+  sprintName?: string;
+  sprintStart?: Timestamp | null;
+}
+
+/** Bản đánh giá tổng hợp theo THÁNG/QUÝ do AI (bot) sinh từ các note trong kỳ (migration 0060). */
+export interface MemberPeriodReview {
+  id: string;
+  memberId: string;
+  periodKind: PeriodKind;
+  periodStart: string; // 'YYYY-MM-DD'
+  periodEnd: string;
+  summary: string; // văn bản AI (markdown)
+  sourceNoteCount: number;
+  model: string;
+  status: 'done' | 'empty'; // empty = kỳ không có note (khỏi tốn LLM)
+  generatedAt?: Timestamp;
+  generatedBy: string | null;
+}
+
+/** Thang điểm đánh giá 1..5 — nguồn sự thật (nhãn + icon) giống JOB_ROLES. */
+export const NOTE_RATINGS: { value: number; label: string; icon: string }[] = [
+  { value: 1, label: 'Cần cải thiện', icon: '🔴' },
+  { value: 2, label: 'Dưới kỳ vọng', icon: '🟠' },
+  { value: 3, label: 'Đạt', icon: '🟡' },
+  { value: 4, label: 'Tốt', icon: '🟢' },
+  { value: 5, label: 'Xuất sắc', icon: '⭐' },
+];
+
+export const NOTE_RATING_LABEL: Record<number, string> = NOTE_RATINGS.reduce(
+  (acc, r) => ({ ...acc, [r.value]: r.label }),
+  {} as Record<number, string>,
+);

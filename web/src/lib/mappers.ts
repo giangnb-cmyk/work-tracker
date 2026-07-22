@@ -15,6 +15,8 @@ import type {
   CostMemberItems,
   CostProjection,
   MemberComp,
+  MemberPeriodReview,
+  MemberSprintNote,
   Feature,
   FeatureLabel,
   Project,
@@ -123,6 +125,40 @@ export function rowToMemberComp(r: Row): MemberComp {
     monthlySalary: Number(r.monthly_salary ?? 0),
     startDate: r.start_date ?? null,
     endDate: r.end_date ?? null,
+  };
+}
+
+export function rowToMemberSprintNote(r: Row): MemberSprintNote {
+  return {
+    id: r.id,
+    memberId: r.member_id,
+    sprintId: r.sprint_id,
+    overview: r.overview ?? '',
+    highlights: r.highlights ?? '',
+    concerns: r.concerns ?? '',
+    rating: r.rating ?? null,
+    updatedBy: r.updated_by ?? null,
+    updatedAt: Timestamp.fromISO(r.updated_at) ?? undefined,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    // Chỉ có khi query embed sprints(...) — dùng cho lịch sử ở MemberModal.
+    sprintName: r.sprints?.name ?? undefined,
+    sprintStart: r.sprints ? Timestamp.fromISO(r.sprints.start_date) : undefined,
+  };
+}
+
+export function rowToMemberPeriodReview(r: Row): MemberPeriodReview {
+  return {
+    id: r.id,
+    memberId: r.member_id,
+    periodKind: r.period_kind,
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    summary: r.summary ?? '',
+    sourceNoteCount: r.source_note_count ?? 0,
+    model: r.model ?? '',
+    status: r.status ?? 'done',
+    generatedAt: Timestamp.fromISO(r.generated_at) ?? undefined,
+    generatedBy: r.generated_by ?? null,
   };
 }
 

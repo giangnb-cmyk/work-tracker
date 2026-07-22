@@ -26,6 +26,7 @@ const Dashboard = lazyView(() => dashboardImport);
 const Performance = lazyView(() => import('./Performance'));
 const Visits = lazyView(() => import('./Visits'));
 const SprintManager = lazyView(() => import('./SprintManager'));
+const Reviews = lazyView(() => import('./Reviews'));
 const ProjectMembers = lazyView(() => import('./ProjectMembers'));
 // Lazy để TaskModal (nó import tĩnh) không bị kéo vào bundle khởi động.
 const TaskDeepLink = lazyView(() => import('./TaskDeepLink'));
@@ -76,6 +77,7 @@ export default function Layout() {
             {activeView === 'performance' && <Performance />}
             {activeView === 'visits' && <Visits />}
             {activeView === 'sprints' && <SprintManager />}
+            {activeView === 'reviews' && <Reviews />}
             {activeView === 'members' && <ProjectMembers />}
             {/* Deep link task (đủ /tasks/<id> hoặc rút gọn /t/<mã>): modal đè lên view nền. */}
             {taskMatch && <TaskDeepLink match={taskMatch} fallbackPath={pathFor(activeView)} />}

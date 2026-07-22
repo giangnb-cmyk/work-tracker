@@ -3,13 +3,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
 import { fetchCompHistory, upsertMemberComp } from '../lib/costWrites';
+import { fetchMemberNotes } from '../lib/memberReviewWrites';
 import { formatDate, formatIsoDate, formatVnd, todayIso } from '../lib/format';
 import DateInput from './DateInput';
 import MoneyInput from './cost/MoneyInput';
-import type { CompChange } from '../types';
+import type { CompChange, MemberSprintNote } from '../types';
 import {
   JOB_ROLES,
   MEMBER_PERMS,
+  NOTE_RATINGS,
   USER_ROLE_LABEL,
   type JobRole,
   type MemberPerm,
@@ -49,7 +51,9 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
   const [error, setError] = useState<string | null>(null);
   // Modal tách 3 tab nhỏ (Thông tin | Quyền | Lương) — một cột dài quá; state các tab vẫn
   // sống chung nên chuyển tab không mất gì, nút Lưu lưu tất cả.
-  const [tab, setTab] = useState<'info' | 'perms' | 'salary'>('info');
+  const [tab, setTab] = useState<'info' | 'perms' | 'salary' | 'notes'>('info');
+  // Lịch sử ghi chú đánh giá qua các sprint (chỉ admin — RLS 0059). Imperative, không mở channel thứ 2.
+  const [notes, setNotes] = useState<MemberSprintNote[]>([]);
 
   // Nạp lương hiện có + lịch sử của người đang sửa (chỉ admin đọc được — RLS). Một lần.
   useEffect(() => {
@@ -77,6 +81,16 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
     return () => {
       alive = false;
     };
+  }, [member?.uid, isAdmin]);
+
+  // Ghi chú đánh giá của người này qua các sprint (mới nhất trước) — hiện ở tab "Ghi chú".
+  useEffect(() => {
+    if (!member?.uid || !isAdmin) return;
+    let alive = true;
+    fetchMemberNotes(member.uid)
+      .then((n) => { if (alive) setNotes(n); })
+      .catch((err) => console.error('Tải ghi chú đánh giá thất bại', err));
+    return () => { alive = false; };
   }, [member?.uid, isAdmin]);
 
   /** Gõ mức lương MỚI: tự điền "Áp dụng từ" = hôm nay (đổi tay được) — đây là chỗ tăng lương. */
@@ -142,6 +156,9 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
           <button type="button" className={`seg${tab === 'perms' ? ' on' : ''}`} onClick={() => setTab('perms')}>Quyền</button>
           {isAdmin && (
             <button type="button" className={`seg${tab === 'salary' ? ' on' : ''}`} onClick={() => setTab('salary')}>💰 Lương</button>
+          )}
+          {isAdmin && (
+            <button type="button" className={`seg${tab === 'notes' ? ' on' : ''}`} onClick={() => setTab('notes')}>📝 Ghi chú</button>
           )}
         </div>
 
@@ -272,6 +289,35 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
                       <span className={`mono ${first ? '' : up ? 'comp-up' : 'comp-down'}`}>
                         {formatVnd(h.newSalary)}{!first && (up ? ' ↑' : ' ↓')}
                       </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'notes' && isAdmin && (
+          <div className="comp-card">
+            <div className="comp-card-title">
+              📝 Ghi chú đánh giá theo sprint
+              <span className="muted comp-card-sub">chỉ admin &amp; owner — điền ở tab “Đánh giá”</span>
+            </div>
+            {notes.length === 0 ? (
+              <p className="muted" style={{ fontSize: '0.85rem' }}>Chưa có ghi chú nào cho người này.</p>
+            ) : (
+              <div className="mm-notes">
+                {notes.map((n) => {
+                  const r = NOTE_RATINGS.find((x) => x.value === n.rating);
+                  return (
+                    <div key={n.id} className="mm-note-row">
+                      <div className="mm-note-head">
+                        <strong>{n.sprintName || 'Sprint'}</strong>
+                        {r && <span className="muted">{r.icon} {r.label}</span>}
+                      </div>
+                      {n.overview && <p><span className="muted">Tổng quan:</span> {n.overview}</p>}
+                      {n.highlights && <p><span className="muted">Nổi bật:</span> {n.highlights}</p>}
+                      {n.concerns && <p><span className="muted">Lưu ý:</span> {n.concerns}</p>}
                     </div>
                   );
                 })}

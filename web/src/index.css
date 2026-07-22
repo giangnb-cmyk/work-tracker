@@ -2781,3 +2781,62 @@ table.data-table { width: 100%; border-collapse: collapse; }
   .cost-project-picker { width: 100%; }
   .cost-section-head { flex-direction: column; align-items: stretch; }
 }
+
+/* ============================================================================
+   Đánh giá thành viên theo sprint (tab "Đánh giá" — components/review/*).
+   ========================================================================== */
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.member-note-card,
+.period-review {
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.mnc-head,
+.pr-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.mnc-head-name {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mnc-field { display: flex; flex-direction: column; gap: 0.28rem; margin: 0; }
+.mnc-field > span { font-size: 0.74rem; color: var(--muted); font-weight: 600; }
+.mnc-textarea { min-height: 52px; }
+.mnc-foot { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.1rem; }
+.mnc-saved { font-size: 0.76rem; color: var(--green); font-weight: 600; }
+
+.pr-summary {
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.6rem;
+}
+.pr-meta { font-size: 0.72rem; color: var(--muted); }
+.pr-status { font-size: 0.8rem; }
+
+/* Lịch sử ghi chú trong MemberModal (tab "Ghi chú"). */
+.mm-notes { display: flex; flex-direction: column; gap: 0.7rem; }
+.mm-note-row {
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+.mm-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+}
+.mm-note-row p { font-size: 0.84rem; margin: 0.15rem 0; line-height: 1.45; }

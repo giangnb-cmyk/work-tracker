@@ -56,6 +56,7 @@ import weekly_report  # noqa: E402  — task Supabase -> Google Sheet cua tung p
 import weekly_mail  # noqa: E402  — soan + gui mail weekly report tu template Gmail
 import member_dm  # noqa: E402  — DM diem tuan (task xong/ton dong) cho tung member
 import release_sync  # noqa: E402  — sheet release -> feature_labels.release_date
+import member_review  # noqa: E402  — tong hop danh gia AI theo thang/quy tu ghi chu sprint
 from supabase_client import get_client  # noqa: E402
 
 # Hint chi Claude cach + khi nao chay tung skill: xem hints.py.
@@ -161,6 +162,13 @@ MEMBER_DM_CFG = _settings.get("member_dm", {}) or {}
 MEMBER_DM_ENABLED = bool(MEMBER_DM_CFG.get("enabled", False))
 _DM_HOUR = int(MEMBER_DM_CFG.get("hour", BUG_SYNC_HOUR))
 _DM_WEEKDAY = int(MEMBER_DM_CFG.get("weekday", 3))  # 3 = thu 5
+
+# --- Tong hop danh gia AI theo ky (member_review_requests) — settings.json > member_review ----
+MEMBER_REVIEW_CFG = _settings.get("member_review", {}) or {}
+MEMBER_REVIEW_ENABLED = bool(MEMBER_REVIEW_CFG.get("enabled", False))
+MEMBER_REVIEW_MODEL = str(MEMBER_REVIEW_CFG.get("model", "")).strip()
+MEMBER_REVIEW_EFFORT = str(MEMBER_REVIEW_CFG.get("effort", "")).strip()
+MEMBER_REVIEW_TIMEOUT = int(MEMBER_REVIEW_CFG.get("timeout_seconds", 600))
 
 try:
     from zoneinfo import ZoneInfo
@@ -276,6 +284,42 @@ async def ask_claude(prompt: str, channel_id: int, sender_id: int = 0) -> str:
             break
 
     raise RuntimeError(last_err[:500])
+
+
+async def ask_claude_text(prompt: str, *, system: str,
+                          model: str | None = None, effort: str | None = None,
+                          timeout: int | None = None) -> str:
+    """Goi Claude CLI HEADLESS cho van ban thuan: KHONG persona Discord, KHONG skill/hint/MCP,
+    KHONG session/--resume. Dung cho tong hop danh gia. Tai dung _last_json + claude_slots cua bot.
+
+    Vi la tac vu thuan van ban, o che do an toan truyen `--allowedTools ""` (allowlist rong) ->
+    Claude khong goi tool nao, `-p` non-interactive nen cung khong hoi quyen -> khong ket."""
+    args = [CLAUDE_CMD, "-p", prompt, "--output-format", "json", "--append-system-prompt", system]
+    use_model = model or CLAUDE_MODEL
+    use_effort = effort or CLAUDE_EFFORT
+    if use_model:
+        args += ["--model", use_model]
+    if use_effort:
+        args += ["--effort", use_effort]
+    if not BYPASS_PERMISSIONS:
+        args += ["--allowedTools", ""]
+    async with claude_slots:
+        proc = await asyncio.create_subprocess_exec(
+            *args, cwd=WORKSPACE, env={**os.environ},
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=timeout or CLAUDE_TIMEOUT)
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise RuntimeError(f"Claude khong tra loi sau {timeout or CLAUDE_TIMEOUT}s")
+    data = _last_json(out_b.decode("utf-8", errors="replace"))
+    if not data:
+        raise RuntimeError((err_b.decode("utf-8", errors="replace") or "claude loi khong ro")[:500])
+    if data.get("is_error"):
+        raise RuntimeError(str(data.get("result") or data.get("subtype") or "loi")[:500])
+    return data.get("result") or ""
 
 
 _ACK_EMOJI = "👀"  # "da thay cau hoi" — bao ngay, ke ca khi Claude nghi lau
@@ -750,6 +794,81 @@ async def _process_release_sync_request(sb, req):
         log.warning("Cập nhật trạng thái sync lịch lỗi: %s", e)
 
 
+@tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
+async def poll_member_review_requests():
+    """Quét yêu cầu 'Phân tích AI' từ web (bảng member_review_requests, nút ở tab Đánh giá)."""
+    if not MEMBER_REVIEW_ENABLED:
+        return
+    try:
+        sb = get_client()
+        pending = await asyncio.to_thread(
+            lambda: sb.table("member_review_requests").select("*").eq("status", "pending")
+            .order("created_at").execute().data
+        )
+    except Exception as e:
+        log.warning("Đọc member_review_requests lỗi (chưa áp migration 0060?): %s", e)
+        return
+    for req in pending or []:
+        await _process_review_request(sb, req)
+
+
+async def _process_review_request(sb, req):
+    status, result = "done", ""
+    try:
+        # Phong thu nhieu lop: RLS da chan insert cho member, nhung service-role bo qua RLS nen
+        # bot van tu kiem nguoi yeu cau la admin (dung hoc thuyet permissions.py).
+        if not await asyncio.to_thread(member_review.requester_is_admin, sb, req.get("requested_by")):
+            status, result = "error", "người yêu cầu không phải admin"
+        elif (not req.get("force")) and await asyncio.to_thread(
+            member_review.has_existing_review, sb, req["target_user_id"], req["period_kind"], req["period_start"]
+        ):
+            result = "đã có kết quả (bấm Làm mới để tạo lại)"
+        else:
+            notes = await asyncio.to_thread(
+                member_review.fetch_period_notes, sb, req["target_user_id"], req["period_start"], req["period_end"]
+            )
+            base = {
+                "member_id": req["target_user_id"],
+                "period_kind": req["period_kind"],
+                "period_start": req["period_start"],
+                "period_end": req["period_end"],
+                "generated_by": req.get("requested_by"),
+            }
+            if not notes:
+                # Ky khong co ghi chu: luu 'empty' de khoi goi LLM va khoi chay lai vo ich.
+                await asyncio.to_thread(member_review.save_review, sb, {
+                    **base, "summary": "Chưa có ghi chú sprint nào trong kỳ.",
+                    "source_note_count": 0, "model": "", "status": "empty",
+                })
+                result = "không có ghi chú trong kỳ"
+            else:
+                name = await asyncio.to_thread(member_review.member_name, sb, req["target_user_id"])
+                label = member_review.period_label(req["period_kind"], req["period_start"])
+                prompt = member_review.build_prompt(name, label, notes)
+                summary = await ask_claude_text(
+                    prompt, system=member_review.SYSTEM_PROMPT,
+                    model=MEMBER_REVIEW_MODEL or None, effort=MEMBER_REVIEW_EFFORT or None,
+                    timeout=MEMBER_REVIEW_TIMEOUT,
+                )
+                await asyncio.to_thread(member_review.save_review, sb, {
+                    **base, "summary": summary, "source_note_count": len(notes),
+                    "model": (MEMBER_REVIEW_MODEL or CLAUDE_MODEL), "status": "done",
+                })
+                result = f"đã tạo đánh giá từ {len(notes)} ghi chú"
+    except Exception as e:
+        status, result = "error", str(e)[:300]
+        log.exception("Xử lý yêu cầu đánh giá lỗi")
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        await asyncio.to_thread(
+            lambda: sb.table("member_review_requests").update(
+                {"status": status, "result": result[:300], "processed_at": now_iso}
+            ).eq("id", req["id"]).execute()
+        )
+    except Exception as e:
+        log.warning("Cập nhật trạng thái đánh giá lỗi: %s", e)
+
+
 @client.event
 async def on_ready():
     log.info("Bot online: %s (id=%s)", client.user, client.user.id)
@@ -780,6 +899,9 @@ async def on_ready():
             "Member DM bật: thứ %d lúc %sh (%s) + quét yêu cầu test từ web mỗi %ds",
             _DM_WEEKDAY + 2, _DM_HOUR, BUG_SYNC_TZ, BUG_SYNC_POLL_SECONDS,
         )
+    if MEMBER_REVIEW_ENABLED and not poll_member_review_requests.is_running():
+        poll_member_review_requests.start()
+        log.info("Đánh giá AI bật: quét yêu cầu phân tích từ web mỗi %ds", BUG_SYNC_POLL_SECONDS)
 
 
 @client.event

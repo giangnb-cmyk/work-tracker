@@ -75,5 +75,12 @@
     "enabled": true,
     "weekday": 3,
     "hour": 9
+  },
+  "_note_member_review": "Tong hop danh gia AI theo thang/quy tu ghi chu sprint (bang member_sprint_notes, tab 'Danh gia' tren web, admin-only). Admin bam 'Phan tich AI' -> web xep hang member_review_requests -> bot chay Claude CLI viet danh gia -> luu member_period_reviews (can migration 0059+0060). enabled=false tat poller. model/effort de TRONG '' = theo cau hinh chung (model/effort o tren); timeout_seconds cao hon 300 vi ca thang ghi chu sinh dai hon. Chi chay qua hang doi tu web, KHONG phai skill Claude goi duoc (du lieu nhay cam).",
+  "member_review": {
+    "enabled": true,
+    "model": "",
+    "effort": "medium",
+    "timeout_seconds": 600
   }
 }
