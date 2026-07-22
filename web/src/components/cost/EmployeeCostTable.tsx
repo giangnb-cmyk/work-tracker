@@ -68,12 +68,12 @@ export default function EmployeeCostTable({ employees, itemById, memberItemIds, 
                 <td>
                   <div className="row">
                     <Avatar name={e.name} photoURL={e.photoURL} size="sm" />
-                    <div className="cost-emp-id">
-                      <span className="cost-emp-name">{e.name}</span>
-                      {e.jobRole && (
-                        <span className="muted cost-emp-role">{JOB_ROLE_ICON[e.jobRole]} {JOB_ROLE_LABEL[e.jobRole]}</span>
-                      )}
-                    </div>
+                    <span className="cost-emp-name">{e.name}</span>
+                    {e.jobRole && (
+                      <span className="cost-emp-role" title={JOB_ROLE_LABEL[e.jobRole]}>
+                        {JOB_ROLE_ICON[e.jobRole]} {JOB_ROLE_LABEL[e.jobRole]}
+                      </span>
+                    )}
                     {ids.length > 0 && <span className="muted cost-gear-chip">🖥️ {ids.length}</span>}
                   </div>
                 </td>
