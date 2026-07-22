@@ -2,9 +2,12 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectMembers } from '../hooks/useProjectMembers';
+import { useCostEmployees } from '../hooks/useCostEmployees';
 import { removeProjectMember } from '../lib/projectMemberWrites';
+import { upsertCostEmployee, type CostEmployeePatch } from '../lib/costWrites';
 import Avatar from './Avatar';
 import ConfirmDialog from './ConfirmDialog';
+import MoneyInput from './cost/MoneyInput';
 import ProjectMemberPicker from './ProjectMemberPicker';
 import { JOB_ROLE_LABEL, USER_ROLE_LABEL, type TeamMember } from '../types';
 
@@ -17,12 +20,26 @@ export default function ProjectMembers() {
   const { isAdmin } = useAuth();
   const { members, membersLoading, selectedProjectId, selectedProject } = useSprintContext();
   const { memberships, loading: mLoading } = useProjectMembers(selectedProjectId);
+  // Lương/ngày CHỈ nạp cho admin/owner (RLS admin-only) — member không mở socket thừa.
+  const { employees: costRows, loading: costLoading } = useCostEmployees(selectedProjectId, isAdmin);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<TeamMember | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(members.map((m) => [m.uid, m])), [members]);
   const existingIds = useMemo(() => new Set(memberships.map((m) => m.userId)), [memberships]);
+  const costByMember = useMemo(() => new Map(costRows.map((r) => [r.memberId, r])), [costRows]);
+
+  async function saveCost(memberId: string, patch: CostEmployeePatch) {
+    if (!selectedProjectId) return;
+    try {
+      await upsertCostEmployee(selectedProjectId, memberId, patch);
+      setError(null);
+    } catch (err) {
+      console.error('Lưu lương/thời gian của thành viên thất bại', err);
+      setError('Lưu lương thất bại (cần quyền admin).');
+    }
+  }
 
   // Ghép quan hệ thô với roster; hồ sơ đã xoá (còn trong bảng nhưng mất profiles) thì bỏ.
   const projectMembers = useMemo(
@@ -46,7 +63,7 @@ export default function ProjectMembers() {
     }
   }
 
-  if (membersLoading || mLoading) {
+  if (membersLoading || mLoading || (isAdmin && costLoading)) {
     return (
       <div className="center-screen" style={{ minHeight: 200 }}>
         <div className="spinner" />
@@ -62,6 +79,7 @@ export default function ProjectMembers() {
           <p>
             {projectMembers.length} người trong “{selectedProject?.name ?? 'dự án'}”. Chỉ hiện người đã
             được thêm vào dự án.
+            {isAdmin && ' Cột Lương / Bắt đầu / Kết thúc chỉ admin & owner thấy và sửa được.'}
           </p>
         </div>
         {isAdmin && (
@@ -86,7 +104,14 @@ export default function ProjectMembers() {
                 <th>Chuyên môn</th>
                 <th>Vai trò</th>
                 <th>Discord ID</th>
-                {isAdmin && <th></th>}
+                {isAdmin && (
+                  <>
+                    <th className="cost-num-col">Lương / tháng</th>
+                    <th>Bắt đầu</th>
+                    <th>Kết thúc</th>
+                    <th></th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -111,9 +136,34 @@ export default function ProjectMembers() {
                   </td>
                   <td className="muted mono" style={{ fontSize: '0.78rem' }}>{m.discordId || '—'}</td>
                   {isAdmin && (
-                    <td>
-                      <button className="btn-sm btn-danger" onClick={() => setRemoving(m)}>Gỡ</button>
-                    </td>
+                    <>
+                      <td className="cost-num-col">
+                        <MoneyInput
+                          value={costByMember.get(m.uid)?.monthlySalary ?? 0}
+                          onCommit={(n) => saveCost(m.uid, { monthlySalary: n })}
+                          ariaLabel={`Lương ${m.displayName}`}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          className="input cost-date"
+                          value={costByMember.get(m.uid)?.startDate ?? ''}
+                          onChange={(e) => saveCost(m.uid, { startDate: e.target.value || null })}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          className="input cost-date"
+                          value={costByMember.get(m.uid)?.endDate ?? ''}
+                          onChange={(e) => saveCost(m.uid, { endDate: e.target.value || null })}
+                        />
+                      </td>
+                      <td>
+                        <button className="btn-sm btn-danger" onClick={() => setRemoving(m)}>Gỡ</button>
+                      </td>
+                    </>
                   )}
                 </tr>
               ))}

@@ -2612,6 +2612,12 @@ table.data-table { width: 100%; border-collapse: collapse; }
 }
 .cost-stat-total .cost-stat-value { color: var(--primary); font-size: 1.3rem; }
 
+/* Thẻ "Lương nhân sự" phải nổi lên trên các thẻ .glass phía dưới: mỗi .glass có
+   backdrop-filter → một stacking context riêng, nên dropdown "Thêm từ thành viên" tràn ra
+   ngoài thẻ sẽ bị thẻ kế tiếp (DOM sau) vẽ đè lên. z-index của panel không vượt được ranh
+   giới đó — phải nâng chính cái thẻ này. */
+.cost-emp-card { position: relative; z-index: 3; }
+
 /* Đầu mỗi bảng: tiêu đề + nút thêm. */
 .cost-section-head { align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
 .cost-section-sub { font-size: 0.82rem; margin-top: 0.2rem; max-width: 60ch; }
@@ -2622,8 +2628,8 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .cost-num-col { text-align: right; }
 .cost-center-col { text-align: center; }
 .cost-table .input { padding: 0.4rem 0.55rem; font-size: 0.85rem; }
-.cost-money { text-align: right; max-width: 160px; margin-left: auto; }
-.cost-date { max-width: 155px; }
+.cost-money { text-align: right; max-width: 160px; margin-left: auto; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
+.cost-date { max-width: 155px; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
 .cost-kind-select { width: auto; min-width: 130px; padding: 0.4rem 0.55rem; }
 .cost-count-input { max-width: 80px; text-align: center; margin: 0 auto; }
 

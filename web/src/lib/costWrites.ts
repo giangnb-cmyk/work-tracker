@@ -42,6 +42,27 @@ export async function deleteCostEmployee(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Đặt lương/ngày cho MỘT thành viên trong dự án theo (project_id, member_id) — dùng ở tab
+ * Thành viên, admin điền thẳng vào hàng của người đó. Tạo dòng nếu chưa có, cập nhật nếu đã
+ * có (unique project+member). KHÔNG gửi created_by để không ghi đè người tạo gốc khi sửa
+ * (dòng tạo từ đây để created_by null — cột cho phép null).
+ */
+export async function upsertCostEmployee(
+  projectId: string,
+  memberId: string,
+  patch: CostEmployeePatch,
+): Promise<void> {
+  const row: Record<string, unknown> = { project_id: projectId, member_id: memberId };
+  if (patch.monthlySalary !== undefined) row.monthly_salary = patch.monthlySalary;
+  if (patch.startDate !== undefined) row.start_date = patch.startDate || null;
+  if (patch.endDate !== undefined) row.end_date = patch.endDate || null;
+  const { error } = await supabase
+    .from('project_cost_employees')
+    .upsert(row, { onConflict: 'project_id,member_id' });
+  if (error) throw error;
+}
+
 /* --------------------------- Chi phí thiết bị/vận hành --------------------------- */
 
 export async function addCostItem(projectId: string, createdBy: string | null): Promise<void> {

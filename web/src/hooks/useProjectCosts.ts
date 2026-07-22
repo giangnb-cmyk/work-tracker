@@ -1,11 +1,12 @@
-// useProjectCosts — dữ liệu LIVE cho tab "Chi phí" của một dự án: lương nhân viên,
-// chi phí thiết bị/vận hành, và các khoản dự chi. Ba bảng độc lập nên gọi useLiveQuery
-// ba lần (mỗi bảng tự subscribe realtime, lọc theo project_id) rồi gộp lại cho gọn.
+// useProjectCosts — dữ liệu LIVE cho tab "Chi phí" của một dự án: lương nhân viên (qua
+// useCostEmployees, dùng chung với tab Thành viên), chi phí thiết bị/vận hành, và các khoản
+// dự chi. Mỗi bảng tự subscribe realtime (lọc theo project_id) rồi gộp lại cho gọn.
 
 import { useCallback } from 'react';
 import { supabase } from '../supabase';
-import { rowToCostEmployee, rowToCostItem, rowToCostProjection } from '../lib/mappers';
-import type { CostEmployee, CostItem, CostProjection } from '../types';
+import { rowToCostItem, rowToCostProjection } from '../lib/mappers';
+import type { CostItem, CostProjection } from '../types';
+import { useCostEmployees } from './useCostEmployees';
 import { useLiveQuery } from './useLiveQuery';
 
 export function useProjectCosts(projectId: string | null) {
@@ -13,16 +14,7 @@ export function useProjectCosts(projectId: string | null) {
   const filter = projectId ? `project_id=eq.${projectId}` : undefined;
   const enabled = Boolean(projectId);
 
-  const employeesFetcher = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('project_cost_employees')
-      .select('*')
-      .eq('project_id', pid)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    return (data ?? []).map(rowToCostEmployee);
-  }, [pid]);
+  const { employees, loading: employeesLoading } = useCostEmployees(projectId);
 
   const itemsFetcher = useCallback(async () => {
     const { data, error } = await supabase
@@ -45,14 +37,6 @@ export function useProjectCosts(projectId: string | null) {
     if (error) throw error;
     return (data ?? []).map(rowToCostProjection);
   }, [pid]);
-
-  const { data: employees, loading: employeesLoading } = useLiveQuery<CostEmployee>({
-    table: 'project_cost_employees',
-    fetcher: employeesFetcher,
-    filter,
-    deps: [pid],
-    enabled,
-  });
 
   const { data: items, loading: itemsLoading } = useLiveQuery<CostItem>({
     table: 'project_cost_items',

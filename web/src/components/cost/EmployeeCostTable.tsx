@@ -38,7 +38,7 @@ export default function EmployeeCostTable({
   );
 
   return (
-    <div className="glass section" style={{ padding: '1.25rem' }}>
+    <div className="glass section cost-emp-card" style={{ padding: '1.25rem' }}>
       <div className="row between cost-section-head">
         <div>
           <h3>Lương nhân sự</h3>
