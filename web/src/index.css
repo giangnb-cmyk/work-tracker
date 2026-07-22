@@ -2620,15 +2620,19 @@ table.data-table { width: 100%; border-collapse: collapse; }
    hàng tiêu đề, và cho chiều rộng đủ đọc tên dự án. */
 .cost-project-picker { margin-bottom: 0; min-width: 220px; }
 .cost-project-picker .select { width: 100%; }
-.cost-salary-block { margin-top: 2.5rem; }
-.cost-salary-head { align-items: flex-end; gap: 1rem; margin-bottom: 1rem; }
 
-/* Bảng chi phí: ô nhập gọn, cột số canh phải. */
+/* Bảng chi phí: ô nhập gọn, cột số canh phải. Phải nhắm cả th.cost-num-col lẫn td: bản thân
+   `.data-table th { text-align:left }` (đặc hiệu 0,1,1) đè `.cost-num-col` (0,1,0) nên tiêu
+   đề bị canh trái trong khi giá trị canh phải → lệch. Ghép .data-table để đủ đặc hiệu. */
 .cost-table td { vertical-align: middle; }
-.cost-num-col { text-align: right; }
-.cost-center-col { text-align: center; }
+.data-table th.cost-num-col,
+.data-table td.cost-num-col { text-align: right; }
+.data-table th.cost-center-col,
+.data-table td.cost-center-col { text-align: center; }
 .cost-table .input { padding: 0.4rem 0.55rem; font-size: 0.85rem; }
 .cost-money { text-align: right; max-width: 160px; margin-left: auto; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
+/* Trong modal chi tiết thành viên, ô lương chiếm hết bề ngang field (bỏ giới hạn của .cost-money). */
+.cost-money-block { max-width: none; margin-left: 0; }
 .cost-date { max-width: 155px; padding: 0.4rem 0.55rem; font-size: 0.85rem; }
 .cost-kind-select { width: auto; min-width: 130px; padding: 0.4rem 0.55rem; }
 .cost-count-input { max-width: 80px; text-align: center; margin: 0 auto; }
@@ -2648,6 +2652,5 @@ table.data-table { width: 100%; border-collapse: collapse; }
 
 @media (max-width: 640px) {
   .cost-project-picker { width: 100%; }
-  .cost-section-head,
-  .cost-salary-head { flex-direction: column; align-items: stretch; }
+  .cost-section-head { flex-direction: column; align-items: stretch; }
 }

@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../supabase';
 import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
+import { upsertMemberComp } from '../lib/costWrites';
+import MoneyInput from './cost/MoneyInput';
 import {
   JOB_ROLES,
   MEMBER_PERMS,
@@ -18,7 +21,7 @@ interface MemberModalProps {
 
 /** Admin dialog to add or edit a team member (role + Discord/Notion links). */
 export default function MemberModal({ member, onClose }: MemberModalProps) {
-  const { isOwner } = useAuth();
+  const { isOwner, isAdmin, profile } = useAuth();
   const isEdit = Boolean(member);
   // Chỉ owner phong/gỡ admin (0037). Không cho đổi role của CHÍNH owner qua UI — tránh tự
   // hạ quyền rồi khoá mình ra ngoài; muốn chuyển owner thì làm ở DB.
@@ -30,8 +33,32 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
   const [jobRole, setJobRole] = useState<JobRole>(member?.jobRole ?? 'developer');
   const [discordId, setDiscordId] = useState(member?.discordId ?? '');
   const [notionUserId, setNotionUserId] = useState(member?.notionUserId ?? '');
+  // Lương + thời gian làm việc (bảng member_compensation, toàn cục). Nạp riêng vì admin-only.
+  const [salary, setSalary] = useState(0);
+  const [workStart, setWorkStart] = useState('');
+  const [workEnd, setWorkEnd] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Nạp lương hiện có của người đang sửa (chỉ admin đọc được — RLS). Một lần, không cần realtime.
+  useEffect(() => {
+    if (!member?.uid || !isAdmin) return;
+    let alive = true;
+    void supabase
+      .from('member_compensation')
+      .select('monthly_salary, start_date, end_date')
+      .eq('member_id', member.uid)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive || !data) return;
+        setSalary(Number(data.monthly_salary ?? 0));
+        setWorkStart((data.start_date as string | null) ?? '');
+        setWorkEnd((data.end_date as string | null) ?? '');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [member?.uid, isAdmin]);
 
   async function handleSave() {
     if (!displayName.trim()) {
@@ -42,6 +69,7 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
     setError(null);
     const input: MemberInput = { displayName, email, role, perms, jobRole, discordId, notionUserId };
     try {
+      let uid: string;
       if (isEdit && member) {
         await updateMember(member.uid, {
           displayName: displayName.trim(),
@@ -52,8 +80,17 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
           discordId: discordId.trim(),
           notionUserId: notionUserId.trim(),
         });
+        uid = member.uid;
       } else {
-        await createMember(input);
+        uid = await createMember(input);
+      }
+      // Lương lưu ở bảng riêng (admin-only). Chỉ admin/owner mới thấy & ghi được phần này.
+      if (isAdmin) {
+        await upsertMemberComp(
+          uid,
+          { monthlySalary: salary, startDate: workStart || null, endDate: workEnd || null },
+          profile?.uid ?? null,
+        );
       }
       onClose();
     } catch (err) {
@@ -133,6 +170,28 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
           <span>Notion User ID (tuỳ chọn)</span>
           <input className="input" value={notionUserId} onChange={(e) => setNotionUserId(e.target.value)} />
         </label>
+
+        {isAdmin && (
+          <div className="field cost-comp-block">
+            <span className="field-label">
+              💰 Lương &amp; thời gian làm việc <small className="muted">— chỉ admin &amp; owner thấy; dùng để tính chi phí dự án</small>
+            </span>
+            <div className="grid-2">
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span>Lương / tháng</span>
+                <MoneyInput value={salary} onCommit={setSalary} className="cost-money-block" ariaLabel="Lương tháng" />
+              </label>
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span>Ngày bắt đầu</span>
+                <input type="date" className="input" value={workStart} onChange={(e) => setWorkStart(e.target.value)} />
+              </label>
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span>Ngày kết thúc <small className="muted">(để trống nếu còn làm)</small></span>
+                <input type="date" className="input" value={workEnd} onChange={(e) => setWorkEnd(e.target.value)} />
+              </label>
+            </div>
+          </div>
+        )}
 
         <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
           💡 Discord User ID (không phải username): bật Developer Mode trong Discord → chuột phải vào người đó → Copy User ID.

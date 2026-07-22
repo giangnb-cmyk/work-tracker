@@ -1,65 +1,33 @@
-// Ghi dữ liệu chi phí (3 bảng của tab "Chi phí"). RLS (migration 0053) đòi admin/owner cho
-// MỌI thao tác kể cả đọc — member gọi vào chỉ nhận 42501, caller tự hiện thông báo.
-// Naming boundary: app camelCase ↔ Postgres snake_case, chuyển ngay tại đây.
+// Ghi dữ liệu chi phí. RLS (migration 0053/0054) đòi admin/owner cho MỌI thao tác kể cả đọc
+// — member gọi vào chỉ nhận 42501, caller tự hiện thông báo. Naming boundary: app camelCase ↔
+// Postgres snake_case, chuyển ngay tại đây.
 
 import { supabase } from '../supabase';
 import type { CostCadence, CostItemKind, CostProjectionKind } from '../types';
 
-/* ------------------------------- Nhân viên (lương) ------------------------------- */
+/* ----------------------------- Lương nhân sự (toàn cục) ----------------------------- */
 
-/** Thêm một thành viên vào bảng lương của dự án (idempotent theo unique project+member). */
-export async function addCostEmployee(
-  projectId: string,
-  memberId: string,
-  createdBy: string | null,
-): Promise<void> {
-  const { error } = await supabase
-    .from('project_cost_employees')
-    .upsert(
-      { project_id: projectId, member_id: memberId, created_by: createdBy },
-      { onConflict: 'project_id,member_id', ignoreDuplicates: true },
-    );
-  if (error) throw error;
-}
-
-export interface CostEmployeePatch {
+export interface MemberCompPatch {
   monthlySalary?: number;
   startDate?: string | null;
   endDate?: string | null;
 }
 
-export async function updateCostEmployee(id: string, patch: CostEmployeePatch): Promise<void> {
-  const row: Record<string, unknown> = {};
-  if (patch.monthlySalary !== undefined) row.monthly_salary = patch.monthlySalary;
-  if (patch.startDate !== undefined) row.start_date = patch.startDate || null;
-  if (patch.endDate !== undefined) row.end_date = patch.endDate || null;
-  const { error } = await supabase.from('project_cost_employees').update(row).eq('id', id);
-  if (error) throw error;
-}
-
-export async function deleteCostEmployee(id: string): Promise<void> {
-  const { error } = await supabase.from('project_cost_employees').delete().eq('id', id);
-  if (error) throw error;
-}
-
 /**
- * Đặt lương/ngày cho MỘT thành viên trong dự án theo (project_id, member_id) — dùng ở tab
- * Thành viên, admin điền thẳng vào hàng của người đó. Tạo dòng nếu chưa có, cập nhật nếu đã
- * có (unique project+member). KHÔNG gửi created_by để không ghi đè người tạo gốc khi sửa
- * (dòng tạo từ đây để created_by null — cột cho phép null).
+ * Đặt lương + thời gian làm việc của MỘT người (bảng member_compensation, toàn cục — không
+ * theo dự án). Điền ở chi tiết thành viên (MemberModal). Tạo dòng nếu chưa có, cập nhật nếu
+ * đã có (member_id là khoá chính).
  */
-export async function upsertCostEmployee(
-  projectId: string,
+export async function upsertMemberComp(
   memberId: string,
-  patch: CostEmployeePatch,
+  patch: MemberCompPatch,
+  updatedBy: string | null,
 ): Promise<void> {
-  const row: Record<string, unknown> = { project_id: projectId, member_id: memberId };
+  const row: Record<string, unknown> = { member_id: memberId, updated_at: new Date().toISOString(), updated_by: updatedBy };
   if (patch.monthlySalary !== undefined) row.monthly_salary = patch.monthlySalary;
   if (patch.startDate !== undefined) row.start_date = patch.startDate || null;
   if (patch.endDate !== undefined) row.end_date = patch.endDate || null;
-  const { error } = await supabase
-    .from('project_cost_employees')
-    .upsert(row, { onConflict: 'project_id,member_id' });
+  const { error } = await supabase.from('member_compensation').upsert(row, { onConflict: 'member_id' });
   if (error) throw error;
 }
 

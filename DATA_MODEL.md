@@ -182,27 +182,29 @@ cho vào dự án. Bảng N-N thuần, không có id riêng — khoá chính là
 
 ---
 
-## `project_cost_employees` / `project_cost_items` / `project_cost_projections` (Chi phí dự án)
+## `member_compensation` / `project_cost_items` / `project_cost_projections` (Chi phí dự án)
 
-Dữ liệu tab **Chi phí** (khu Quản trị của dự án — migration `0053`). Chỉ **web** dùng; bot
-không đụng. Vì chứa **lương** (nhạy cảm) nên RLS khoá **admin-only cho CẢ ĐỌC lẫn GHI** — chặt
-hơn các bảng khác vốn mở đọc. Cả ba bật realtime + `replica identity full` (event DELETE mang
-đủ `project_id` cho bộ lọc `project_id=eq.<id>`). Không seed dữ liệu lúc migration — seed theo
-dự án bằng nút "Thêm mẫu" trong UI.
+Dữ liệu tab **Chi phí** (khu Quản trị NGOÀI dự án — migration `0053`, `0054`). Chỉ **web** dùng;
+bot không đụng. Vì chứa **lương** (nhạy cảm) nên RLS khoá **admin-only cho CẢ ĐỌC lẫn GHI** —
+chặt hơn các bảng khác vốn mở đọc. Cả ba bật realtime + `replica identity full`. Không seed dữ
+liệu lúc migration — chi phí thiết bị seed bằng nút "Thêm mẫu" trong UI.
 
-**`project_cost_employees`** — lương thực tế, mỗi thành viên dự án MỘT dòng:
+**`member_compensation`** — lương + thời gian làm việc của MỘT NGƯỜI, **toàn cục** (không theo
+dự án). Điền ở chi tiết thành viên (`MemberModal`, tab Thành viên). TÁCH khỏi `profiles` vì
+`profiles` mở đọc cho mọi user — để lương ở đó là lộ. Chi phí từng dự án lấy mức lương này cho
+các thành viên của dự án (`project_members`) → "pick người là có thông tin luôn".
 
-| Field            | Type         | Notes                                                       |
-|------------------|--------------|-------------------------------------------------------------|
-| `id`             | uuid (PK)    | `gen_random_uuid()`                                         |
-| `project_id`     | uuid         | → `projects.id`, `on delete cascade`                       |
-| `member_id`      | uuid         | → `profiles.id`, `on delete cascade`; `unique(project_id, member_id)` |
-| `monthly_salary` | numeric      | lương/tháng (VND)                                          |
-| `start_date`     | date \| null | ngày vào dự án                                             |
-| `end_date`       | date \| null | ngày rời; null = còn đang làm                              |
-| `sort_order`     | int          | thứ tự hiển thị                                            |
-| `created_at`     | timestamptz  | `now()`                                                    |
-| `created_by`     | uuid \| null | → `profiles.id` (`on delete set null`)                     |
+| Field            | Type         | Notes                                              |
+|------------------|--------------|----------------------------------------------------|
+| `member_id`      | uuid (PK)    | → `profiles.id`, `on delete cascade`               |
+| `monthly_salary` | numeric      | lương/tháng (VND)                                  |
+| `start_date`     | date \| null | ngày bắt đầu làm                                   |
+| `end_date`       | date \| null | ngày nghỉ; null = còn đang làm                     |
+| `updated_at`     | timestamptz  | `now()`                                            |
+| `updated_by`     | uuid \| null | → `profiles.id` (`on delete set null`)             |
+
+> Bảng cũ `project_cost_employees` (0053, lương theo-dự-án) đã bị **drop ở 0054**, thay bằng
+> `member_compensation` toàn cục theo yêu cầu "tập trung 1 chỗ ở chi tiết thành viên".
 
 **`project_cost_items`** — chi phí thiết bị/vận hành:
 
@@ -237,11 +239,12 @@ dự án bằng nút "Thêm mẫu" trong UI.
   start sớm nhất (slider chọn số tháng). Tổng lương cộng theo TỪNG THÁNG (mỗi tháng cộng người
   còn active). `one_time` đếm 1 lần; `annual`/`cadence=annual` chia đều `× horizon/12`;
   `cadence=monthly` `× horizon`. `per_employee`/`head_count` nhân thêm.
-- **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`), chọn dự án qua `useAdminCostProject`
-  (không dùng dự án đang mở của app). Tab **Chi phí** (`CostAdmin` → `CostManagement` +
-  `components/cost/*`, hook `useProjectCosts`) hiện tổng/slider/thiết bị/dự chi. **Lương** điền
-  ở tab **Thành viên** (`Team` → `MemberSalaryTable`, ghi qua `upsertCostEmployee`); bảng lương
-  trong tab Chi phí chỉ đọc. `lib/costWrites.ts` cho mọi ghi. Admin-only ở cả nav lẫn RLS.
+- **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`). **Lương** điền một chỗ ở chi tiết
+  thành viên (`MemberModal`, tab Thành viên), ghi qua `upsertMemberComp`. Tab **Chi phí**
+  (`CostAdmin` → `CostManagement` + `components/cost/*`) chọn dự án qua `useAdminCostProject`,
+  ghép `project_members` với `member_compensation` (hook `useMemberComp`) ra bảng lương CHỈ ĐỌC,
+  cộng với thiết bị (`useProjectCosts`) + dự chi. `lib/costWrites.ts` cho mọi ghi. Admin-only ở
+  cả nav lẫn RLS.
 
 ---
 

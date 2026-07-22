@@ -10,9 +10,9 @@ import type {
   AuditEntry,
   Bug,
   BugLabel,
-  CostEmployee,
   CostItem,
   CostProjection,
+  MemberComp,
   Feature,
   FeatureLabel,
   Project,
@@ -115,17 +115,12 @@ export function rowToBugLabel(r: Row): BugLabel {
   };
 }
 
-export function rowToCostEmployee(r: Row): CostEmployee {
+export function rowToMemberComp(r: Row): MemberComp {
   return {
-    id: r.id,
-    projectId: r.project_id,
     memberId: r.member_id,
     monthlySalary: Number(r.monthly_salary ?? 0),
     startDate: r.start_date ?? null,
     endDate: r.end_date ?? null,
-    sortOrder: r.sort_order ?? 0,
-    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
-    createdBy: r.created_by ?? '',
   };
 }
 

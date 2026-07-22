@@ -4,7 +4,14 @@
 // Ngày nhân viên để dạng 'YYYY-MM-DD' và quy về CHỈ SỐ THÁNG tuyệt đối (year*12 + month)
 // để cộng theo tháng mà không dính lệch múi giờ.
 
-import type { CostCadence, CostEmployee, CostItem, CostProjection } from '../types';
+import type { CostCadence, CostItem, CostProjection } from '../types';
+
+/** Đủ để tính lương: mức lương/tháng + khoảng thời gian làm (dạng 'YYYY-MM-DD'). */
+export interface SalaryLine {
+  monthlySalary: number;
+  startDate: string | null;
+  endDate: string | null;
+}
 
 /** 'YYYY-MM-DD' → chỉ số tháng tuyệt đối (year*12 + month0). null nếu rỗng/không hợp lệ. */
 function monthIndex(date: string | null | undefined): number | null {
@@ -24,7 +31,7 @@ function currentMonthIndex(): number {
  * Mốc bắt đầu cửa sổ tính lương = ngày start SỚM NHẤT trong danh sách nhân viên; nếu chưa
  * ai điền start thì lấy đầu tháng hiện tại. Cửa sổ xem là [anchor, anchor + horizon).
  */
-export function anchorMonth(employees: CostEmployee[]): number {
+export function anchorMonth(employees: SalaryLine[]): number {
   let min: number | null = null;
   for (const e of employees) {
     const mi = monthIndex(e.startDate);
@@ -38,7 +45,7 @@ export function anchorMonth(employees: CostEmployee[]): number {
  * [start, end] của người đó với cửa sổ. Không có start → coi như active từ anchor; không
  * có end → active tới hết cửa sổ. Nhờ vậy người vào/ra lệch nhau đều tính đúng.
  */
-export function activeMonths(emp: CostEmployee, anchor: number, horizon: number): number {
+export function activeMonths(emp: SalaryLine, anchor: number, horizon: number): number {
   if (horizon <= 0) return 0;
   const start = monthIndex(emp.startDate) ?? anchor;
   const end = monthIndex(emp.endDate);
@@ -49,7 +56,7 @@ export function activeMonths(emp: CostEmployee, anchor: number, horizon: number)
 }
 
 /** Tổng lương của cả dự án trong `horizon` tháng (cộng theo từng nhân viên × số tháng active). */
-export function salaryTotal(employees: CostEmployee[], anchor: number, horizon: number): number {
+export function salaryTotal(employees: SalaryLine[], anchor: number, horizon: number): number {
   return employees.reduce((sum, e) => sum + e.monthlySalary * activeMonths(e, anchor, horizon), 0);
 }
 

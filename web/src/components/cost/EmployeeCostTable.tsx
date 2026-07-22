@@ -1,11 +1,10 @@
 import { activeMonths } from '../../lib/projectCost';
 import { formatVnd } from '../../lib/format';
-import type { CostEmployee, TeamMember } from '../../types';
+import type { CostEmployeeRow } from '../../types';
 import Avatar from '../Avatar';
 
 interface Props {
-  employees: CostEmployee[];
-  memberById: Map<string, TeamMember>;
+  employees: CostEmployeeRow[];
   anchor: number;
   months: number;
 }
@@ -18,16 +17,17 @@ function fmtDate(d: string | null): string {
 }
 
 /**
- * Bảng lương của dự án — CHỈ ĐỌC. Lương/ngày được điền ở tab Thành viên (khu quản trị);
- * ở đây chỉ hiển thị và cộng vào tổng theo số tháng đang chọn.
+ * Bảng lương của dự án — CHỈ ĐỌC. Mỗi dòng = một thành viên dự án + lương TOÀN CỤC của họ
+ * (điền ở chi tiết thành viên, tab Thành viên). Ở đây chỉ hiển thị và cộng vào tổng.
  */
-export default function EmployeeCostTable({ employees, memberById, anchor, months }: Props) {
+export default function EmployeeCostTable({ employees, anchor, months }: Props) {
   return (
     <div className="glass section" style={{ padding: '1.25rem' }}>
       <div className="cost-section-head">
         <h3>Lương nhân sự</h3>
         <p className="muted cost-section-sub">
-          Số liệu lấy từ tab <strong>Thành viên</strong> — vào đó để điền/sửa lương và ngày vào–ra.
+          Danh sách = thành viên của dự án; lương/ngày lấy từ chi tiết mỗi người ở tab{' '}
+          <strong>Thành viên</strong>. Vào đó để điền/sửa.
         </p>
       </div>
 
@@ -45,15 +45,13 @@ export default function EmployeeCostTable({ employees, memberById, anchor, month
           </thead>
           <tbody>
             {employees.map((e) => {
-              const m = memberById.get(e.memberId);
               const active = activeMonths(e, anchor, months);
-              const name = m?.displayName || m?.email || 'Đã rời dự án';
               return (
-                <tr key={e.id}>
+                <tr key={e.memberId}>
                   <td>
                     <div className="row">
-                      <Avatar name={name} photoURL={m?.photoURL} size="sm" />
-                      {name}
+                      <Avatar name={e.name} photoURL={e.photoURL} size="sm" />
+                      {e.name}
                     </div>
                   </td>
                   <td className="cost-num-col mono">{formatVnd(e.monthlySalary)}</td>
@@ -67,7 +65,7 @@ export default function EmployeeCostTable({ employees, memberById, anchor, month
             {employees.length === 0 && (
               <tr>
                 <td colSpan={6} className="empty">
-                  Chưa ai được điền lương cho dự án này. Vào tab <strong>Thành viên</strong> để điền.
+                  Dự án chưa có thành viên. Thêm người ở tab Thành viên của dự án, rồi điền lương ở chi tiết.
                 </td>
               </tr>
             )}

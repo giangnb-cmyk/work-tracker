@@ -1,20 +1,17 @@
-// useProjectCosts — dữ liệu LIVE cho tab "Chi phí" của một dự án: lương nhân viên (qua
-// useCostEmployees, dùng chung với tab Thành viên), chi phí thiết bị/vận hành, và các khoản
-// dự chi. Mỗi bảng tự subscribe realtime (lọc theo project_id) rồi gộp lại cho gọn.
+// useProjectCosts — chi phí thiết bị/vận hành + dự chi của MỘT dự án (LIVE). Lương KHÔNG ở
+// đây nữa: nó là thuộc tính toàn cục của người (member_compensation, xem useMemberComp) và
+// bảng chi phí ghép với thành viên dự án ở CostManagement.
 
 import { useCallback } from 'react';
 import { supabase } from '../supabase';
 import { rowToCostItem, rowToCostProjection } from '../lib/mappers';
 import type { CostItem, CostProjection } from '../types';
-import { useCostEmployees } from './useCostEmployees';
 import { useLiveQuery } from './useLiveQuery';
 
 export function useProjectCosts(projectId: string | null) {
   const pid = projectId ?? '';
   const filter = projectId ? `project_id=eq.${projectId}` : undefined;
   const enabled = Boolean(projectId);
-
-  const { employees, loading: employeesLoading } = useCostEmployees(projectId);
 
   const itemsFetcher = useCallback(async () => {
     const { data, error } = await supabase
@@ -55,9 +52,8 @@ export function useProjectCosts(projectId: string | null) {
   });
 
   return {
-    employees,
     items,
     projections,
-    loading: employeesLoading || itemsLoading || projectionsLoading,
+    loading: itemsLoading || projectionsLoading,
   };
 }

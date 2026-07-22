@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectCosts } from '../hooks/useProjectCosts';
+import { useProjectMembers } from '../hooks/useProjectMembers';
+import { useMemberComp } from '../hooks/useMemberComp';
 import {
   addCostItem,
   addCostProjection,
@@ -14,7 +16,7 @@ import {
   type CostProjectionPatch,
 } from '../lib/costWrites';
 import { anchorMonth, overheadTotal, projectionTotal, salaryTotal } from '../lib/projectCost';
-import type { CostProjectionKind } from '../types';
+import type { CostEmployeeRow, CostProjectionKind } from '../types';
 import CostSummary from './cost/CostSummary';
 import EmployeeCostTable from './cost/EmployeeCostTable';
 import MonthSlider from './cost/MonthSlider';
@@ -41,7 +43,9 @@ function readMonths(): number {
 export default function CostManagement({ projectId }: { projectId: string }) {
   const { profile } = useAuth();
   const { members } = useSprintContext();
-  const { employees, items, projections, loading } = useProjectCosts(projectId);
+  const { items, projections, loading: costsLoading } = useProjectCosts(projectId);
+  const { memberships, loading: mLoading } = useProjectMembers(projectId);
+  const { byMember: compByMember, loading: compLoading } = useMemberComp();
 
   const [months, setMonths] = useState(readMonths);
   const [error, setError] = useState<string | null>(null);
@@ -70,11 +74,33 @@ export default function CostManagement({ projectId }: { projectId: string }) {
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.uid, m])), [members]);
 
+  // Nhân sự của bảng chi phí = thành viên DỰ ÁN + lương TOÀN CỤC của họ (không có → lương 0).
+  const employees = useMemo<CostEmployeeRow[]>(() => {
+    const rows: CostEmployeeRow[] = [];
+    for (const ms of memberships) {
+      const m = memberById.get(ms.userId);
+      if (!m) continue;
+      const comp = compByMember.get(ms.userId);
+      rows.push({
+        memberId: m.uid,
+        name: m.displayName || m.email || m.uid,
+        photoURL: m.photoURL,
+        monthlySalary: comp?.monthlySalary ?? 0,
+        startDate: comp?.startDate ?? null,
+        endDate: comp?.endDate ?? null,
+      });
+    }
+    rows.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    return rows;
+  }, [memberships, memberById, compByMember]);
+
   const headcount = employees.length;
   const anchor = useMemo(() => anchorMonth(employees), [employees]);
   const salary = useMemo(() => salaryTotal(employees, anchor, months), [employees, anchor, months]);
   const overhead = useMemo(() => overheadTotal(items, headcount, months), [items, headcount, months]);
   const projection = useMemo(() => projectionTotal(projections, months), [projections, months]);
+
+  const loading = costsLoading || mLoading || compLoading;
 
   if (loading) {
     return (
@@ -99,7 +125,7 @@ export default function CostManagement({ projectId }: { projectId: string }) {
 
       {error && <p className="error-text">{error}</p>}
 
-      <EmployeeCostTable employees={employees} memberById={memberById} anchor={anchor} months={months} />
+      <EmployeeCostTable employees={employees} anchor={anchor} months={months} />
 
       <OverheadTable
         items={items}

@@ -306,18 +306,25 @@ export interface Project {
    và tránh lệch múi giờ khi Timestamp làm tròn về UTC.
    =========================================================================== */
 
-/** Lương thực tế của một thành viên trong dự án (1 dòng / thành viên). */
-export interface CostEmployee {
-  id: string;
-  projectId: string;
-  /** profiles.id — người này phải là thành viên của dự án. */
+/**
+ * Lương + thời gian làm việc của một NGƯỜI — TOÀN CỤC, không theo dự án (bảng
+ * member_compensation). Điền ở chi tiết thành viên (MemberModal). Nhạy cảm → admin-only.
+ */
+export interface MemberComp {
   memberId: string;
   monthlySalary: number;
   startDate: string | null; // 'YYYY-MM-DD'
   endDate: string | null; // 'YYYY-MM-DD' — null = còn đang làm
-  sortOrder: number;
-  createdAt?: Timestamp;
-  createdBy: string;
+}
+
+/** Một dòng nhân sự trong bảng chi phí dự án = thành viên của dự án + lương toàn cục của họ. */
+export interface CostEmployeeRow {
+  memberId: string;
+  name: string;
+  photoURL?: string;
+  monthlySalary: number;
+  startDate: string | null;
+  endDate: string | null;
 }
 
 /** one_time = chi phí ban đầu 1 lần; annual = chi phí theo năm. */
