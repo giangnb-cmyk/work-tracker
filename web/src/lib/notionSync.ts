@@ -98,8 +98,11 @@ function toPayload(
   // Chỉ gửi subtasks khi được yêu cầu (tạo mới, hoặc update mà subtask VỪA đổi) — gửi bừa
   // ở mỗi lần đổi status là ghi lại cả checklist trên Notion vô ích + có thể xoá to-do
   // người ta tự thêm.
+  // `?? []`: caller hay dựng Task RÚT GỌN (createTask từng thiếu subtasks → "Cannot read
+  // properties of undefined (reading 'map')" ở MỌI lần tạo task). Side-sync không được nổ
+  // vì một trường vắng — thiếu thì coi như checklist rỗng.
   if (withSubtasks) {
-    payload.subtasks = task.subtasks.map((s) => ({ title: s.title, done: s.done }));
+    payload.subtasks = (task.subtasks ?? []).map((s) => ({ title: s.title, done: s.done }));
   }
   return payload;
 }

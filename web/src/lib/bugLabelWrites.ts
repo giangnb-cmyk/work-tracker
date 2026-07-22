@@ -1,7 +1,8 @@
 // Admin-only bug-label (tag palette) writes. RLS requires admin.
 
 import { supabase } from '../supabase';
-import type { BugLabel } from '../types';
+import { BUG_STATUS_COLOR, STATUS_TAG_NAME, isStatusLabelName } from './bugStatus';
+import type { BugLabel, BugStatus } from '../types';
 
 export interface BugLabelInput {
   projectId: string;
@@ -61,6 +62,48 @@ const DEFAULT_LABELS: Omit<BugLabelInput, 'projectId'>[] = [
   { name: 'iOS', color: '#38bdf8', icon: '🍎' },
   { name: 'Android', color: '#22c55e', icon: '🤖' },
 ];
+
+/** Icon cho nhãn workflow tạo tự động — khớp DEFAULT_LABELS ở trên. */
+const STATUS_LABEL_ICON: Partial<Record<BugStatus, string>> = {
+  reopen: '🔁',
+  fixing: '🔧',
+  pending: '⏸️',
+  deployed: '🚀',
+  done: '✅',
+};
+
+/**
+ * Bảo đảm palette CÓ nhãn workflow cho `status` — thiếu thì tạo (tên chuẩn + màu/icon mặc
+ * định) và trả về nhãn mới; đủ rồi (hoặc status='open') thì trả null.
+ *
+ * Vì sao phải có: kéo card sang cột mà nhãn tương ứng KHÔNG tồn tại thì status đổi mà nhãn
+ * không đổi → không có gì push sang Discord, và lần sync sau bot suy status từ tag sẽ KÉO
+ * CARD VỀ CỘT CŨ. Người kéo không phải admin thì tạo bị RLS chặn (42501) — nuốt lỗi, trả
+ * null, giữ hành vi cũ (palette các dự án thật đã đủ nhãn sau một lần sync).
+ */
+export async function ensureStatusLabel(
+  projectId: string,
+  status: BugStatus,
+  labels: BugLabel[],
+  createdBy: string,
+): Promise<BugLabel | null> {
+  const name = STATUS_TAG_NAME[status];
+  if (!name) return null; // 'open' không có nhãn
+  if (labels.some((l) => isStatusLabelName(l.name, status))) return null;
+  const input: BugLabelInput = {
+    projectId,
+    name,
+    color: BUG_STATUS_COLOR[status],
+    icon: STATUS_LABEL_ICON[status] ?? '',
+  };
+  try {
+    const id = await createBugLabel(input, createdBy);
+    return { id, projectId, name, color: input.color, icon: input.icon, discordTagId: null, createdBy };
+  } catch (err) {
+    console.error(`Tạo nhãn workflow "${name}" thất bại (cần quyền admin?)`, err);
+    return null;
+  }
+}
 
 /** One-tap seed of the standard palette for a project that has no labels yet. */
 export async function seedDefaultBugLabels(projectId: string, createdBy: string): Promise<void> {

@@ -38,10 +38,16 @@ export function descWithLongTitle(title: string, description: string): string {
 }
 
 export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise<string> {
-  // Auto due window: starts today, ends Friday of this week (unless a due end was picked).
+  // Auto due window: starts today. Hạn chót: người tạo chọn thì tôn trọng; không chọn mà
+  // task VÀO SPRINT thì mặc định cuối tuần làm việc; còn task BACKLOG (không sprint) thì
+  // ĐỂ TRỐNG — backlog là chỗ đậu chưa hẹn ngày, tự điền hạn là ra một đống task "trễ" ảo.
   const now = new Date();
   const dueStart = Timestamp.fromDate(now);
-  const dueDate = Timestamp.fromDate(input.dueDate ?? endOfWorkWeek(now));
+  const dueDate = input.dueDate
+    ? Timestamp.fromDate(input.dueDate)
+    : input.sprintId
+      ? Timestamp.fromDate(endOfWorkWeek(now))
+      : null;
   // Tên dài mà chưa có mô tả → chép tiêu đề vào mô tả để đọc được ở chi tiết.
   const description = descWithLongTitle(input.title, input.description);
 
@@ -60,7 +66,7 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
       reporter_id: opts.reporterId || null,
       points: input.points,
       due_start: dueStart.toISOString(),
-      due_date: dueDate.toISOString(),
+      due_date: dueDate?.toISOString() ?? null,
       order: Date.now(),
       source: 'web',
       attachments: input.attachments ?? [],
@@ -74,6 +80,9 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
 
   const id = data.id as string;
   const shortCode = (data.short_code as string | null) ?? null;
+  // Object này đi vào toPayload của notionSync — PHẢI mang đủ mọi trường payload đọc tới.
+  // Đã cắn thật: thiếu `subtasks` là `task.subtasks.map` nổ "Cannot read properties of
+  // undefined" và MỌI lần tạo task đều báo lỗi Notion (dù task vẫn lưu).
   const created = {
     id,
     title: input.title,
@@ -83,6 +92,9 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     assigneeName: opts.assigneeName,
     dueStart,
     dueDate,
+    subtasks: input.subtasks ?? [],
+    attachments: input.attachments ?? [],
+    watcherIds: input.watcherIds ?? [],
   } as Task;
   void syncNewToNotion(id, created, opts.assigneeNotionUserId, opts.notionProjectId);
   // Báo Discord có task mới (webhook) — fire-and-forget, không chặn việc tạo nếu lỗi.

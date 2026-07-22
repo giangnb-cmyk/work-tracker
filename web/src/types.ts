@@ -387,14 +387,17 @@ export interface CostProjection {
   createdBy: string;
 }
 
-export type BugStatus = 'open' | 'fixing' | 'pending' | 'deployed' | 'done';
+// 'reopen' = bug Done bị tái hiện, tester mở lại (tag Discord "Re-open"). Đứng cạnh Open
+// vì cùng là "cần xử lý". Enum DB thêm ở migration 0055.
+export type BugStatus = 'open' | 'reopen' | 'fixing' | 'pending' | 'deployed' | 'done';
 
-export const BUG_STATUSES: BugStatus[] = ['open', 'fixing', 'pending', 'deployed', 'done'];
+export const BUG_STATUSES: BugStatus[] = ['open', 'reopen', 'fixing', 'pending', 'deployed', 'done'];
 
 // Mirrors STATUS_TAG_NAME in lib/bugStatus.ts — these are the Discord forum tag
 // names, so display and sync stay on the same vocabulary.
 export const BUG_STATUS_LABEL: Record<BugStatus, string> = {
   open: 'Open',
+  reopen: 'Re-open',
   fixing: 'Fixing',
   pending: 'Pending',
   deployed: 'Deployed',

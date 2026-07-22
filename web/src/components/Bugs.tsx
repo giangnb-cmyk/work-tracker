@@ -6,7 +6,7 @@ import { useBugLabels } from '../hooks/useBugLabels';
 import { useStoredView } from '../hooks/useStoredView';
 import { navigate, useRoute } from '../lib/router';
 import { updateBug } from '../lib/bugWrites';
-import { seedDefaultBugLabels } from '../lib/bugLabelWrites';
+import { ensureStatusLabel, seedDefaultBugLabels } from '../lib/bugLabelWrites';
 import { requestBugSync } from '../lib/bugSyncWrites';
 import { labelsForStatus } from '../lib/bugStatus';
 import BugKanban from './bug/BugKanban';
@@ -65,8 +65,16 @@ export default function Bugs() {
 
   /** Move on the kanban: set status AND swap the matching workflow tag, so the
    *  card's tag stays consistent (and the change pushes back to Discord). */
-  function move(bug: Bug, status: BugStatus) {
-    const nextLabels = labelsForStatus(bug.labelIds, status, labels);
+  async function move(bug: Bug, status: BugStatus) {
+    // Nhãn của cột đích chưa có trong palette thì tạo trước — không thì status đổi mà nhãn
+    // không đổi, không có gì push sang Discord, lần sync sau bot suy status từ tag sẽ kéo
+    // card VỀ CỘT CŨ (bug "đồng bộ chưa đúng" đã cắn thật). Non-admin tạo fail → như cũ.
+    let palette = labels;
+    if (selectedProjectId) {
+      const created = await ensureStatusLabel(selectedProjectId, status, labels, user?.uid ?? '');
+      if (created) palette = [...labels, created];
+    }
+    const nextLabels = labelsForStatus(bug.labelIds, status, palette);
     const changed = key(nextLabels) !== key(bug.labelIds);
     void updateBug(bug.id, {
       status,

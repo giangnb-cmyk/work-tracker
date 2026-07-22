@@ -669,11 +669,32 @@ async def poll_bug_sync_requests():
     except Exception as e:
         log.warning("Đọc bug_sync_requests lỗi: %s", e)
         return
+    # GỘP yêu cầu trùng: bấm "Sync Discord" 5 lần là 5 dòng pending — chạy đủ 5 lượt
+    # full-sync (~650 call Discord/lượt) là ép rate limit vô ích trong khi kết quả y hệt.
+    # Mỗi project chỉ sync MỘT lần mỗi đợt; các yêu cầu còn lại nhận cùng kết quả.
+    done_projects: dict[str, tuple[str, str]] = {}
     for req in pending or []:
-        await _process_sync_request(sb, req)
+        pid = str(req.get("project_id") or "")
+        if pid in done_projects:
+            status, result = done_projects[pid]
+            await _finish_sync_request(sb, req["id"], status, f"(gộp cùng đợt) {result}")
+            continue
+        done_projects[pid] = await _process_sync_request(sb, req)
 
 
-async def _process_sync_request(sb, req):
+async def _finish_sync_request(sb, req_id, status: str, result: str) -> None:
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        await asyncio.to_thread(
+            lambda: sb.table("bug_sync_requests").update(
+                {"status": status, "result": result, "processed_at": now_iso}
+            ).eq("id", req_id).execute()
+        )
+    except Exception as e:
+        log.warning("Cập nhật trạng thái sync request lỗi: %s", e)
+
+
+async def _process_sync_request(sb, req) -> tuple[str, str]:
     pid = req.get("project_id")
     cfg = bug_sync.forum_for_project(pid) if pid else (BUG_FORUMS[0] if len(BUG_FORUMS) == 1 else None)
     status, result = "done", ""
@@ -685,15 +706,8 @@ async def _process_sync_request(sb, req):
     except Exception as e:
         status, result = "error", str(e)[:300]
         log.exception("Xử lý yêu cầu sync bug lỗi")
-    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    try:
-        await asyncio.to_thread(
-            lambda: sb.table("bug_sync_requests").update(
-                {"status": status, "result": result, "processed_at": now_iso}
-            ).eq("id", req["id"]).execute()
-        )
-    except Exception as e:
-        log.warning("Cập nhật trạng thái sync request lỗi: %s", e)
+    await _finish_sync_request(sb, req["id"], status, result)
+    return status, result
 
 
 @tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)

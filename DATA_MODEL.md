@@ -452,7 +452,7 @@ A `BEFORE INSERT` trigger assigns `number` = next per-project running id.
 | `number`       | number            | per-project running id (shown as `#530`)                    |
 | `title`        | string            | 1–200 chars                                                 |
 | `description`  | string            | repro / expected / actual                                   |
-| `status`       | string            | `open` \| `fixing` \| `pending` \| `deployed` \| `done` (Kanban columns) |
+| `status`       | string            | `open` \| `reopen` \| `fixing` \| `pending` \| `deployed` \| `done` (Kanban columns; `reopen` thêm ở 0055) |
 | `labelIds`     | string[]          | ids into `bug_labels` (tag palette)                         |
 | `reporterId` / `reporterName` | string \| null / string | who filed it                       |
 | `assigneeId` / `assigneeName` | string \| null / string | who owns the fix                   |
@@ -478,6 +478,13 @@ The bot keeps a Discord **forum channel** and `bugs` in sync **both directions**
   rewrites that thread's applied tags to match (creating a forum tag for an app-only
   label if needed). While `pendingDiscordPush` is set, the Discord→app sync won't
   relabel that bug (the app edit wins until pushed).
+- **Status ← workflow tag** (cả hai chiều dùng chung luật): tag → cột theo ưu tiên
+  **Re-open > Done > Deployed > Pending > Fixing**, không có tag workflow = Open. Tên tag
+  nhận nhiều biến thể (`Re-open`/`Reopen`) — nguồn sự thật: `_STATUS_PRECEDENCE`
+  (`bot/skills/bug_sync.py`) gương với `STATUS_ALIASES` (`web/src/lib/bugStatus.ts`).
+  Web kéo card sang cột mà palette THIẾU nhãn workflow đó thì tự tạo nhãn
+  (`ensureStatusLabel`) — thiếu nhãn là status đổi mà không có gì push, lần sync sau
+  kéo card về cột cũ.
 
 Triggers: daily (default 09:00 `Asia/Ho_Chi_Minh`), `@bot sync bug`, or the web
 "Sync Discord" button (queues `bug_sync_requests`, admin-only insert; the service-role

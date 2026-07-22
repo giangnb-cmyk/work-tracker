@@ -100,16 +100,26 @@ def _thread_created_at(t) -> str | None:
             return None
     return at.isoformat()
 
-# Tag workflow -> cot kanban (status). Uu tien: giai doan sau thang.
-_STATUS_PRECEDENCE = ["done", "deployed", "pending", "fixing"]
+# Tag workflow -> cot kanban (status). Moi status nhan NHIEU bien the ten (forum dat
+# "Re-open" co gach noi). Uu tien tu tren xuong: RE-OPEN THANG DONE — tester mo lai bug
+# thuong chi THEM tag Re-open ma khong go Done, truoc day vi vay bug mo lai van nam o cot
+# Done ("dong bo chua dung"). GUONG web/src/lib/bugStatus.ts (STATUS_ALIASES) — doi bo ten
+# o day thi doi ca ben web.
+_STATUS_PRECEDENCE = [
+    ("reopen",   {"reopen", "re-open"}),
+    ("done",     {"done"}),
+    ("deployed", {"deployed"}),
+    ("pending",  {"pending"}),
+    ("fixing",   {"fixing"}),
+]
 
 
 def _status_from_label_names(names: list[str]) -> str:
     """Suy ra status tu ten cac nhan da gan (khong khop -> 'open')."""
     lowered = {(n or "").strip().lower() for n in names}
-    for s in _STATUS_PRECEDENCE:
-        if s in lowered:
-            return s
+    for status, aliases in _STATUS_PRECEDENCE:
+        if lowered & aliases:
+            return status
     return "open"
 
 
@@ -359,8 +369,20 @@ def _upsert_bugs(sb, project_id: str, items: list[dict], available: list, by_thr
 
 # --- Entry points -----------------------------------------------------------
 
+# Chi MOT luot full-sync tai mot thoi diem. Nut web + lich 9h + '@bot sync bug' co the
+# rot trung nhau: hai luot song song la ~1300 call REST don cung luc vao rate limit
+# Discord (moi luot ~650 call: fetch_message tung thread) ma ket qua y het nhau.
+_SYNC_LOCK = asyncio.Lock()
+
+
 async def sync_forum(client, sb, project_id: str, forum_channel_id: int) -> dict:
-    """Discord -> app: doc forum (kem tai anh/video len Storage) roi upsert vao bugs."""
+    """Discord -> app: doc forum (kem tai anh/video len Storage) roi upsert vao bugs.
+    Tuan tu hoa bang _SYNC_LOCK — luot sau cho luot truoc xong roi moi chay."""
+    async with _SYNC_LOCK:
+        return await _sync_forum_locked(client, sb, project_id, forum_channel_id)
+
+
+async def _sync_forum_locked(client, sb, project_id: str, forum_channel_id: int) -> dict:
     ch = await _get_forum(client, forum_channel_id)
     available = [(str(t.id), t.name, _emoji_str(t.emoji)) for t in ch.available_tags]
     threads = await _gather_threads(ch)

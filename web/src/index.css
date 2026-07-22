@@ -867,6 +867,7 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 
 /* Status accent (kanban dots + list pill) */
 .s-open { --st: #94a3b8; }
+.s-reopen { --st: #f472b6; }
 .s-fixing { --st: #fb923c; }
 .s-pending { --st: #f59e0b; }
 .s-deployed { --st: #6366f1; }

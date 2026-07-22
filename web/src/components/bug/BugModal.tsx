@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSprintContext } from '../../contexts/SprintContext';
 import { createBug, deleteBug, fetchBugDetail, updateBug } from '../../lib/bugWrites';
+import { ensureStatusLabel } from '../../lib/bugLabelWrites';
 import { BUG_STATUS_COLOR, labelsForStatus } from '../../lib/bugStatus';
 import { labelsInGroup, selectedInGroup, setGroupLabel, type LabelGroup } from '../../lib/bugLabelGroups';
 import { openDiscordThread } from '../../lib/discordLink';
@@ -79,9 +80,15 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   function setGroup(g: LabelGroup, id: string) {
     setLabelIds((ids) => setGroupLabel(ids, labels, g, id));
   }
-  function changeStatus(next: BugStatus) {
+  async function changeStatus(next: BugStatus) {
     setStatus(next);
-    setLabelIds((ids) => labelsForStatus(ids, next, labels));
+    // Palette thiếu nhãn workflow của trạng thái đích thì tạo trước (cùng lý do move() ở
+    // Bugs.tsx: thiếu nhãn thì không push, sync sau kéo bug về trạng thái cũ). Fail (non-
+    // admin) thì như cũ.
+    let palette = labels;
+    const created = await ensureStatusLabel(projectId, next, labels, user?.uid ?? '');
+    if (created) palette = [...labels, created];
+    setLabelIds((ids) => labelsForStatus(ids, next, palette));
   }
 
   function copyLink() {

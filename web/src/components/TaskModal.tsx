@@ -418,10 +418,11 @@ export default function TaskModal({
               )}
               {/* Chưa có trang Notion -> cho tạo lại bằng tay. Sync lúc tạo task là
                   fire-and-forget nên hỏng thì im lặng; đây là đường bù duy nhất.
-                  canEditOwn (admin HOẶC người tạo task) chứ không phải canEditFields:
-                  member tạo task mà sync tự động lỗi thì phải tự tạo lại được — RLS
-                  tasks_update vốn cho reporter ghi notion_page_id. */}
-              {isEdit && task && !task.notionPageId && canEditOwn && (
+                  canChangeStatus (admin / NGƯỜI TẠO / NGƯỜI NHẬN) chứ không hẹp hơn:
+                  member được giao task mà sync tự động lỗi thì phải tự tạo lại được —
+                  RLS tasks_update (0002) vốn cho cả reporter lẫn assignee ghi
+                  notion_page_id, nên nới tới đây là khớp đúng quyền ghi thật. */}
+              {isEdit && task && !task.notionPageId && canChangeStatus && (
                 <div className="notion-sync-row">
                   <button className="btn-sm" onClick={handleSyncNotion} disabled={notionSyncing}>
                     {notionSyncing ? '⏳ Đang tạo trên Notion…' : '📝 Tạo task trên Notion'}
