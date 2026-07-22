@@ -22,11 +22,22 @@ interface Props {
  * khoản theo năm chia theo số tháng người đó làm việc trong cửa sổ.
  */
 export default function EmployeeCostTable({ employees, itemById, memberItemIds, hireCount, anchor, months, onPick }: Props) {
+  // Tính trước từng hàng MỘT lần để thân bảng và hàng TỔNG dùng chung một con số.
+  const rows = employees.map((e) => {
+    const active = activeMonths(e, anchor, months);
+    const ids = memberItemIds.get(e.memberId) ?? [];
+    const gear = overheadForEmployee(ids, itemById, active);
+    return { e, active, ids, gear, total: e.monthlySalary * active + gear };
+  });
+  const totMonthly = rows.reduce((s, r) => s + r.e.monthlySalary, 0);
+  const totGear = rows.reduce((s, r) => s + r.gear, 0);
+  const totAll = rows.reduce((s, r) => s + r.total, 0);
+
   return (
     <div className="glass section" style={{ padding: '1.25rem' }}>
       <div className="cost-section-head">
         <h3>
-          Lương nhân sự
+          Chi phí nhân sự
           <span className="cost-headcount">
             👥 {employees.length} người
             {hireCount > 0 && <span className="muted"> · dự tuyển thêm {hireCount} (dự chi)</span>}
@@ -52,29 +63,24 @@ export default function EmployeeCostTable({ employees, itemById, memberItemIds, 
             </tr>
           </thead>
           <tbody>
-            {employees.map((e) => {
-              const active = activeMonths(e, anchor, months);
-              const ids = memberItemIds.get(e.memberId) ?? [];
-              const gear = overheadForEmployee(ids, itemById, active);
-              return (
-                <tr key={e.memberId} className="tsal-row" onClick={() => onPick(e)} title="Gán khoản thiết bị / vận hành">
-                  <td>
-                    <div className="row">
-                      <Avatar name={e.name} photoURL={e.photoURL} size="sm" />
-                      {e.name}
-                      {ids.length > 0 && <span className="muted cost-gear-chip">🖥️ {ids.length}</span>}
-                    </div>
-                  </td>
-                  <td className="cost-num-col mono">{formatVnd(e.monthlySalary)}</td>
-                  <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(e.startDate)}</td>
-                  <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(e.endDate)}</td>
-                  <td className="cost-num-col mono muted">{active}</td>
-                  <td className="cost-num-col mono">{gear > 0 ? formatVnd(gear) : '—'}</td>
-                  <td className="cost-num-col mono">{formatVnd(e.monthlySalary * active + gear)}</td>
-                </tr>
-              );
-            })}
-            {employees.length === 0 && (
+            {rows.map(({ e, active, ids, gear, total }) => (
+              <tr key={e.memberId} className="tsal-row" onClick={() => onPick(e)} title="Gán khoản thiết bị / vận hành">
+                <td>
+                  <div className="row">
+                    <Avatar name={e.name} photoURL={e.photoURL} size="sm" />
+                    {e.name}
+                    {ids.length > 0 && <span className="muted cost-gear-chip">🖥️ {ids.length}</span>}
+                  </div>
+                </td>
+                <td className="cost-num-col mono">{formatVnd(e.monthlySalary)}</td>
+                <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(e.startDate)}</td>
+                <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(e.endDate)}</td>
+                <td className="cost-num-col mono muted">{active}</td>
+                <td className="cost-num-col mono">{gear > 0 ? formatVnd(gear) : '—'}</td>
+                <td className="cost-num-col mono">{formatVnd(total)}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="empty">
                   Dự án chưa có thành viên. Thêm người ở tab Thành viên của dự án, rồi điền lương ở chi tiết.
@@ -82,6 +88,17 @@ export default function EmployeeCostTable({ employees, itemById, memberItemIds, 
               </tr>
             )}
           </tbody>
+          {rows.length > 0 && (
+            <tfoot>
+              <tr className="cost-foot-row">
+                <td className="cost-foot-label">Tổng ({rows.length} người) · {months} tháng</td>
+                <td className="cost-num-col mono cost-foot-total">{formatVnd(totMonthly)}</td>
+                <td colSpan={3}></td>
+                <td className="cost-num-col mono cost-foot-total">{formatVnd(totGear)}</td>
+                <td className="cost-num-col mono cost-foot-total">{formatVnd(totAll)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
