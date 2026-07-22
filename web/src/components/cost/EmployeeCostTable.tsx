@@ -1,6 +1,6 @@
 import { activeMonths, overheadForEmployee } from '../../lib/projectCost';
 import { formatIsoDate, formatVnd } from '../../lib/format';
-import type { CostEmployeeRow, CostItem } from '../../types';
+import { JOB_ROLE_ICON, JOB_ROLE_LABEL, type CostEmployeeRow, type CostItem } from '../../types';
 import Avatar from '../Avatar';
 
 interface Props {
@@ -68,7 +68,12 @@ export default function EmployeeCostTable({ employees, itemById, memberItemIds, 
                 <td>
                   <div className="row">
                     <Avatar name={e.name} photoURL={e.photoURL} size="sm" />
-                    {e.name}
+                    <div className="cost-emp-id">
+                      <span className="cost-emp-name">{e.name}</span>
+                      {e.jobRole && (
+                        <span className="muted cost-emp-role">{JOB_ROLE_ICON[e.jobRole]} {JOB_ROLE_LABEL[e.jobRole]}</span>
+                      )}
+                    </div>
                     {ids.length > 0 && <span className="muted cost-gear-chip">🖥️ {ids.length}</span>}
                   </div>
                 </td>

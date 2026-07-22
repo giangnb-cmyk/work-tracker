@@ -108,6 +108,7 @@ export default function CostManagement({ projectId }: { projectId: string }) {
         memberId: m.uid,
         name: m.displayName || m.email || m.uid,
         photoURL: m.photoURL,
+        jobRole: m.jobRole,
         monthlySalary: comp?.monthlySalary ?? 0,
         startDate: comp?.startDate ?? null,
         endDate: comp?.endDate ?? null,

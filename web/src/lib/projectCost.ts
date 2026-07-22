@@ -77,12 +77,12 @@ export interface OverheadResult {
 }
 
 /**
- * Chi phí thiết bị/vận hành theo mô hình GÁN THEO NGƯỜI (migration 0056):
- * - Khoản gán cho nhân sự: one_time đếm 1 lần/người; annual × (số tháng người đó LÀM VIỆC
- *   trong cửa sổ / 12) — người vào giữa chừng không gánh nguyên năm.
- * - Khoản gán cho dòng dự chi: × head_count; annual tính đủ cửa sổ (× horizon/12) vì dự chi
- *   không có ngày vào/ra.
- * - Khoản KHÔNG gán cho ai (Văn phòng, Điện…): chi phí chung — 1 lần, hoặc annual × horizon/12.
+ * Chi phí thiết bị/vận hành theo mô hình GÁN THEO NGƯỜI (migration 0056). Hệ số theo `kind`
+ * lấy từ costFactor: one_time ×1, monthly ×(số tháng), annual ×(số tháng/12):
+ * - Khoản gán cho nhân sự: × số tháng người đó LÀM VIỆC trong cửa sổ (vào giữa chừng không
+ *   gánh nguyên kỳ).
+ * - Khoản gán cho dòng dự chi: × head_count, tính đủ cửa sổ (horizon) vì dự chi không có ngày vào/ra.
+ * - Khoản KHÔNG gán cho ai (Văn phòng, Điện…): chi phí chung, tính đủ cửa sổ (horizon).
  */
 export function overheadTotal(inp: OverheadInput): OverheadResult {
   const { items, employees, memberItemIds, projections, anchor, horizon } = inp;
@@ -95,6 +95,8 @@ export function overheadTotal(inp: OverheadInput): OverheadResult {
   const add = (item: CostItem, amount: number, seats: number) => {
     perItem.set(item.id, (perItem.get(item.id) ?? 0) + amount);
     perItemCount.set(item.id, (perItemCount.get(item.id) ?? 0) + seats);
+    // monthly + annual đều là chi phí vận hành ĐỊNH KỲ → gộp vào bucket `annual`
+    // (thẻ "Chi phí vận hành" ở CostSummary). Chỉ one_time tách riêng.
     if (item.kind === 'one_time') oneTime += amount;
     else annual += amount;
   };
@@ -104,7 +106,7 @@ export function overheadTotal(inp: OverheadInput): OverheadResult {
     for (const id of memberItemIds.get(emp.memberId) ?? []) {
       const it = byId.get(id);
       if (!it) continue; // khoản đã xoá còn sót id trong mảng — bỏ qua
-      add(it, it.kind === 'one_time' ? it.amount : it.amount * (months / 12), 1);
+      add(it, it.amount * costFactor(it.kind, months), 1);
     }
   }
 
@@ -112,7 +114,7 @@ export function overheadTotal(inp: OverheadInput): OverheadResult {
     for (const id of p.itemIds ?? []) {
       const it = byId.get(id);
       if (!it) continue;
-      const each = it.kind === 'one_time' ? it.amount : it.amount * (horizon / 12);
+      const each = it.amount * costFactor(it.kind, horizon);
       add(it, each * p.headCount, p.headCount);
     }
   }
@@ -120,7 +122,7 @@ export function overheadTotal(inp: OverheadInput): OverheadResult {
   // Khoản chưa gán ai = chi phí CHUNG của dự án, tính một suất như trước 0056.
   for (const it of items) {
     if ((perItemCount.get(it.id) ?? 0) === 0) {
-      add(it, it.kind === 'one_time' ? it.amount : it.amount * (horizon / 12), 0);
+      add(it, it.amount * costFactor(it.kind, horizon), 0);
     }
   }
 
@@ -137,7 +139,7 @@ export function overheadForEmployee(
   for (const id of itemIds) {
     const it = itemById.get(id);
     if (!it) continue;
-    sum += it.kind === 'one_time' ? it.amount : it.amount * (months / 12);
+    sum += it.amount * costFactor(it.kind, months);
   }
   return sum;
 }

@@ -322,17 +322,20 @@ export interface CostEmployeeRow {
   memberId: string;
   name: string;
   photoURL?: string;
+  /** Vị trí/chuyên môn (từ profiles.job_role) — hiện dưới tên trong bảng Chi phí nhân sự. */
+  jobRole?: JobRole;
   monthlySalary: number;
   startDate: string | null;
   endDate: string | null;
 }
 
-/** one_time = chi phí ban đầu 1 lần; annual = chi phí theo năm. */
-export type CostItemKind = 'one_time' | 'annual';
+/** one_time = ban đầu 1 lần; monthly = theo tháng (×số tháng); annual = theo năm (×số tháng/12). */
+export type CostItemKind = 'one_time' | 'annual' | 'monthly';
 
-export const COST_ITEM_KINDS: CostItemKind[] = ['one_time', 'annual'];
+export const COST_ITEM_KINDS: CostItemKind[] = ['one_time', 'monthly', 'annual'];
 export const COST_ITEM_KIND_LABEL: Record<CostItemKind, string> = {
   one_time: 'Ban đầu (1 lần)',
+  monthly: 'Theo tháng',
   annual: 'Theo năm',
 };
 

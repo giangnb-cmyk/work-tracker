@@ -2771,6 +2771,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .cost-picker-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: 10px; margin-bottom: 0.5rem; }
 .cost-picker-meta { margin-left: auto; font-size: 0.78rem; white-space: nowrap; }
 .cost-gear-chip { font-size: 0.75rem; white-space: nowrap; }
+/* Tên + vị trí (job role) hai dòng trong bảng Chi phí nhân sự. */
+.cost-emp-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.cost-emp-name { white-space: nowrap; }
+.cost-emp-role { font-size: 0.72rem; white-space: nowrap; }
 
 /* Dòng tổng cuối bảng dự chi. */
 .cost-foot-row td { border-top: 2px solid var(--border); border-bottom: none; padding-top: 0.9rem; }

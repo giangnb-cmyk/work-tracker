@@ -28,7 +28,7 @@ export default function OverheadTable({ items, months, totalByItem, countByItem,
           <h3>Chi phí thiết bị &amp; vận hành</h3>
           <p className="muted cost-section-sub">
             Danh mục để gán: bấm tên nhân sự ở bảng lương (hoặc nút 🖥️ ở dự chi) để chọn khoản cho từng người.
-            “Theo năm” tự chia theo số tháng làm việc; khoản chưa gán ai tính một suất chung cho dự án.
+            “Theo tháng” × số tháng, “Theo năm” chia theo số tháng làm việc; khoản chưa gán ai tính một suất chung.
           </p>
         </div>
         <div className="row" style={{ gap: '0.5rem' }}>
