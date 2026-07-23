@@ -183,6 +183,11 @@
               <label>Domain email cho phép (tuỳ chọn)<span class="tgt">web · VITE_ALLOWED_EMAIL_DOMAIN</span></label>
               <input type="text" id="allowedEmailDomain" placeholder="vd: easygoing.vn — để trống = cho phép mọi tài khoản lúc đầu" />
             </div>
+            <div class="field wide">
+              <label>Google OAuth Client ID — nút "Xuất Google Sheet" (tuỳ chọn)<span class="tgt">web · VITE_GOOGLE_CLIENT_ID</span></label>
+              <input type="text" id="googleClientId" placeholder="vd: 1234567890-abc.apps.googleusercontent.com — để trống = tắt nút Xuất" />
+              <span class="hint">Client-safe (public), ghi sheet TRỰC TIẾP bằng tài khoản Google của người bấm. Dùng chung client của đăng nhập Google được — nhớ thêm domain web + localhost vào "Authorized JavaScript origins". VITE_ nhúng lúc BUILD → đổi phải redeploy.</span>
+            </div>
           </div>
         </div>
       </details>
@@ -627,6 +632,7 @@ function collect(){
   return {
     supabaseUrl: val('supabaseUrl'), supabaseAnonKey: val('supabaseAnonKey'),
     supabaseServiceKey: val('supabaseServiceKey'), allowedEmailDomain: val('allowedEmailDomain'),
+    googleClientId: val('googleClientId'),
     discordToken: val('discordToken'), allowedUserIds: listIds('allowedUserIds'),
     reminderChannelId: idOrZero('reminderChannelId'), standupChannelId: idOrZero('standupChannelId'),
     taskDoneChannelId: idOrZero('taskDoneChannelId'), bugSyncChannelId: idOrZero('bugSyncChannelId'),
@@ -675,6 +681,10 @@ function buildWebEnv(v){
     'VITE_SUPABASE_URL='+v.supabaseUrl,
     'VITE_SUPABASE_ANON_KEY='+v.supabaseAnonKey,
     'VITE_ALLOWED_EMAIL_DOMAIN='+v.allowedEmailDomain,
+    '# OAuth Web client id — nut "Xuat Google Sheet" (tab Chi phi) ghi TRUC TIEP bang tai',
+    '# khoan Google cua nguoi bam. Public (client-safe). Nho them domain web + localhost vao',
+    '# "Authorized JavaScript origins" cua client nay. VITE_ nhung luc BUILD -> doi phai redeploy.',
+    'VITE_GOOGLE_CLIENT_ID='+v.googleClientId,
     '',
     '# --- Server-side (Vercel serverless web/api/*). KHONG co tien to VITE_ nen khong vao browser. ---',
     '# web/api/_auth.ts dung 2 bien nay de xac thuc JWT gui len. Thieu chung thi moi lenh',
@@ -1004,6 +1014,7 @@ function applyWebEnv(m){
   if (m.VITE_SUPABASE_URL) setVal('supabaseUrl', m.VITE_SUPABASE_URL);
   if (m.VITE_SUPABASE_ANON_KEY) setVal('supabaseAnonKey', m.VITE_SUPABASE_ANON_KEY);
   if ('VITE_ALLOWED_EMAIL_DOMAIN' in m) setVal('allowedEmailDomain', m.VITE_ALLOWED_EMAIL_DOMAIN);
+  if ('VITE_GOOGLE_CLIENT_ID' in m) setVal('googleClientId', m.VITE_GOOGLE_CLIENT_ID);
   if ('NOTION_SYNC_SECRET' in m && m.NOTION_SYNC_SECRET) setVal('notionSyncSecret', m.NOTION_SYNC_SECRET);
   if ('NOTION_TOKEN' in m) setVal('notionToken', m.NOTION_TOKEN);
   if ('NOTION_DATABASE_ID' in m) setVal('notionDatabaseId', m.NOTION_DATABASE_ID);
@@ -1156,6 +1167,7 @@ function saveDraft(v, silent){
 function restore(v){
   setVal('supabaseUrl', v.supabaseUrl); setVal('supabaseAnonKey', v.supabaseAnonKey);
   setVal('supabaseServiceKey', v.supabaseServiceKey); setVal('allowedEmailDomain', v.allowedEmailDomain);
+  setVal('googleClientId', v.googleClientId);
   setVal('discordToken', v.discordToken);
   setVal('allowedUserIds', (v.allowedUserIds || []).join('\n'));
   setVal('reminderChannelId', v.reminderChannelId === '0' ? '' : v.reminderChannelId);

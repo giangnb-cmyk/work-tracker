@@ -276,13 +276,15 @@ thành viên (📈 Lịch sử lương).
   không; thưởng Tết không đóng BHXH. Đổi thang lương = sửa `docs/bhxh.xlsx` **và**
   `BHXH_GRADES` (hằng số chép tay, không tự đọc file).
 
-**Xuất Google Sheet (0060)** — theo pattern queue (như release_sync): web tính sẵn toàn bộ
-số liệu bằng engine rồi chèn `cost_export_requests(project_id, payload jsonb, status,
-result, requested_by)`; bot (`skills/cost_export.py`, poll cùng nhịp `bug_sync_poll_seconds`)
-ghi payload vào sheet `projects.cost_sheet_id` (tab "Chi phí (auto)", ghi đè mỗi lần).
-`cost_sheet_id` cấu hình ở ProjectModal — PHẢI là file RIÊNG chỉ admin mở (payload có LƯƠNG)
-và share Editor cho service account. RLS queue: admin insert+select; chỉ bot (service role)
-update. Payload: `{tab, sections:[{name, rows:[[…]]}]}`.
+**Xuất Google Sheet (0060)** — đường CHÍNH chạy **trực tiếp từ trình duyệt** bằng tài khoản
+Google của người bấm (`lib/googleSheets.ts`, GIS token client — cần `VITE_GOOGLE_CLIENT_ID`
++ origins trong "Authorized JavaScript origins"; người xuất cần quyền Edit trên sheet).
+Web tính sẵn số liệu bằng engine (`buildCostExportPayload` → `{tab, sections:[{name,
+rows:[[…]]}]}`) và ghi đè tab "Chi phí (auto)" của `projects.cost_sheet_id` (file RIÊNG chỉ
+admin mở — payload có LƯƠNG; cấu hình ở ProjectModal). Đường DỰ PHÒNG qua bot vẫn còn:
+queue `cost_export_requests(project_id, payload jsonb, status, result, requested_by)` +
+`skills/cost_export.py` (cần share Editor cho service account) — RLS queue: admin
+insert+select, chỉ bot (service role) update.
 
 - **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`). **Lương** điền một chỗ ở chi tiết
   thành viên (`MemberModal`, tab Thành viên), ghi qua `upsertMemberComp`. Tab **Chi phí**

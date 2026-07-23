@@ -205,8 +205,9 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           ) : costSheetId ? (
             <>✅ Sheet id: <span className="mono">{costSheetId}</span> — bảng chi phí (CÓ LƯƠNG) sẽ ghi vào đây.</>
           ) : (
-            <>💡 File RIÊNG chỉ admin/owner mở được (bảng xuất có LƯƠNG). Nhớ Share cho service
-              account của bot quyền <b>Editor</b>. Rỗng = tắt nút Xuất.</>
+            <>💡 File RIÊNG chỉ admin/owner mở được (bảng xuất có LƯƠNG). Xuất chạy bằng chính
+              tài khoản Google của người bấm — người đó cần quyền <b>Edit</b> trên sheet.
+              Rỗng = tắt nút Xuất.</>
           )}
         </p>
 

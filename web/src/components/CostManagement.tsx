@@ -23,7 +23,8 @@ import {
   type CostProjectionPatch,
 } from '../lib/costWrites';
 import { anchorMonth, buildCostSeries, monthIso, monthLabel, overheadTotal } from '../lib/projectCost';
-import { buildCostExportPayload, fetchExportStatus, requestCostExport } from '../lib/costExport';
+import { buildCostExportPayload, flattenPayload } from '../lib/costExport';
+import { writeSheetTab } from '../lib/googleSheets';
 import { COST_PROJECTION_KIND_LABEL, type CostEmployeeRow, type CostProjection, type CostProjectionKind } from '../types';
 import CostChart from './cost/CostChart';
 import CostProfitChart from './cost/CostProfitChart';
@@ -197,14 +198,18 @@ export default function CostManagement({ projectId }: { projectId: string }) {
     ? `https://docs.google.com/spreadsheets/d/${costProject.costSheetId}`
     : null;
 
-  /** Xuất ra Google Sheet: web tính sẵn payload (engine), xếp queue, bot ghi — poll trạng thái. */
+  /**
+   * Xuất TRỰC TIẾP bằng tài khoản Google của người đang dùng (GIS token client) — không qua
+   * bot. Lần đầu Google hiện popup xin quyền Sheets; người xuất phải có quyền Edit sheet.
+   * (Hàng đợi cost_export_requests + bot vẫn còn nguyên — đường dự phòng nếu cần.)
+   */
   async function handleExport() {
     if (!costProject?.costSheetId) {
-      setExportMsg('⚠ Dự án chưa cấu hình “Google Sheet CHI PHÍ” — owner bấm ⚙ sửa dự án ở trang chọn dự án, dán link sheet riêng và Share Editor cho service account của bot.');
+      setExportMsg('⚠ Dự án chưa cấu hình “Google Sheet CHI PHÍ” — owner bấm ⚙ sửa dự án ở trang chọn dự án và dán link sheet.');
       return;
     }
     setExporting(true);
-    setExportMsg('Đang gửi yêu cầu…');
+    setExportMsg('⏳ Đang ghi vào Google Sheet…');
     try {
       const payload = buildCostExportPayload({
         projectName: costProject.name,
@@ -218,28 +223,13 @@ export default function CostManagement({ projectId }: { projectId: string }) {
         overhead,
         projections,
       });
-      const reqId = await requestCostExport(projectId, payload, createdBy);
-      setExportMsg('⏳ Bot đang ghi vào sheet (nhịp quét ~1 phút)…');
-      const started = Date.now();
-      const timer = setInterval(() => {
-        void fetchExportStatus(reqId)
-          .then((st) => {
-            if (st && st.status !== 'pending') {
-              clearInterval(timer);
-              setExporting(false);
-              setExportMsg(st.status === 'done' ? `✅ ${st.result || 'Đã xuất xong.'}` : `❌ ${st.result || 'Xuất thất bại.'}`);
-            } else if (Date.now() - started > 120_000) {
-              clearInterval(timer);
-              setExporting(false);
-              setExportMsg('⚠ Chưa thấy bot phản hồi sau 2 phút — kiểm tra bot có đang chạy không. Yêu cầu vẫn nằm trong hàng đợi, bot bật lên sẽ xử lý.');
-            }
-          })
-          .catch(() => {/* mạng chớp — giữ poll */});
-      }, 3000);
+      const cells = await writeSheetTab(costProject.costSheetId, payload.tab, flattenPayload(payload));
+      setExportMsg(`✅ Đã ghi ${cells} ô vào tab “${payload.tab}”.`);
     } catch (err) {
-      console.error('Gửi yêu cầu xuất chi phí thất bại', err);
+      console.error('Xuất Google Sheet thất bại', err);
+      setExportMsg(`❌ ${err instanceof Error ? err.message : 'Xuất thất bại.'}`);
+    } finally {
       setExporting(false);
-      setExportMsg('❌ Gửi yêu cầu thất bại (cần quyền admin).');
     }
   }
 

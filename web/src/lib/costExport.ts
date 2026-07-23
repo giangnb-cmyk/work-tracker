@@ -143,6 +143,17 @@ export function buildCostExportPayload(a: BuildArgs): ExportPayload {
   };
 }
 
+/** sections → một mảng hàng phẳng: [TÊN KHỐI] + rows + dòng trống ngăn cách (ghi vào tab). */
+export function flattenPayload(payload: ExportPayload): (string | number)[][] {
+  const out: (string | number)[][] = [];
+  for (const sec of payload.sections) {
+    out.push([sec.name]);
+    out.push(...sec.rows);
+    out.push([]);
+  }
+  return out;
+}
+
 /** Xếp yêu cầu xuất vào hàng đợi — trả về id để theo dõi trạng thái. */
 export async function requestCostExport(
   projectId: string,
