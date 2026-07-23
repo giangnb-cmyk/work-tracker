@@ -267,8 +267,14 @@ thành viên (📈 Lịch sử lương).
 - `member_salary_plan(id, member_id, effective_from, monthly_salary)` — bậc DỰ TÍNH tăng
   lương (toàn cục theo người, điền ở MemberModal); engine đọc thành lương bậc thang.
 - Engine `buildCostSeries` (web/src/lib/projectCost.ts) tính MỌI bucket theo TỪNG THÁNG
-  (lương bậc thang, Tết, TB&VH, dự chi, doanh thu) — thẻ tổng = Σ series = đúng số biểu đồ
-  (tab 📊 trong Chi phí). CHECK `project_cost_items.kind` nới thêm 'monthly' ở 0059.
+  (lương bậc thang, Tết, BHXH, TB&VH, dự chi, doanh thu) — thẻ tổng = Σ series = đúng số
+  biểu đồ (tab 📊 trong Chi phí). CHECK `project_cost_items.kind` nới thêm 'monthly' ở 0059.
+- **BHXH (Cty đóng)**: bảng bậc trong `BHXH_GRADES` (projectCost.ts) chép từ
+  `docs/bhxh.xlsx` — lương đóng BHXH = bậc CAO NHẤT có tổng lương HĐLĐ ≤ lương thực;
+  Cty đóng 21.5% (17.5 BHXH + 3 BHYT + 1 BHTN) trên mức đó, tính mỗi tháng active, nhảy
+  bậc theo lương bậc thang; suất TUYỂN THÊM trả lương tháng cũng gánh, outsource thì
+  không; thưởng Tết không đóng BHXH. Đổi thang lương = sửa `docs/bhxh.xlsx` **và**
+  `BHXH_GRADES` (hằng số chép tay, không tự đọc file).
 
 - **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`). **Lương** điền một chỗ ở chi tiết
   thành viên (`MemberModal`, tab Thành viên), ghi qua `upsertMemberComp`. Tab **Chi phí**

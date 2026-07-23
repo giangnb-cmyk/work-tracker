@@ -48,6 +48,7 @@ export default function CostChart({ series }: { series: CostSeries }) {
       },
       { type: 'bar' as const, label: 'Lương', data: series.salary, backgroundColor: '#6366f1', stack: 'chi' },
       { type: 'bar' as const, label: 'Thưởng Tết', data: series.tet, backgroundColor: '#fbbf24', stack: 'chi' },
+      { type: 'bar' as const, label: 'BHXH (Cty)', data: series.insurance, backgroundColor: '#f87171', stack: 'chi' },
       { type: 'bar' as const, label: 'TB & VH', data: series.overhead, backgroundColor: '#38bdf8', stack: 'chi' },
       { type: 'bar' as const, label: 'Dự chi', data: series.projection, backgroundColor: '#c084fc', stack: 'chi' },
     ],

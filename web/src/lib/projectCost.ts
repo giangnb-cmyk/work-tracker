@@ -169,6 +169,41 @@ export function projectionTotal(projections: CostProjection[], horizon: number):
 }
 
 /* ===========================================================================
+   BHXH — phần CÔNG TY đóng (docs/bhxh.xlsx). Lương đóng BHXH lấy theo BẬC (grade):
+   chọn grade CAO NHẤT có tổng lương HĐLĐ ≤ lương thực của người đó — giữ mức đóng
+   thấp nhất đúng chính sách trong sheet. Cty đóng 21.5% (BHXH 17.5 + BHYT 3 + BHTN 1)
+   trên lương đóng BHXH; khớp từng số cột "BHXH Cty đóng" trong sheet.
+   Phần NLĐ chịu (10.5%) trừ vào lương gross — KHÔNG phải chi phí cộng thêm của dự án.
+   =========================================================================== */
+
+/** Ngưỡng tổng lương HĐLĐ → lương đóng BHXH của bậc đó (docs/bhxh.xlsx). */
+const BHXH_GRADES: { minTotal: number; base: number }[] = [
+  { minTotal: 0, base: 5_400_000 }, // Grade 1 (HĐLĐ 6tr)
+  { minTotal: 12_000_000, base: 6_000_000 }, // Grade 2
+  { minTotal: 15_000_000, base: 7_000_000 }, // Grade 3
+  { minTotal: 19_000_000, base: 8_500_000 }, // Grade 4
+  { minTotal: 23_000_000, base: 10_000_000 }, // Grade 5
+  { minTotal: 25_000_000, base: 11_000_000 }, // Trưởng nhóm / trưởng dự án
+  { minTotal: 32_000_000, base: 15_000_000 }, // Level C
+];
+
+/** Tỷ lệ CÔNG TY đóng trên lương đóng BHXH: 17.5% BHXH + 3% BHYT + 1% BHTN. */
+export const BHXH_EMPLOYER_RATE = 0.215;
+
+/** Lương đóng BHXH theo bậc cho một mức lương HĐLĐ (0 khi chưa có lương). */
+export function bhxhBaseFor(monthlySalary: number): number {
+  if (monthlySalary <= 0) return 0;
+  let base = BHXH_GRADES[0].base;
+  for (const g of BHXH_GRADES) if (monthlySalary >= g.minTotal) base = g.base;
+  return base;
+}
+
+/** BHXH công ty đóng MỖI THÁNG cho một mức lương HĐLĐ. */
+export function employerBhxh(monthlySalary: number): number {
+  return bhxhBaseFor(monthlySalary) * BHXH_EMPLOYER_RATE;
+}
+
+/* ===========================================================================
    ENGINE THEO TỪNG THÁNG (0059) — nguồn sự thật CHUNG cho thẻ tổng và tab Biểu đồ.
    Tính mọi bucket theo từng tháng trong cửa sổ rồi cộng lại: thẻ tổng = Σ series,
    nên hai chỗ không bao giờ lệch nhau.
@@ -202,6 +237,8 @@ export interface CostSeries {
   monthsIdx: number[];
   salary: number[];
   tet: number[];
+  /** BHXH/BHYT/BHTN phần CÔNG TY đóng (21.5% × lương đóng BHXH theo bậc). */
+  insurance: number[];
   /** Thiết bị/vận hành gộp (ban đầu rơi vào tháng bắt đầu, định kỳ rải theo tháng). */
   overhead: number[];
   projection: number[];
@@ -209,11 +246,12 @@ export interface CostSeries {
   totals: {
     salary: number;
     tet: number;
+    insurance: number;
     oneTime: number;
     recurring: number;
     projection: number;
     revenue: number;
-    /** Tổng CHI = lương + Tết + thiết bị/vận hành + dự chi. */
+    /** Tổng CHI = lương + Tết + BHXH (Cty) + thiết bị/vận hành + dự chi. */
     grand: number;
     /** Lãi/lỗ = doanh thu − tổng chi. */
     profit: number;
@@ -256,6 +294,7 @@ export function buildCostSeries(inp: SeriesInput): CostSeries {
   const monthsIdx = Array.from({ length: n }, (_, i) => anchor + i);
   const salary = new Array(n).fill(0);
   const tet = new Array(n).fill(0);
+  const insurance = new Array(n).fill(0);
   const overhead = new Array(n).fill(0);
   const projectionArr = new Array(n).fill(0);
   const revenue = monthsIdx.map((m) => inp.revenueByMonth.get(m) ?? 0);
@@ -281,7 +320,10 @@ export function buildCostSeries(inp: SeriesInput): CostSeries {
       if (!isActiveAt(emp, m, anchor)) continue;
       const sal = salaryAt(emp, plans, m);
       salary[i] += sal;
+      // BHXH Cty đóng theo bậc của mức lương THÁNG NÀY (tăng lương là nhảy bậc theo).
+      insurance[i] += employerBhxh(sal);
       // Thưởng Tết: đúng tháng dương cấu hình, mỗi năm một lần, theo LƯƠNG TẠI THÁNG ĐÓ.
+      // (Thưởng không đóng BHXH.)
       if (inp.tetBonusMonths > 0 && (m % 12) + 1 === inp.tetBonusMonth) {
         tet[i] += sal * inp.tetBonusMonths;
       }
@@ -316,6 +358,12 @@ export function buildCostSeries(inp: SeriesInput): CostSeries {
       const per = p.cadence === 'annual' ? (p.amount * p.headCount) / 12 : p.amount * p.headCount;
       for (let i = 0; i < n; i++) projectionArr[i] += per;
     }
+    // Suất TUYỂN THÊM trả lương THÁNG cũng phải gánh BHXH Cty như người thật.
+    // Outsource thì không — thuê ngoài không đóng bảo hiểm.
+    if (p.kind === 'hire' && p.cadence === 'monthly') {
+      const perHead = employerBhxh(p.amount) * p.headCount;
+      for (let i = 0; i < n; i++) insurance[i] += perHead;
+    }
   }
 
   // Khoản chưa gán ai = chi phí chung: one_time ở tháng đầu, định kỳ rải mọi tháng.
@@ -329,16 +377,18 @@ export function buildCostSeries(inp: SeriesInput): CostSeries {
   }
 
   const sum = (a: number[]) => a.reduce((s, x) => s + x, 0);
+  const grand = sum(salary) + sum(tet) + sum(insurance) + sum(overhead) + sum(projectionArr);
   const totals = {
     salary: sum(salary),
     tet: sum(tet),
+    insurance: sum(insurance),
     oneTime,
     recurring: sum(overhead) - oneTime,
     projection: sum(projectionArr),
     revenue: sum(revenue),
-    grand: sum(salary) + sum(tet) + sum(overhead) + sum(projectionArr),
-    profit: sum(revenue) - (sum(salary) + sum(tet) + sum(overhead) + sum(projectionArr)),
+    grand,
+    profit: sum(revenue) - grand,
   };
 
-  return { monthsIdx, salary, tet, overhead, projection: projectionArr, revenue, totals };
+  return { monthsIdx, salary, tet, insurance, overhead, projection: projectionArr, revenue, totals };
 }

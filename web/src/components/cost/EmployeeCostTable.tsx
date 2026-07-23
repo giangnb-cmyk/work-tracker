@@ -1,4 +1,4 @@
-import { activeMonths, overheadForEmployee } from '../../lib/projectCost';
+import { activeMonths, employerBhxh, overheadForEmployee } from '../../lib/projectCost';
 import { formatIsoDate, formatVnd } from '../../lib/format';
 import { JOB_ROLE_ICON, JOB_ROLE_LABEL, type CostEmployeeRow, type CostItem } from '../../types';
 import Avatar from '../Avatar';
@@ -23,13 +23,16 @@ interface Props {
  */
 export default function EmployeeCostTable({ employees, itemById, memberItemIds, hireCount, anchor, months, onPick }: Props) {
   // Tính trước từng hàng MỘT lần để thân bảng và hàng TỔNG dùng chung một con số.
+  // BHXH = phần CÔNG TY đóng (21.5% × lương đóng BHXH theo bậc — docs/bhxh.xlsx).
   const rows = employees.map((e) => {
     const active = activeMonths(e, anchor, months);
     const ids = memberItemIds.get(e.memberId) ?? [];
     const gear = overheadForEmployee(ids, itemById, active);
-    return { e, active, ids, gear, total: e.monthlySalary * active + gear };
+    const bhxh = employerBhxh(e.monthlySalary);
+    return { e, active, ids, gear, bhxh, total: (e.monthlySalary + bhxh) * active + gear };
   });
   const totMonthly = rows.reduce((s, r) => s + r.e.monthlySalary, 0);
+  const totBhxh = rows.reduce((s, r) => s + r.bhxh, 0);
   const totGear = rows.reduce((s, r) => s + r.gear, 0);
   const totAll = rows.reduce((s, r) => s + r.total, 0);
 
@@ -55,15 +58,15 @@ export default function EmployeeCostTable({ employees, itemById, memberItemIds, 
             <tr>
               <th>Nhân viên</th>
               <th className="cost-num-col">Lương / tháng</th>
-              <th className="cost-tight">Bắt đầu</th>
-              <th className="cost-tight">Kết thúc</th>
+              <th className="cost-num-col" title="BHXH/BHYT/BHTN phần công ty đóng — 21.5% × lương đóng BHXH theo bậc">BHXH (Cty) / th</th>
+              <th className="cost-tight">Thời gian</th>
               <th className="cost-num-col">Số tháng</th>
               <th className="cost-num-col">TB &amp; VH</th>
               <th className="cost-num-col">Thành tiền ({months} tháng)</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ e, active, ids, gear, total }) => (
+            {rows.map(({ e, active, ids, gear, bhxh, total }) => (
               <tr key={e.memberId} className="tsal-row" onClick={() => onPick(e)} title="Gán khoản thiết bị / vận hành">
                 <td>
                   <div className="row">
@@ -78,8 +81,10 @@ export default function EmployeeCostTable({ employees, itemById, memberItemIds, 
                   </div>
                 </td>
                 <td className="cost-num-col mono">{formatVnd(e.monthlySalary)}</td>
-                <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(e.startDate)}</td>
-                <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(e.endDate)}</td>
+                <td className="cost-num-col mono">{bhxh > 0 ? formatVnd(bhxh) : '—'}</td>
+                <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>
+                  {formatIsoDate(e.startDate)} → {e.endDate ? formatIsoDate(e.endDate) : 'nay'}
+                </td>
                 <td className="cost-num-col mono muted">{active}</td>
                 <td className="cost-num-col mono">{gear > 0 ? formatVnd(gear) : '—'}</td>
                 <td className="cost-num-col mono">{formatVnd(total)}</td>
@@ -98,7 +103,8 @@ export default function EmployeeCostTable({ employees, itemById, memberItemIds, 
               <tr className="cost-foot-row">
                 <td className="cost-foot-label">Tổng ({rows.length} người) · {months} tháng</td>
                 <td className="cost-num-col mono cost-foot-total">{formatVnd(totMonthly)}</td>
-                <td colSpan={3}></td>
+                <td className="cost-num-col mono cost-foot-total">{formatVnd(totBhxh)}</td>
+                <td colSpan={2}></td>
                 <td className="cost-num-col mono cost-foot-total">{formatVnd(totGear)}</td>
                 <td className="cost-num-col mono cost-foot-total">{formatVnd(totAll)}</td>
               </tr>

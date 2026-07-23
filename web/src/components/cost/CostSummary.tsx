@@ -18,6 +18,7 @@ export default function CostSummary({ months, totals }: { months: number; totals
   const cards: Card[] = [
     { icon: '💵', label: `Tổng lương · ${span}`, value: formatVnd(totals.salary) },
     { icon: '🧧', label: 'Thưởng Tết', value: formatVnd(totals.tet) },
+    { icon: '🛡️', label: `BHXH Cty đóng · ${span}`, value: formatVnd(totals.insurance) },
     { icon: '🖥️', label: 'Chi phí ban đầu (1 lần)', value: formatVnd(totals.oneTime) },
     { icon: '🔌', label: `Chi phí vận hành · ${span}`, value: formatVnd(totals.recurring) },
     { icon: '🔮', label: `Dự chi · ${span}`, value: formatVnd(totals.projection) },
