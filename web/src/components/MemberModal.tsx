@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import { createMember, updateMember, type MemberInput } from '../lib/memberWrites';
-import { fetchCompHistory, upsertMemberComp } from '../lib/costWrites';
+import { addSalaryPlan, deleteSalaryPlan, fetchCompHistory, fetchSalaryPlans, upsertMemberComp } from '../lib/costWrites';
 import { fetchMemberNotes } from '../lib/memberReviewWrites';
 import { formatDate, formatIsoDate, formatVnd, todayIso } from '../lib/format';
 import DateInput from './DateInput';
 import MoneyInput from './cost/MoneyInput';
-import type { CompChange, MemberSprintNote } from '../types';
+import type { CompChange, MemberSprintNote, SalaryPlanRow } from '../types';
 import {
   JOB_ROLES,
   MEMBER_PERMS,
@@ -47,6 +47,10 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
   const [workEnd, setWorkEnd] = useState('');
   // Lịch sử đổi lương (trigger 0057 ghi) — hiện ngay dưới ô lương.
   const [history, setHistory] = useState<CompChange[]>([]);
+  // Dự tính tăng lương (member_salary_plan, 0059) — tab Chi phí đọc thành bậc thang.
+  const [plans, setPlans] = useState<SalaryPlanRow[]>([]);
+  const [newPlanDate, setNewPlanDate] = useState('');
+  const [newPlanSalary, setNewPlanSalary] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Modal tách 3 tab nhỏ (Thông tin | Quyền | Lương) — một cột dài quá; state các tab vẫn
@@ -78,10 +82,40 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
         if (alive) setHistory(h);
       })
       .catch((err) => console.error('Tải lịch sử lương thất bại', err));
+    fetchSalaryPlans(member.uid)
+      .then((p) => {
+        if (alive) setPlans(p);
+      })
+      .catch((err) => console.error('Tải dự tính tăng lương thất bại', err));
     return () => {
       alive = false;
     };
   }, [member?.uid, isAdmin]);
+
+  /** Thêm một bậc dự tính tăng lương — ghi ngay (không đợi nút Lưu), gắn dòng thật về list. */
+  async function addPlan() {
+    if (!member?.uid || !newPlanDate || newPlanSalary <= 0) return;
+    try {
+      const row = await addSalaryPlan(member.uid, newPlanDate, newPlanSalary, profile?.uid ?? null);
+      setPlans((prev) => [...prev, row].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom)));
+      setNewPlanDate('');
+      setNewPlanSalary(0);
+      setError(null);
+    } catch (err) {
+      console.error('Thêm dự tính tăng lương thất bại', err);
+      setError('Thêm dự tính tăng lương thất bại (cần quyền admin).');
+    }
+  }
+
+  async function removePlan(id: string) {
+    try {
+      await deleteSalaryPlan(id);
+      setPlans((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error('Gỡ dự tính tăng lương thất bại', err);
+      setError('Gỡ dự tính tăng lương thất bại (cần quyền admin).');
+    }
+  }
 
   // Ghi chú đánh giá của người này qua các sprint (mới nhất trước) — hiện ở tab "Ghi chú".
   useEffect(() => {
@@ -292,6 +326,38 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Dự tính TĂNG LƯƠNG (0059): từ ngày X lương thành Y — tab Chi phí tính bậc
+                thang theo đây. Ghi NGAY khi thêm/gỡ (không đợi nút Lưu). */}
+            {isEdit && (
+              <div className="comp-history">
+                <div className="comp-history-title">📈 Dự tính tăng lương</div>
+                {plans.map((p) => (
+                  <div key={p.id} className="comp-hist-row">
+                    <span className="muted mono comp-hist-date">{formatIsoDate(p.effectiveFrom)}</span>
+                    <span className="mono">→ {formatVnd(p.monthlySalary)}</span>
+                    <button type="button" className="btn-sm btn-danger comp-plan-del" onClick={() => void removePlan(p.id)}>
+                      Gỡ
+                    </button>
+                  </div>
+                ))}
+                {plans.length === 0 && (
+                  <p className="muted" style={{ fontSize: '0.8rem' }}>Chưa có dự tính nào — thêm bên dưới để tính chi phí năm cho chuẩn.</p>
+                )}
+                <div className="comp-plan-add">
+                  <DateInput value={newPlanDate} onChange={setNewPlanDate} ariaLabel="Ngày hiệu lực mức mới" />
+                  <MoneyInput value={newPlanSalary} onCommit={setNewPlanSalary} className="cost-money-block" ariaLabel="Mức lương dự tính" />
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={() => void addPlan()}
+                    disabled={!newPlanDate || newPlanSalary <= 0}
+                  >
+                    + Thêm
+                  </button>
+                </div>
               </div>
             )}
           </div>

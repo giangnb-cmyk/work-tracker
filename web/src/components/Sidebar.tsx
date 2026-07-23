@@ -53,7 +53,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ active, onSelect }: SidebarProps) {
-  const { profile, isAdmin, isOwner, isRealAdmin, viewAsMember, setViewAsMember, signOut } = useAuth();
+  const { profile, isAdmin, isOwner, isRealAdmin, isRealOwner, viewAsMember, viewAsAdmin, setViewAsMember, setViewAsAdmin, signOut } = useAuth();
   const { selectedProject, selectProject } = useSprintContext();
   const [editingProfile, setEditingProfile] = useState(false);
   // Đang đứng trong một view quản trị thì mở sẵn — không thì mục đang chọn bị giấu trong
@@ -130,7 +130,7 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
             </div>
           </div>
         </button>
-        {/* Ẩn hẳn khi ĐANG xem thử: sidebar phải giống y hệt cái thành viên thật nhìn
+        {/* Ẩn hẳn khi ĐANG xem thử: sidebar phải giống y hệt cái vai được mô phỏng nhìn
             thấy. Lối thoát nằm ở MemberPreviewBar phía trên. */}
         {isRealAdmin && !viewAsMember && (
           <button
@@ -140,6 +140,16 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
           >
             <EyeIcon size={15} />
             Xem như thành viên
+          </button>
+        )}
+        {isRealOwner && !viewAsAdmin && !viewAsMember && (
+          <button
+            className="btn-sm preview-toggle"
+            onClick={() => setViewAsAdmin(true)}
+            title="Xem giao diện đúng như một admin thường (không có độc quyền owner)"
+          >
+            <EyeIcon size={15} />
+            Xem như admin
           </button>
         )}
         <button className="btn-sm btn-signout" style={{ width: '100%', marginTop: '0.4rem' }} onClick={signOut}>

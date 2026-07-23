@@ -27,6 +27,8 @@ interface AppUser {
 
 /** Khoá sessionStorage — cố ý KHÔNG dùng localStorage: đóng tab là thoát chế độ xem thử. */
 const PREVIEW_KEY = 'viewAsMember';
+/** Xem thử "như admin" (chỉ owner) — sessionStorage riêng, hai chế độ loại trừ nhau. */
+const PREVIEW_ADMIN_KEY = 'viewAsAdmin';
 
 /**
  * Deep link mở lúc CHƯA đăng nhập: OAuth redirect quay về origin '/' nên path bị mất.
@@ -61,6 +63,9 @@ interface AuthState {
   isRealOwner: boolean;
   viewAsMember: boolean;
   setViewAsMember: (on: boolean) => void;
+  /** Owner xem thử với con mắt ADMIN thường (mất các độc quyền owner: sửa dự án, đổi vai trò). */
+  viewAsAdmin: boolean;
+  setViewAsAdmin: (on: boolean) => void;
   loading: boolean;
   error: string | null;
   signIn: () => Promise<void>;
@@ -159,6 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [viewAsMember, setViewAsMemberState] = useState(
     () => sessionStorage.getItem(PREVIEW_KEY) === '1',
+  );
+  const [viewAsAdmin, setViewAsAdminState] = useState(
+    () => sessionStorage.getItem(PREVIEW_ADMIN_KEY) === '1',
   );
   const handledUser = useRef<string | null>(null);
 
@@ -282,6 +290,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (on) sessionStorage.setItem(PREVIEW_KEY, '1');
     else sessionStorage.removeItem(PREVIEW_KEY);
     setViewAsMemberState(on);
+    // Hai chế độ xem thử loại trừ nhau — bật member là tắt admin.
+    if (on) {
+      sessionStorage.removeItem(PREVIEW_ADMIN_KEY);
+      setViewAsAdminState(false);
+    }
+  }
+
+  /** Chỉ OWNER mới có gì để "hạ xuống admin" — admin thường bật cờ này là vô nghĩa. */
+  function setViewAsAdmin(on: boolean) {
+    if (!isRealOwner) return;
+    if (on) sessionStorage.setItem(PREVIEW_ADMIN_KEY, '1');
+    else sessionStorage.removeItem(PREVIEW_ADMIN_KEY);
+    setViewAsAdminState(on);
+    if (on) {
+      sessionStorage.removeItem(PREVIEW_KEY);
+      setViewAsMemberState(false);
+    }
   }
 
   const value = useMemo<AuthState>(
@@ -291,12 +316,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // `role` là vai trò HIỆU LỰC nên chế độ xem thử phản chiếu đúng ở đây luôn.
       role: isRealAdmin && !viewAsMember ? 'admin' : 'member',
       isAdmin: isRealAdmin && !viewAsMember,
-      isOwner: isRealOwner && !viewAsMember,
+      // Xem như admin = mất độc quyền owner (sửa dự án, đổi vai trò) nhưng vẫn là admin.
+      isOwner: isRealOwner && !viewAsMember && !viewAsAdmin,
       can,
       isRealAdmin,
       isRealOwner,
       viewAsMember,
       setViewAsMember,
+      viewAsAdmin,
+      setViewAsAdmin,
       loading,
       error,
       signIn,
@@ -305,7 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, profile, loading, error, isRealAdmin, isRealOwner, viewAsMember],
+    [user, profile, loading, error, isRealAdmin, isRealOwner, viewAsMember, viewAsAdmin],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

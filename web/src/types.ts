@@ -366,6 +366,30 @@ export interface CompChange {
   changedAt: Timestamp | null;
 }
 
+/** Cấu hình chi phí của dự án (project_cost_settings, 0059) — hiện là thưởng Tết. */
+export interface CostSettings {
+  projectId: string;
+  /** Số THÁNG LƯƠNG thưởng Tết mỗi người (mặc định 1; 0 = tắt). */
+  tetBonusMonths: number;
+  /** Tháng dương trả thưởng (1–12, mặc định 1). */
+  tetBonusMonth: number;
+}
+
+/** Doanh thu DỰ KIẾN của một tháng (project_revenue, 0059). `month` = ISO ngày đầu tháng. */
+export interface RevenueEntry {
+  projectId: string;
+  month: string;
+  amount: number;
+}
+
+/** Một bậc DỰ TÍNH tăng lương (member_salary_plan, 0059) — toàn cục theo người. */
+export interface SalaryPlanRow {
+  id: string;
+  memberId: string;
+  effectiveFrom: string; // 'YYYY-MM-DD'
+  monthlySalary: number;
+}
+
 /** Các khoản chi phí đã gán cho MỘT người trong dự án (project_cost_member_items). */
 export interface CostMemberItems {
   projectId: string;

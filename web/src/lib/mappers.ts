@@ -14,7 +14,10 @@ import type {
   CostItem,
   CostMemberItems,
   CostProjection,
+  CostSettings,
   MemberComp,
+  RevenueEntry,
+  SalaryPlanRow,
   MemberPeriodReview,
   MemberSprintNote,
   Feature,
@@ -196,6 +199,31 @@ export function rowToCostMemberItems(r: Row): CostMemberItems {
     projectId: r.project_id,
     memberId: r.member_id,
     itemIds: r.item_ids ?? [],
+  };
+}
+
+export function rowToCostSettings(r: Row): CostSettings {
+  return {
+    projectId: r.project_id,
+    tetBonusMonths: Number(r.tet_bonus_months ?? 1),
+    tetBonusMonth: r.tet_bonus_month ?? 1,
+  };
+}
+
+export function rowToRevenueEntry(r: Row): RevenueEntry {
+  return {
+    projectId: r.project_id,
+    month: r.month,
+    amount: Number(r.amount ?? 0),
+  };
+}
+
+export function rowToSalaryPlan(r: Row): SalaryPlanRow {
+  return {
+    id: r.id,
+    memberId: r.member_id,
+    effectiveFrom: r.effective_from,
+    monthlySalary: Number(r.monthly_salary ?? 0),
   };
 }
 

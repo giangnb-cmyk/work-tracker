@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectCosts } from '../hooks/useProjectCosts';
 import { useProjectMembers } from '../hooks/useProjectMembers';
 import { useMemberComp } from '../hooks/useMemberComp';
+import { useCostPlanning } from '../hooks/useCostPlanning';
 import { useOptimisticList } from '../hooks/useOptimisticList';
+import { useStoredView } from '../hooks/useStoredView';
 import {
   addCostItem,
   addCostProjection,
@@ -14,17 +16,26 @@ import {
   setMemberItems,
   updateCostItem,
   updateCostProjection,
+  upsertCostSettings,
+  upsertRevenue,
   type CostItemPatch,
   type CostProjectionPatch,
 } from '../lib/costWrites';
-import { anchorMonth, overheadTotal, projectionTotal, salaryTotal } from '../lib/projectCost';
+import { anchorMonth, buildCostSeries, monthIso, overheadTotal } from '../lib/projectCost';
 import { COST_PROJECTION_KIND_LABEL, type CostEmployeeRow, type CostProjection, type CostProjectionKind } from '../types';
+import CostChart from './cost/CostChart';
 import CostSummary from './cost/CostSummary';
 import EmployeeCostTable from './cost/EmployeeCostTable';
 import ItemPickerModal from './cost/ItemPickerModal';
 import MonthSlider from './cost/MonthSlider';
 import OverheadTable from './cost/OverheadTable';
 import ProjectionTable from './cost/ProjectionTable';
+import RevenueEditor from './cost/RevenueEditor';
+import TetSettingCard from './cost/TetSettingCard';
+
+/** Hai màn con của tab Chi phí: bảng số liệu và biểu đồ theo tháng. */
+type CostView = 'table' | 'chart';
+const COST_VIEWS: readonly CostView[] = ['table', 'chart'];
 
 /** Popup gán khoản chi phí đang mở cho ai: một nhân sự, hoặc một dòng dự chi. */
 type PickerTarget = { kind: 'member'; employee: CostEmployeeRow } | { kind: 'projection'; projection: CostProjection };
@@ -60,7 +71,29 @@ export default function CostManagement({ projectId }: { projectId: string }) {
   } = useProjectCosts(projectId);
   const { memberships, loading: mLoading } = useProjectMembers(projectId);
   const { byMember: compByMember, loading: compLoading } = useMemberComp();
+  const { settings, revenueByMonth, plansByMember, refetchSettings, refetchRevenue, loading: planLoading } =
+    useCostPlanning(projectId);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
+  const [cview, selectCview] = useStoredView<CostView>('costTabView', COST_VIEWS, 'table');
+
+  // Ghi lạc quan cho thưởng Tết + doanh thu (giá trị đơn lẻ, không có id để dùng
+  // useOptimisticList): overlay cục bộ đè lên server, reset khi đổi dự án; server về
+  // cùng giá trị nên overlay "đứng lại" cũng vô hại.
+  const [tetLocal, setTetLocal] = useState<{ tetBonusMonths?: number; tetBonusMonth?: number }>({});
+  const [revLocal, setRevLocal] = useState<Map<number, number>>(new Map());
+  useEffect(() => {
+    setTetLocal({});
+    setRevLocal(new Map());
+  }, [projectId]);
+
+  const tetMonths = tetLocal.tetBonusMonths ?? settings.tetBonusMonths;
+  const tetMonth = tetLocal.tetBonusMonth ?? settings.tetBonusMonth;
+  const revenueEffective = useMemo(() => {
+    if (revLocal.size === 0) return revenueByMonth;
+    const merged = new Map(revenueByMonth);
+    for (const [k, v] of revLocal) merged.set(k, v);
+    return merged;
+  }, [revenueByMonth, revLocal]);
 
   // Ghi lạc quan: tick/gõ là UI đổi NGAY, ghi chạy nền — không đợi vòng realtime (~1s).
   const { rows: items, mutate: mutateItems, create: createItems } = useOptimisticList(serverItems, refetchItems);
@@ -121,14 +154,29 @@ export default function CostManagement({ projectId }: { projectId: string }) {
   // Cửa sổ tính = [tháng hiện tại, +N) — xem anchorMonth (đã từng neo nhầm vào người vào
   // sớm nhất làm cả bảng về 0 ₫).
   const anchor = anchorMonth();
-  const salary = useMemo(() => salaryTotal(employees, anchor, months), [employees, anchor, months]);
-  // Thiết bị/vận hành theo mô hình GÁN THEO NGƯỜI (0056): khoản gán ai tính theo người đó
-  // (annual chia theo tháng làm việc), khoản chưa gán tính một suất chung.
+  // MỘT engine theo tháng cho cả thẻ tổng lẫn biểu đồ (lương bậc thang theo dự tính tăng,
+  // thưởng Tết, thiết bị/vận hành, dự chi, doanh thu) — hai nơi không bao giờ lệch số.
+  const series = useMemo(
+    () =>
+      buildCostSeries({
+        employees,
+        plansByMember,
+        items,
+        memberItemIds,
+        projections,
+        tetBonusMonths: tetMonths,
+        tetBonusMonth: tetMonth,
+        revenueByMonth: revenueEffective,
+        anchor,
+        horizon: months,
+      }),
+    [employees, plansByMember, items, memberItemIds, projections, tetMonths, tetMonth, revenueEffective, anchor, months],
+  );
+  // Bảng danh mục vẫn cần thành tiền + số suất TỪNG KHOẢN — cùng luật với engine.
   const overhead = useMemo(
     () => overheadTotal({ items, employees, memberItemIds, projections, anchor, horizon: months }),
     [items, employees, memberItemIds, projections, anchor, months],
   );
-  const projection = useMemo(() => projectionTotal(projections, months), [projections, months]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   // Tổng SUẤT tuyển thêm trong dự chi — hiện cạnh số người thật ở bảng lương.
   const hireCount = useMemo(
@@ -136,7 +184,7 @@ export default function CostManagement({ projectId }: { projectId: string }) {
     [projections],
   );
 
-  const loading = costsLoading || mLoading || compLoading;
+  const loading = costsLoading || mLoading || compLoading || planLoading;
 
   if (loading) {
     return (
@@ -150,15 +198,48 @@ export default function CostManagement({ projectId }: { projectId: string }) {
     <>
       <MonthSlider months={months} onChange={changeMonths} />
 
-      <CostSummary
-        months={months}
-        salary={salary}
-        oneTime={overhead.oneTime}
-        annual={overhead.annual}
-        projection={projection}
-      />
+      <div className="row cost-view-row">
+        <div className="seg-toggle">
+          <button className={`seg${cview === 'table' ? ' on' : ''}`} onClick={() => selectCview('table')}>📋 Bảng</button>
+          <button className={`seg${cview === 'chart' ? ' on' : ''}`} onClick={() => selectCview('chart')}>📊 Biểu đồ</button>
+        </div>
+      </div>
+
+      <CostSummary months={months} totals={series.totals} />
 
       {error && <p className="error-text">{error}</p>}
+
+      {cview === 'chart' && (
+        <>
+          <CostChart series={series} />
+          <RevenueEditor
+            series={series}
+            revenueByMonth={revenueEffective}
+            onCommit={(mIdx, amount) => {
+              // Lạc quan: chart đổi ngay, ghi nền, refetch chốt sổ.
+              setRevLocal((prev) => new Map(prev).set(mIdx, amount));
+              void runOp(
+                () => upsertRevenue(projectId, monthIso(mIdx), amount, createdBy).then(refetchRevenue),
+                'Lưu doanh thu thất bại (cần quyền admin).',
+              );
+            }}
+          />
+        </>
+      )}
+
+      {cview === 'table' && (
+      <>
+      <TetSettingCard
+        months={tetMonths}
+        payMonth={tetMonth}
+        onChange={(patch) => {
+          setTetLocal((prev) => ({ ...prev, ...patch }));
+          void runOp(
+            () => upsertCostSettings(projectId, patch, createdBy).then(refetchSettings),
+            'Lưu cấu hình thưởng Tết thất bại (cần quyền admin).',
+          );
+        }}
+      />
 
       {/* Danh mục chi phí đứng TRÊN bảng lương (yêu cầu): xem danh mục trước, rồi xuống
           bảng lương bấm từng người để gán. */}
@@ -211,6 +292,8 @@ export default function CostManagement({ projectId }: { projectId: string }) {
           )}
         onPickItems={(p) => setPicker({ kind: 'projection', projection: p })}
       />
+      </>
+      )}
 
       {picker?.kind === 'member' && (
         <ItemPickerModal

@@ -14,7 +14,7 @@ export interface SalaryLine {
 }
 
 /** 'YYYY-MM-DD' → chỉ số tháng tuyệt đối (year*12 + month0). null nếu rỗng/không hợp lệ. */
-function monthIndex(date: string | null | undefined): number | null {
+export function monthIndex(date: string | null | undefined): number | null {
   if (!date) return null;
   const m = /^(\d{4})-(\d{2})/.exec(date);
   if (!m) return null;
@@ -166,4 +166,179 @@ export function projectionLineTotal(p: CostProjection, horizon: number): number 
 /** Tổng dự chi (tuyển thêm + outsource) trong `horizon` tháng. */
 export function projectionTotal(projections: CostProjection[], horizon: number): number {
   return projections.reduce((sum, p) => sum + projectionLineTotal(p, horizon), 0);
+}
+
+/* ===========================================================================
+   ENGINE THEO TỪNG THÁNG (0059) — nguồn sự thật CHUNG cho thẻ tổng và tab Biểu đồ.
+   Tính mọi bucket theo từng tháng trong cửa sổ rồi cộng lại: thẻ tổng = Σ series,
+   nên hai chỗ không bao giờ lệch nhau.
+   =========================================================================== */
+
+/** Một bậc dự tính tăng lương: từ `effectiveFrom` lương thành `monthlySalary`. */
+export interface PlanStep {
+  effectiveFrom: string; // 'YYYY-MM-DD'
+  monthlySalary: number;
+}
+
+export interface SeriesInput {
+  employees: (SalaryLine & { memberId: string })[];
+  /** memberId → các bậc tăng lương DỰ TÍNH (member_salary_plan). */
+  plansByMember: Map<string, PlanStep[]>;
+  items: CostItem[];
+  memberItemIds: Map<string, string[]>;
+  projections: CostProjection[];
+  /** Thưởng Tết = `tetBonusMonths` THÁNG LƯƠNG (theo mức tại tháng trả), trả vào tháng
+   *  dương `tetBonusMonth` (1-12) mỗi năm trong cửa sổ. 0 = tắt. */
+  tetBonusMonths: number;
+  tetBonusMonth: number;
+  /** Doanh thu dự kiến: chỉ số tháng tuyệt đối → tiền. */
+  revenueByMonth: Map<number, number>;
+  anchor: number;
+  horizon: number;
+}
+
+export interface CostSeries {
+  /** Chỉ số tháng tuyệt đối của từng cột (anchor … anchor+horizon-1). */
+  monthsIdx: number[];
+  salary: number[];
+  tet: number[];
+  /** Thiết bị/vận hành gộp (ban đầu rơi vào tháng bắt đầu, định kỳ rải theo tháng). */
+  overhead: number[];
+  projection: number[];
+  revenue: number[];
+  totals: {
+    salary: number;
+    tet: number;
+    oneTime: number;
+    recurring: number;
+    projection: number;
+    revenue: number;
+    /** Tổng CHI = lương + Tết + thiết bị/vận hành + dự chi. */
+    grand: number;
+    /** Lãi/lỗ = doanh thu − tổng chi. */
+    profit: number;
+  };
+}
+
+/** Nhãn 'MM/YYYY' của một chỉ số tháng tuyệt đối — trục X biểu đồ. */
+export function monthLabel(idx: number): string {
+  return `${String((idx % 12) + 1).padStart(2, '0')}/${Math.floor(idx / 12)}`;
+}
+
+/** Ngày ISO đầu tháng của một chỉ số tháng tuyệt đối — khoá dòng doanh thu. */
+export function monthIso(idx: number): string {
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}-01`;
+}
+
+/** Lương của một người tại tháng `m`: bậc dự tính mới nhất có hiệu lực ≤ m, không có → mức hiện tại. */
+function salaryAt(emp: SalaryLine, plans: PlanStep[] | undefined, m: number): number {
+  let best = emp.monthlySalary;
+  let bestIdx = -Infinity;
+  for (const p of plans ?? []) {
+    const mi = monthIndex(p.effectiveFrom);
+    if (mi != null && mi <= m && mi > bestIdx) {
+      bestIdx = mi;
+      best = p.monthlySalary;
+    }
+  }
+  return best;
+}
+
+function isActiveAt(emp: SalaryLine, m: number, anchor: number): boolean {
+  const start = monthIndex(emp.startDate) ?? anchor;
+  const end = monthIndex(emp.endDate);
+  return start <= m && (end == null || m <= end);
+}
+
+export function buildCostSeries(inp: SeriesInput): CostSeries {
+  const { employees, plansByMember, items, memberItemIds, projections, anchor, horizon } = inp;
+  const n = Math.max(0, horizon);
+  const monthsIdx = Array.from({ length: n }, (_, i) => anchor + i);
+  const salary = new Array(n).fill(0);
+  const tet = new Array(n).fill(0);
+  const overhead = new Array(n).fill(0);
+  const projectionArr = new Array(n).fill(0);
+  const revenue = monthsIdx.map((m) => inp.revenueByMonth.get(m) ?? 0);
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const assigned = new Set<string>();
+  let oneTime = 0;
+
+  /** Cộng một khoản thiết bị/vận hành vào tháng i, tách tổng one-time để hiện thẻ riêng. */
+  const addItem = (i: number, item: CostItem, mult: number) => {
+    const amt =
+      (item.kind === 'one_time' ? item.amount : item.kind === 'annual' ? item.amount / 12 : item.amount) * mult;
+    overhead[i] += amt;
+    if (item.kind === 'one_time') oneTime += amt;
+  };
+
+  for (const emp of employees) {
+    const plans = plansByMember.get(emp.memberId);
+    const itemIds = memberItemIds.get(emp.memberId) ?? [];
+    itemIds.forEach((id) => assigned.add(id));
+    let chargedOneTime = false;
+    for (let i = 0; i < n; i++) {
+      const m = anchor + i;
+      if (!isActiveAt(emp, m, anchor)) continue;
+      const sal = salaryAt(emp, plans, m);
+      salary[i] += sal;
+      // Thưởng Tết: đúng tháng dương cấu hình, mỗi năm một lần, theo LƯƠNG TẠI THÁNG ĐÓ.
+      if (inp.tetBonusMonths > 0 && (m % 12) + 1 === inp.tetBonusMonth) {
+        tet[i] += sal * inp.tetBonusMonths;
+      }
+      for (const id of itemIds) {
+        const it = byId.get(id);
+        if (!it) continue;
+        if (it.kind === 'one_time') {
+          if (!chargedOneTime) addItem(i, it, 1); // sắm 1 lần ở tháng active đầu tiên
+        } else {
+          addItem(i, it, 1);
+        }
+      }
+      chargedOneTime = true;
+    }
+  }
+
+  for (const p of projections) {
+    for (const id of p.itemIds ?? []) {
+      const it = byId.get(id);
+      if (!it) continue;
+      assigned.add(id);
+      if (it.kind === 'one_time') {
+        if (n > 0) addItem(0, it, p.headCount);
+      } else {
+        for (let i = 0; i < n; i++) addItem(i, it, p.headCount);
+      }
+    }
+    // Tiền mặt của dự chi (lương tuyển thêm / gói outsource) theo nhịp riêng.
+    if (p.cadence === 'one_time') {
+      if (n > 0) projectionArr[0] += p.amount * p.headCount;
+    } else {
+      const per = p.cadence === 'annual' ? (p.amount * p.headCount) / 12 : p.amount * p.headCount;
+      for (let i = 0; i < n; i++) projectionArr[i] += per;
+    }
+  }
+
+  // Khoản chưa gán ai = chi phí chung: one_time ở tháng đầu, định kỳ rải mọi tháng.
+  for (const it of items) {
+    if (assigned.has(it.id)) continue;
+    if (it.kind === 'one_time') {
+      if (n > 0) addItem(0, it, 1);
+    } else {
+      for (let i = 0; i < n; i++) addItem(i, it, 1);
+    }
+  }
+
+  const sum = (a: number[]) => a.reduce((s, x) => s + x, 0);
+  const totals = {
+    salary: sum(salary),
+    tet: sum(tet),
+    oneTime,
+    recurring: sum(overhead) - oneTime,
+    projection: sum(projectionArr),
+    revenue: sum(revenue),
+    grand: sum(salary) + sum(tet) + sum(overhead) + sum(projectionArr),
+    profit: sum(revenue) - (sum(salary) + sum(tet) + sum(overhead) + sum(projectionArr)),
+  };
+
+  return { monthsIdx, salary, tet, overhead, projection: projectionArr, revenue, totals };
 }

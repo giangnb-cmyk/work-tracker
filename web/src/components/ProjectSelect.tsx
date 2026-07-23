@@ -14,7 +14,7 @@ import type { Project } from '../types';
  * main workspace (Layout); the top-left icon there returns here.
  */
 export default function ProjectSelect() {
-  const { profile, isAdmin, isOwner, isRealAdmin, viewAsMember, setViewAsMember, signOut } = useAuth();
+  const { profile, isAdmin, isOwner, isRealAdmin, isRealOwner, viewAsMember, viewAsAdmin, setViewAsMember, setViewAsAdmin, signOut } = useAuth();
   const { projects, projectsLoading, selectProject } = useSprintContext();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
@@ -39,6 +39,17 @@ export default function ProjectSelect() {
             >
               <EyeIcon size={15} />
               Xem như thành viên
+            </button>
+          )}
+          {/* Chỉ OWNER có gì để hạ xuống admin thường (mất sửa dự án / đổi vai trò). */}
+          {isRealOwner && !viewAsAdmin && !viewAsMember && (
+            <button
+              className="btn-sm preview-toggle-inline"
+              onClick={() => setViewAsAdmin(true)}
+              title="Xem giao diện đúng như một admin thường (không có độc quyền owner)"
+            >
+              <EyeIcon size={15} />
+              Xem như admin
             </button>
           )}
           {/* Một cửa vào khu quản trị (thành viên toàn web, cấu hình, hệ thống) — bao quát

@@ -3,8 +3,15 @@
 // Postgres snake_case, chuyển ngay tại đây.
 
 import { supabase } from '../supabase';
-import { rowToCompChange, rowToCostItem, rowToCostProjection } from './mappers';
-import type { CostCadence, CostItem, CostItemKind, CostProjection, CostProjectionKind } from '../types';
+import { rowToCompChange, rowToCostItem, rowToCostProjection, rowToSalaryPlan } from './mappers';
+import type {
+  CostCadence,
+  CostItem,
+  CostItemKind,
+  CostProjection,
+  CostProjectionKind,
+  SalaryPlanRow,
+} from '../types';
 
 /* ----------------------------- Lương nhân sự (toàn cục) ----------------------------- */
 
@@ -48,6 +55,77 @@ export async function fetchCompHistory(memberId: string, limit = 12) {
     .limit(limit);
   if (error) throw error;
   return (data ?? []).map(rowToCompChange);
+}
+
+/* -------------------------- Kế hoạch tài chính (0059) -------------------------- */
+
+/** Cấu hình thưởng Tết của dự án (tạo dòng nếu chưa có). */
+export async function upsertCostSettings(
+  projectId: string,
+  patch: { tetBonusMonths?: number; tetBonusMonth?: number },
+  updatedBy: string | null,
+): Promise<void> {
+  const row: Record<string, unknown> = {
+    project_id: projectId,
+    updated_at: new Date().toISOString(),
+    updated_by: updatedBy,
+  };
+  if (patch.tetBonusMonths !== undefined) row.tet_bonus_months = patch.tetBonusMonths;
+  if (patch.tetBonusMonth !== undefined) row.tet_bonus_month = patch.tetBonusMonth;
+  const { error } = await supabase.from('project_cost_settings').upsert(row, { onConflict: 'project_id' });
+  if (error) throw error;
+}
+
+/** Doanh thu dự kiến của MỘT tháng (`monthIso` = 'YYYY-MM-01'). */
+export async function upsertRevenue(
+  projectId: string,
+  monthIso: string,
+  amount: number,
+  updatedBy: string | null,
+): Promise<void> {
+  const { error } = await supabase.from('project_revenue').upsert(
+    {
+      project_id: projectId,
+      month: monthIso,
+      amount,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy,
+    },
+    { onConflict: 'project_id,month' },
+  );
+  if (error) throw error;
+}
+
+/** Các bậc DỰ TÍNH tăng lương của một người (cho MemberModal), sắp theo ngày hiệu lực. */
+export async function fetchSalaryPlans(memberId: string): Promise<SalaryPlanRow[]> {
+  const { data, error } = await supabase
+    .from('member_salary_plan')
+    .select('*')
+    .eq('member_id', memberId)
+    .order('effective_from', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(rowToSalaryPlan);
+}
+
+/** Thêm một bậc dự tính tăng lương — trả về dòng thật để UI gắn ngay. */
+export async function addSalaryPlan(
+  memberId: string,
+  effectiveFrom: string,
+  monthlySalary: number,
+  createdBy: string | null,
+): Promise<SalaryPlanRow> {
+  const { data, error } = await supabase
+    .from('member_salary_plan')
+    .insert({ member_id: memberId, effective_from: effectiveFrom, monthly_salary: monthlySalary, created_by: createdBy })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return rowToSalaryPlan(data);
+}
+
+export async function deleteSalaryPlan(id: string): Promise<void> {
+  const { error } = await supabase.from('member_salary_plan').delete().eq('id', id);
+  if (error) throw error;
 }
 
 /* --------------------------- Chi phí thiết bị/vận hành --------------------------- */

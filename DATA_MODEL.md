@@ -260,6 +260,16 @@ thành viên (📈 Lịch sử lương).
   lần/người, `annual` × (số tháng người đó làm việc trong cửa sổ / 12); gán cho dự chi →
   × `head_count`, `annual` × horizon/12; khoản KHÔNG gán ai → một suất chung (1 lần /
   × horizon/12). Dự chi tiền mặt: `amount × head_count × hệ số cadence`.
+**Kế hoạch tài chính (0059)** — ba bảng phụ, đều RLS admin-only:
+- `project_cost_settings(project_id pk, tet_bonus_months default 1, tet_bonus_month 1–12 default 1)`
+  — thưởng Tết = N THÁNG LƯƠNG/người, trả vào tháng cấu hình, tính theo lương TẠI THÁNG TRẢ.
+- `project_revenue(project_id, month date đầu-tháng, amount)` — doanh thu DỰ KIẾN theo tháng.
+- `member_salary_plan(id, member_id, effective_from, monthly_salary)` — bậc DỰ TÍNH tăng
+  lương (toàn cục theo người, điền ở MemberModal); engine đọc thành lương bậc thang.
+- Engine `buildCostSeries` (web/src/lib/projectCost.ts) tính MỌI bucket theo TỪNG THÁNG
+  (lương bậc thang, Tết, TB&VH, dự chi, doanh thu) — thẻ tổng = Σ series = đúng số biểu đồ
+  (tab 📊 trong Chi phí). CHECK `project_cost_items.kind` nới thêm 'monthly' ở 0059.
+
 - **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`). **Lương** điền một chỗ ở chi tiết
   thành viên (`MemberModal`, tab Thành viên), ghi qua `upsertMemberComp`. Tab **Chi phí**
   (`CostAdmin` → `CostManagement` + `components/cost/*`) chọn dự án qua `useAdminCostProject`,

@@ -2609,7 +2609,7 @@ table.data-table { width: 100%; border-collapse: collapse; }
 }
 .cost-range::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
 
-/* Thẻ tổng: thẻ TỔNG CỘNG nổi bật bằng viền + nền indigo nhạt. */
+/* Thẻ tổng: thẻ TỔNG CHI nổi bật bằng viền + nền indigo nhạt; Lãi/Lỗ tô xanh/đỏ. */
 .cost-summary { margin-top: 1.25rem; }
 .cost-stat-value { font-size: 1.15rem; }
 .cost-stat-total {
@@ -2617,6 +2617,33 @@ table.data-table { width: 100%; border-collapse: collapse; }
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(56, 189, 248, 0.08));
 }
 .cost-stat-total .cost-stat-value { color: var(--primary); font-size: 1.3rem; }
+.cost-stat-profit .cost-stat-value { color: var(--green); }
+.cost-stat-loss { border: 1px solid rgba(239, 68, 68, 0.45); }
+.cost-stat-loss .cost-stat-value { color: var(--red); }
+
+/* Hàng chuyển màn Bảng | Biểu đồ của tab Chi phí. */
+.cost-view-row { justify-content: flex-end; margin-bottom: 1rem; }
+
+/* Card cấu hình thưởng Tết: một hàng ngang, co cột trên màn hẹp. */
+.tet-card { display: flex; align-items: center; gap: 1.25rem; padding: 1rem 1.25rem; flex-wrap: wrap; }
+.tet-title { font-weight: 700; font-size: 0.95rem; white-space: nowrap; }
+.tet-field { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+.tet-months { width: 90px; text-align: center; }
+.tet-month-sel { width: auto; padding: 0.45rem 0.6rem; }
+.tet-note { font-size: 0.76rem; flex: 1; min-width: 220px; }
+
+/* Vùng vẽ biểu đồ chi phí — cao cố định, Chart.js tự co theo. */
+.cost-chart-wrap { position: relative; height: 400px; }
+
+/* Lưới điền doanh thu theo tháng. */
+.rev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.7rem 1rem; }
+.rev-cell { margin-bottom: 0; }
+.rev-cell > span { font-size: 0.8rem; }
+
+/* Hàng thêm dự tính tăng lương trong modal thành viên. */
+.comp-plan-add { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; }
+.comp-plan-add .date-input { width: 170px; flex-shrink: 0; }
+.comp-plan-del { margin-left: auto; }
 
 /* Đầu mỗi bảng: tiêu đề + nút thêm. */
 .cost-section-head { align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
