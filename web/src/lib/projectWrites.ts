@@ -12,6 +12,8 @@ export interface ProjectInput {
   notionProjectId: string | null;
   weeklySheetId: string | null;
   dailyReportWebhook?: string | null;
+  /** Sheet nhận bảng CHI PHÍ (file riêng, có lương — 0060). */
+  costSheetId?: string | null;
 }
 
 /**
@@ -39,6 +41,7 @@ export async function createProject(input: ProjectInput, createdBy: string): Pro
       notion_project_id: input.notionProjectId,
       weekly_sheet_id: input.weeklySheetId,
       daily_report_webhook: input.dailyReportWebhook ?? null,
+      cost_sheet_id: input.costSheetId ?? null,
       created_by: createdBy || null,
     })
     .select('id')
@@ -56,6 +59,7 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
   if (patch.notionProjectId !== undefined) row.notion_project_id = patch.notionProjectId;
   if (patch.weeklySheetId !== undefined) row.weekly_sheet_id = patch.weeklySheetId;
   if (patch.dailyReportWebhook !== undefined) row.daily_report_webhook = patch.dailyReportWebhook;
+  if (patch.costSheetId !== undefined) row.cost_sheet_id = patch.costSheetId;
   const { error } = await supabase.from('projects').update(row).eq('id', id);
   if (error) throw error;
 }

@@ -26,10 +26,13 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   // Giữ nguyên thứ người dùng dán (link đầy đủ) — chỉ bóc id lúc lưu, để họ vẫn đọc được
   // đúng cái mình vừa dán thay vì thấy nó biến thành một chuỗi lạ.
   const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
+  const [costSheetInput, setCostSheetInput] = useState(project?.costSheetId ?? '');
   const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
 
   const sheetId = extractSheetId(sheetInput);
   const sheetInvalid = sheetInput.trim().length > 0 && !sheetId;
+  const costSheetId = extractSheetId(costSheetInput);
+  const costSheetInvalid = costSheetInput.trim().length > 0 && !costSheetId;
   // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
   const webhookInvalid = dailyWebhook.trim().length > 0 && !dailyWebhook.includes('/api/webhooks/');
   const [testing, setTesting] = useState(false);
@@ -88,6 +91,10 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       setError('Link Google Sheet không hợp lệ. Dán link dạng docs.google.com/spreadsheets/d/…');
       return;
     }
+    if (costSheetInvalid) {
+      setError('Link Google Sheet CHI PHÍ không hợp lệ. Dán link dạng docs.google.com/spreadsheets/d/…');
+      return;
+    }
     if (webhookInvalid) {
       setError('Webhook Discord không hợp lệ. Dán link dạng https://discord.com/api/webhooks/…');
       return;
@@ -102,6 +109,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       notionProjectId: notionProjectId || null,
       weeklySheetId: sheetId,
       dailyReportWebhook: dailyWebhook.trim() || null,
+      costSheetId,
     };
     try {
       if (isEdit && project) {
@@ -112,6 +120,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           notionProjectId: notionProjectId || null,
           weeklySheetId: sheetId,
           dailyReportWebhook: dailyWebhook.trim() || null,
+          costSheetId,
         });
       } else {
         await createProject(input, user?.uid ?? '');
@@ -178,6 +187,26 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           ) : (
             <>💡 Bot điền “đã hoàn thành tuần trước” + “kế hoạch tuần tới” vào sheet này mỗi
               sáng thứ 2. Nhớ Share sheet cho service account của bot với quyền <b>Editor</b>.</>
+          )}
+        </p>
+
+        <label className="field">
+          <span>Google Sheet CHI PHÍ (xuất từ tab Chi phí)</span>
+          <input
+            className="input"
+            value={costSheetInput}
+            onChange={(e) => setCostSheetInput(e.target.value)}
+            placeholder="Dán link sheet RIÊNG chỉ admin xem: https://docs.google.com/spreadsheets/d/…"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {costSheetInvalid ? (
+            <span className="error-text">⚠ Không đọc được id từ link này.</span>
+          ) : costSheetId ? (
+            <>✅ Sheet id: <span className="mono">{costSheetId}</span> — bảng chi phí (CÓ LƯƠNG) sẽ ghi vào đây.</>
+          ) : (
+            <>💡 File RIÊNG chỉ admin/owner mở được (bảng xuất có LƯƠNG). Nhớ Share cho service
+              account của bot quyền <b>Editor</b>. Rỗng = tắt nút Xuất.</>
           )}
         </p>
 

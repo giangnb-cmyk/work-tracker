@@ -869,9 +869,30 @@ async def _process_review_request(sb, req):
         log.warning("Cập nhật trạng thái đánh giá lỗi: %s", e)
 
 
+@tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
+async def poll_cost_export_requests():
+    """Quet yeu cau 'Xuat Google Sheet' cua tab Chi phi (bang cost_export_requests, 0060).
+
+    Web da tinh san so lieu trong payload — bot chi ghi vao sheet (cost_sheet_id cua du an).
+    """
+    try:
+        sb = get_client()
+    except Exception as e:
+        log.warning("Chưa cấu hình Supabase cho xuất chi phí: %s", e)
+        return
+    try:
+        import cost_export
+        await asyncio.to_thread(cost_export.process_pending, sb)
+    except Exception:
+        log.exception("Xử lý hàng đợi xuất chi phí lỗi")
+
+
 @client.event
 async def on_ready():
     log.info("Bot online: %s (id=%s)", client.user, client.user.id)
+    if not poll_cost_export_requests.is_running():
+        poll_cost_export_requests.start()
+        log.info("Quét yêu cầu xuất chi phí ra Google Sheet mỗi %ds", BUG_SYNC_POLL_SECONDS)
     if not poll_release_sync_requests.is_running():
         poll_release_sync_requests.start()
         log.info("Quét yêu cầu sync lịch phát hành từ web mỗi %ds", BUG_SYNC_POLL_SECONDS)

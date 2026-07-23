@@ -23,8 +23,10 @@ import {
   type CostProjectionPatch,
 } from '../lib/costWrites';
 import { anchorMonth, buildCostSeries, monthIso, monthLabel, overheadTotal } from '../lib/projectCost';
+import { buildCostExportPayload, fetchExportStatus, requestCostExport } from '../lib/costExport';
 import { COST_PROJECTION_KIND_LABEL, type CostEmployeeRow, type CostProjection, type CostProjectionKind } from '../types';
 import CostChart from './cost/CostChart';
+import CostProfitChart from './cost/CostProfitChart';
 import CostSummary from './cost/CostSummary';
 import EmployeeCostTable from './cost/EmployeeCostTable';
 import ItemPickerModal from './cost/ItemPickerModal';
@@ -60,7 +62,7 @@ function readMonths(): number {
  */
 export default function CostManagement({ projectId }: { projectId: string }) {
   const { profile } = useAuth();
-  const { members } = useSprintContext();
+  const { members, projects } = useSprintContext();
   const {
     items: serverItems,
     projections: serverProjections,
@@ -82,6 +84,9 @@ export default function CostManagement({ projectId }: { projectId: string }) {
   // cùng giá trị nên overlay "đứng lại" cũng vô hại.
   const [tetLocal, setTetLocal] = useState<{ tetBonusMonths?: number; tetBonusMonth?: number }>({});
   const [revLocal, setRevLocal] = useState<Map<number, number>>(new Map());
+  // Trạng thái xuất Google Sheet: null = rảnh; chuỗi = đang hiện thông điệp.
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   useEffect(() => {
     setTetLocal({});
     setRevLocal(new Map());
@@ -187,6 +192,57 @@ export default function CostManagement({ projectId }: { projectId: string }) {
     [projections],
   );
 
+  const costProject = projects.find((p) => p.id === projectId) ?? null;
+  const costSheetUrl = costProject?.costSheetId
+    ? `https://docs.google.com/spreadsheets/d/${costProject.costSheetId}`
+    : null;
+
+  /** Xuất ra Google Sheet: web tính sẵn payload (engine), xếp queue, bot ghi — poll trạng thái. */
+  async function handleExport() {
+    if (!costProject?.costSheetId) {
+      setExportMsg('⚠ Dự án chưa cấu hình “Google Sheet CHI PHÍ” — owner bấm ⚙ sửa dự án ở trang chọn dự án, dán link sheet riêng và Share Editor cho service account của bot.');
+      return;
+    }
+    setExporting(true);
+    setExportMsg('Đang gửi yêu cầu…');
+    try {
+      const payload = buildCostExportPayload({
+        projectName: costProject.name,
+        anchor,
+        months,
+        series,
+        employees,
+        itemById,
+        memberItemIds,
+        items,
+        overhead,
+        projections,
+      });
+      const reqId = await requestCostExport(projectId, payload, createdBy);
+      setExportMsg('⏳ Bot đang ghi vào sheet (nhịp quét ~1 phút)…');
+      const started = Date.now();
+      const timer = setInterval(() => {
+        void fetchExportStatus(reqId)
+          .then((st) => {
+            if (st && st.status !== 'pending') {
+              clearInterval(timer);
+              setExporting(false);
+              setExportMsg(st.status === 'done' ? `✅ ${st.result || 'Đã xuất xong.'}` : `❌ ${st.result || 'Xuất thất bại.'}`);
+            } else if (Date.now() - started > 120_000) {
+              clearInterval(timer);
+              setExporting(false);
+              setExportMsg('⚠ Chưa thấy bot phản hồi sau 2 phút — kiểm tra bot có đang chạy không. Yêu cầu vẫn nằm trong hàng đợi, bot bật lên sẽ xử lý.');
+            }
+          })
+          .catch(() => {/* mạng chớp — giữ poll */});
+      }, 3000);
+    } catch (err) {
+      console.error('Gửi yêu cầu xuất chi phí thất bại', err);
+      setExporting(false);
+      setExportMsg('❌ Gửi yêu cầu thất bại (cần quyền admin).');
+    }
+  }
+
   const loading = costsLoading || mLoading || compLoading || planLoading;
 
   if (loading) {
@@ -213,11 +269,30 @@ export default function CostManagement({ projectId }: { projectId: string }) {
             <button className="btn-sm" onClick={() => setAnchorShift(0)}>Về tháng này</button>
           )}
         </div>
-        <div className="seg-toggle">
-          <button className={`seg${cview === 'table' ? ' on' : ''}`} onClick={() => selectCview('table')}>📋 Bảng</button>
-          <button className={`seg${cview === 'chart' ? ' on' : ''}`} onClick={() => selectCview('chart')}>📊 Biểu đồ</button>
+        <div className="row" style={{ gap: '0.6rem' }}>
+          <button
+            className="btn-sm"
+            onClick={() => void handleExport()}
+            disabled={exporting}
+            title="Ghi toàn bộ bảng chi phí (khoảng đang xem) vào Google Sheet đã cấu hình của dự án"
+          >
+            {exporting ? '⏳ Đang xuất…' : '📤 Xuất Google Sheet'}
+          </button>
+          <div className="seg-toggle">
+            <button className={`seg${cview === 'table' ? ' on' : ''}`} onClick={() => selectCview('table')}>📋 Bảng</button>
+            <button className={`seg${cview === 'chart' ? ' on' : ''}`} onClick={() => selectCview('chart')}>📊 Biểu đồ</button>
+          </div>
         </div>
       </div>
+
+      {exportMsg && (
+        <div className="callout-inline" style={{ marginBottom: '1rem' }}>
+          {exportMsg}
+          {exportMsg.startsWith('✅') && costSheetUrl && (
+            <> — <a href={costSheetUrl} target="_blank" rel="noreferrer">Mở sheet →</a></>
+          )}
+        </div>
+      )}
 
       <CostSummary months={months} totals={series.totals} />
 
@@ -226,6 +301,7 @@ export default function CostManagement({ projectId }: { projectId: string }) {
       {cview === 'chart' && (
         <>
           <CostChart series={series} />
+          <CostProfitChart series={series} />
           <RevenueEditor
             series={series}
             revenueByMonth={revenueEffective}

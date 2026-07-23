@@ -296,6 +296,11 @@ export interface Project {
    * qua Supabase và gửi report của project này vào đây. Rỗng = project không gửi.
    */
   dailyReportWebhook: string | null;
+  /**
+   * Google Sheet **id** nhận bảng CHI PHÍ khi bấm "Xuất Google Sheet" (0060). PHẢI là file
+   * riêng chỉ admin xem (có LƯƠNG) + share Editor cho service account. Rỗng = chưa bật.
+   */
+  costSheetId: string | null;
   createdAt?: Timestamp;
   createdBy: string;
 }

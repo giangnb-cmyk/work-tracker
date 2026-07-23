@@ -12,19 +12,11 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { CHART_GRID, applyChartTheme } from '../../lib/chartTheme';
-import { formatVnd } from '../../lib/format';
+import { formatVnd, shortVnd } from '../../lib/format';
 import { monthLabel, type CostSeries } from '../../lib/projectCost';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend);
 applyChartTheme();
-
-/** Rút gọn tiền cho trục Y: 1.500.000.000 → "1,5 tỷ", 25.000.000 → "25tr". */
-function shortVnd(v: number): string {
-  const abs = Math.abs(v);
-  if (abs >= 1e9) return `${(v / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ`;
-  if (abs >= 1e6) return `${Math.round(v / 1e6)}tr`;
-  return v.toLocaleString('vi-VN');
-}
 
 /**
  * Biểu đồ chi phí ↔ doanh thu QUA CÁC THÁNG trong cửa sổ slider: cột chồng = 4 bucket chi

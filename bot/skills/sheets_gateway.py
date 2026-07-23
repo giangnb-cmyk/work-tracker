@@ -180,6 +180,24 @@ def update_rich(sess: requests.Session, sheet_id: str, tab: str,
     _check(r, f"ghi (định dạng) ô {col_name(col0)}{row}")
 
 
+def ensure_tab(sess: requests.Session, sheet_id: str, tab: str) -> None:
+    """Tao tab neu chua co (idempotent) — dung cho xuat bao cao tu dong."""
+    if tab in tab_titles(sess, sheet_id):
+        return
+    r = sess.post(
+        f"{_API}/{sheet_id}:batchUpdate",
+        json={"requests": [{"addSheet": {"properties": {"title": tab}}}]},
+        timeout=_TIMEOUT,
+    )
+    _check(r, f"tạo tab '{tab}'")
+
+
+def clear_tab(sess: requests.Session, sheet_id: str, tab: str) -> None:
+    """Xoa TOAN BO gia tri cua mot tab (giu dinh dang) truoc khi ghi ban moi."""
+    r = sess.post(f"{_API}/{sheet_id}/values/'{tab}'!A1:ZZ100000:clear", json={}, timeout=_TIMEOUT)
+    _check(r, f"dọn tab '{tab}'")
+
+
 def col_name(index0: int) -> str:
     """0 -> A, 25 -> Z, 26 -> AA. Sheets khong nhan chi so cot trong dia chi A1."""
     if index0 < 0:

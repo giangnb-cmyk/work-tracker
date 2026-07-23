@@ -90,6 +90,14 @@ export function formatVnd(n: number): string {
   return `${Math.round(n).toLocaleString('vi-VN')} ₫`;
 }
 
+/** Rút gọn tiền cho trục biểu đồ: 1.500.000.000 → "1,5 tỷ", 25.000.000 → "25tr". */
+export function shortVnd(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return `${(v / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ`;
+  if (abs >= 1e6) return `${Math.round(v / 1e6)}tr`;
+  return v.toLocaleString('vi-VN');
+}
+
 /** Hôm nay theo GIỜ MÁY dạng 'YYYY-MM-DD' (toISOString là UTC — lệch ngày lúc sáng sớm VN). */
 export function todayIso(): string {
   const d = new Date();

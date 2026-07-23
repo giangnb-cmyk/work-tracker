@@ -276,6 +276,14 @@ thành viên (📈 Lịch sử lương).
   không; thưởng Tết không đóng BHXH. Đổi thang lương = sửa `docs/bhxh.xlsx` **và**
   `BHXH_GRADES` (hằng số chép tay, không tự đọc file).
 
+**Xuất Google Sheet (0060)** — theo pattern queue (như release_sync): web tính sẵn toàn bộ
+số liệu bằng engine rồi chèn `cost_export_requests(project_id, payload jsonb, status,
+result, requested_by)`; bot (`skills/cost_export.py`, poll cùng nhịp `bug_sync_poll_seconds`)
+ghi payload vào sheet `projects.cost_sheet_id` (tab "Chi phí (auto)", ghi đè mỗi lần).
+`cost_sheet_id` cấu hình ở ProjectModal — PHẢI là file RIÊNG chỉ admin mở (payload có LƯƠNG)
+và share Editor cho service account. RLS queue: admin insert+select; chỉ bot (service role)
+update. Payload: `{tab, sections:[{name, rows:[[…]]}]}`.
+
 - **Web**: sống ở khu quản trị NGOÀI dự án (`GlobalAdmin`). **Lương** điền một chỗ ở chi tiết
   thành viên (`MemberModal`, tab Thành viên), ghi qua `upsertMemberComp`. Tab **Chi phí**
   (`CostAdmin` → `CostManagement` + `components/cost/*`) chọn dự án qua `useAdminCostProject`,
