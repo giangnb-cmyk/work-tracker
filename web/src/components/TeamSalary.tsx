@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import Avatar from './Avatar';
 import { formatIsoDate, formatVnd, tenureVi } from '../lib/format';
-import { JOB_ROLE_LABEL, type MemberComp, type TeamMember } from '../types';
+import { JOB_ROLE_LABEL, USER_ROLE_LABEL, type MemberComp, type TeamMember } from '../types';
 
 interface Props {
   members: TeamMember[];
@@ -37,6 +37,7 @@ function SalaryTable({ rows, onEdit }: { rows: Row[]; onEdit: (m: TeamMember) =>
           <tr>
             <th>Thành viên</th>
             <th className="cost-tight">Chuyên môn</th>
+            <th className="cost-tight">Vai trò</th>
             <th className="cost-num-col">Lương / tháng</th>
             <th className="cost-tight">Bắt đầu</th>
             <th className="cost-tight">Kết thúc</th>
@@ -53,6 +54,15 @@ function SalaryTable({ rows, onEdit }: { rows: Row[]; onEdit: (m: TeamMember) =>
                 </div>
               </td>
               <td className="cost-tight muted">{m.jobRole ? JOB_ROLE_LABEL[m.jobRole] : '—'}</td>
+              <td className="cost-tight">
+                <span
+                  className={`badge ${
+                    m.role === 'owner' ? 'role-owner' : m.role === 'admin' ? 'status-active' : 'status-planning'
+                  }`}
+                >
+                  {USER_ROLE_LABEL[m.role]}
+                </span>
+              </td>
               <td className="cost-num-col mono">{comp && comp.monthlySalary > 0 ? formatVnd(comp.monthlySalary) : '—'}</td>
               <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(comp?.startDate)}</td>
               <td className="cost-tight muted mono" style={{ fontSize: '0.82rem' }}>{formatIsoDate(comp?.endDate)}</td>
@@ -60,7 +70,7 @@ function SalaryTable({ rows, onEdit }: { rows: Row[]; onEdit: (m: TeamMember) =>
             </tr>
           ))}
           {rows.length === 0 && (
-            <tr><td colSpan={6} className="empty">Trống.</td></tr>
+            <tr><td colSpan={7} className="empty">Trống.</td></tr>
           )}
         </tbody>
       </table>
