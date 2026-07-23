@@ -21,7 +21,7 @@ import {
   type CostItemPatch,
   type CostProjectionPatch,
 } from '../lib/costWrites';
-import { anchorMonth, buildCostSeries, monthIso, overheadTotal } from '../lib/projectCost';
+import { anchorMonth, buildCostSeries, monthIso, monthLabel, overheadTotal } from '../lib/projectCost';
 import { COST_PROJECTION_KIND_LABEL, type CostEmployeeRow, type CostProjection, type CostProjectionKind } from '../types';
 import CostChart from './cost/CostChart';
 import CostSummary from './cost/CostSummary';
@@ -151,9 +151,11 @@ export default function CostManagement({ projectId }: { projectId: string }) {
     return rows;
   }, [memberships, memberById, compByMember]);
 
-  // Cửa sổ tính = [tháng hiện tại, +N) — xem anchorMonth (đã từng neo nhầm vào người vào
-  // sớm nhất làm cả bảng về 0 ₫).
-  const anchor = anchorMonth();
+  // Cửa sổ tính mặc định = [tháng hiện tại, +N); `anchorShift` cho phép DỊCH mốc bắt đầu
+  // (◀ ▶) để nhìn lại tháng đã qua — sang tháng mới thì tháng cũ rơi khỏi khung nhưng dữ
+  // liệu vẫn nằm trong DB, lùi mốc là thấy lại. Không persist: mở tab luôn về "hôm nay".
+  const [anchorShift, setAnchorShift] = useState(0);
+  const anchor = anchorMonth() + anchorShift;
   // MỘT engine theo tháng cho cả thẻ tổng lẫn biểu đồ (lương bậc thang theo dự tính tăng,
   // thưởng Tết, thiết bị/vận hành, dự chi, doanh thu) — hai nơi không bao giờ lệch số.
   const series = useMemo(
@@ -199,6 +201,17 @@ export default function CostManagement({ projectId }: { projectId: string }) {
       <MonthSlider months={months} onChange={changeMonths} />
 
       <div className="row cost-view-row">
+        {/* Dịch mốc bắt đầu cửa sổ — lùi để xem lại tháng đã qua (dữ liệu vẫn trong DB). */}
+        <div className="row cost-anchor-nav">
+          <button className="btn-sm" onClick={() => setAnchorShift((s) => s - 1)} aria-label="Lùi một tháng">◀</button>
+          <span className="mono cost-anchor-label" title="Tháng bắt đầu của khoảng đang xem">
+            {monthLabel(anchor)}
+          </span>
+          <button className="btn-sm" onClick={() => setAnchorShift((s) => s + 1)} aria-label="Tiến một tháng">▶</button>
+          {anchorShift !== 0 && (
+            <button className="btn-sm" onClick={() => setAnchorShift(0)}>Về tháng này</button>
+          )}
+        </div>
         <div className="seg-toggle">
           <button className={`seg${cview === 'table' ? ' on' : ''}`} onClick={() => selectCview('table')}>📋 Bảng</button>
           <button className={`seg${cview === 'chart' ? ' on' : ''}`} onClick={() => selectCview('chart')}>📊 Biểu đồ</button>

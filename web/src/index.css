@@ -2630,8 +2630,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .cost-stat-loss { border: 1px solid rgba(239, 68, 68, 0.45); }
 .cost-stat-loss .cost-stat-value { color: var(--red); }
 
-/* Hàng chuyển màn Bảng | Biểu đồ của tab Chi phí. */
-.cost-view-row { justify-content: flex-end; margin-bottom: 1rem; }
+/* Hàng chuyển màn Bảng | Biểu đồ của tab Chi phí + nút dịch mốc bắt đầu. */
+.cost-view-row { justify-content: space-between; margin-bottom: 1rem; }
+.cost-anchor-nav { gap: 0.4rem; align-items: center; }
+.cost-anchor-label { font-size: 0.9rem; font-weight: 600; min-width: 64px; text-align: center; }
 
 /* Card cấu hình thưởng Tết: một hàng ngang, co cột trên màn hẹp. */
 .tet-card { display: flex; align-items: center; gap: 1.25rem; padding: 1rem 1.25rem; flex-wrap: wrap; }
@@ -2702,6 +2704,8 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .cost-check-x { font-size: 0.78rem; }
 
 .cost-kind-badge { font-size: 0.75rem; white-space: nowrap; }
+/* Dòng phụ "+🛡️ BHXH" dưới thành tiền của suất tuyển trong bảng Dự chi. */
+.cost-proj-bhxh { font-size: 0.74rem; margin-top: 0.15rem; white-space: nowrap; }
 .cost-kind-hire { background: rgba(99, 102, 241, 0.16); color: #c7d2fe; }
 .cost-kind-outsource { background: rgba(56, 189, 248, 0.16); color: #bae6fd; }
 

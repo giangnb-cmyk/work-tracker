@@ -1,4 +1,4 @@
-import { projectionLineTotal, projectionTotal } from '../../lib/projectCost';
+import { employerBhxh, projectionLineTotal, projectionTotal } from '../../lib/projectCost';
 import { formatVnd } from '../../lib/format';
 import {
   COST_CADENCES,
@@ -29,6 +29,11 @@ interface Props {
 /** Bảng DỰ CHI (what-if): tuyển thêm vị trí X lương Y + các khoản Outsource. */
 export default function ProjectionTable({ projections, months, onAdd, onUpdate, onDelete, onPickItems }: Props) {
   const total = projectionTotal(projections, months);
+  /** BHXH Cty của MỘT dòng trong cả khoảng: chỉ suất TUYỂN trả lương THÁNG (outsource không
+   *  đóng). Con số này nằm ở thẻ 🛡️ BHXH — hiện thêm ở đây để dòng tuyển không "thiếu" phí. */
+  const bhxhFor = (p: CostProjection) =>
+    p.kind === 'hire' && p.cadence === 'monthly' ? employerBhxh(p.amount) * p.headCount * months : 0;
+  const totalBhxh = projections.reduce((s, p) => s + bhxhFor(p), 0);
 
   return (
     <div className="glass section" style={{ padding: '1.25rem' }}>
@@ -99,7 +104,14 @@ export default function ProjectionTable({ projections, months, onAdd, onUpdate, 
                     ariaLabel="Số người / số suất"
                   />
                 </td>
-                <td className="cost-num-col mono">{formatVnd(projectionLineTotal(p, months))}</td>
+                <td className="cost-num-col mono">
+                  {formatVnd(projectionLineTotal(p, months))}
+                  {bhxhFor(p) > 0 && (
+                    <div className="muted cost-proj-bhxh" title="BHXH/BHYT/BHTN phần công ty đóng cho các suất tuyển này — đã cộng ở thẻ 🛡️ BHXH">
+                      +🛡️ {formatVnd(bhxhFor(p))}
+                    </div>
+                  )}
+                </td>
                 <td className="cost-tight">
                   <div className="row-actions">
                     <button
@@ -127,6 +139,15 @@ export default function ProjectionTable({ projections, months, onAdd, onUpdate, 
                 <td className="cost-num-col mono cost-foot-total">{formatVnd(total)}</td>
                 <td></td>
               </tr>
+              {totalBhxh > 0 && (
+                <tr>
+                  <td colSpan={5} className="cost-foot-label" style={{ borderBottom: 'none' }}>
+                    🛡️ BHXH Cty cho các suất tuyển (tính ở thẻ BHXH)
+                  </td>
+                  <td className="cost-num-col mono muted" style={{ borderBottom: 'none' }}>{formatVnd(totalBhxh)}</td>
+                  <td style={{ borderBottom: 'none' }}></td>
+                </tr>
+              )}
             </tfoot>
           )}
         </table>
