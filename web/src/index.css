@@ -2609,14 +2609,23 @@ table.data-table { width: 100%; border-collapse: collapse; }
 }
 .cost-range::-moz-range-track { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
 
-/* Thẻ tổng: thẻ TỔNG CHI nổi bật bằng viền + nền indigo nhạt; Lãi/Lỗ tô xanh/đỏ. */
-.cost-summary { margin-top: 1.25rem; }
-.cost-stat-value { font-size: 1.15rem; }
+/* Thẻ tổng: thẻ TỔNG CHI nổi bật bằng viền + nền indigo nhạt; Lãi/Lỗ tô xanh/đỏ.
+   Lưới RIÊNG rộng hơn .stats-row (180px): 9 thẻ mà ô 180px thì số tiền hàng TỶ gãy giữa
+   chừng, "₫" rơi xuống dòng — vỡ layout thật. 250px + chữ nhỏ lại + nowrap là đủ chỗ. */
+.cost-summary {
+  margin-top: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.9rem;
+}
+.cost-summary .stat-card { padding: 0.85rem 1rem; gap: 0.7rem; }
+.cost-summary .stat-icon { font-size: 1.4rem; }
+.cost-summary .stat-info { min-width: 0; }
+.cost-stat-value { font-size: 1.02rem; white-space: nowrap; }
 .cost-stat-total {
   border: 1px solid rgba(99, 102, 241, 0.55);
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(56, 189, 248, 0.08));
 }
-.cost-stat-total .cost-stat-value { color: var(--primary); font-size: 1.3rem; }
+.cost-stat-total .cost-stat-value { color: var(--primary); font-size: 1.12rem; }
 .cost-stat-profit .cost-stat-value { color: var(--green); }
 .cost-stat-loss { border: 1px solid rgba(239, 68, 68, 0.45); }
 .cost-stat-loss .cost-stat-value { color: var(--red); }

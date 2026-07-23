@@ -84,9 +84,10 @@ export function timeAgo(ts: Timestamp | null | undefined): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-/** Số tiền VND kiểu vi-VN: `30000000` → "30.000.000 ₫". Làm tròn về đồng. */
+/** Số tiền VND kiểu vi-VN: `30000000` → "30.000.000 ₫". Làm tròn về đồng.
+ *  NBSP trước ₫ — space thường thì ô hẹp sẽ bẻ "₫" rơi xuống dòng một mình (đã vỡ layout thật). */
 export function formatVnd(n: number): string {
-  return `${Math.round(n).toLocaleString('vi-VN')} ₫`;
+  return `${Math.round(n).toLocaleString('vi-VN')} ₫`;
 }
 
 /** Hôm nay theo GIỜ MÁY dạng 'YYYY-MM-DD' (toISOString là UTC — lệch ngày lúc sáng sớm VN). */
