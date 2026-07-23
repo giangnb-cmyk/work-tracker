@@ -2650,6 +2650,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .rev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.7rem 1rem; }
 .rev-cell { margin-bottom: 0; }
 .rev-cell > span { font-size: 0.8rem; }
+/* Chế độ "chia đều": một ô tổng + nút chia + ghi chú. */
+.rev-lump { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+.rev-lump-input { margin-bottom: 0; width: 260px; }
+.rev-lump-note { font-size: 0.78rem; max-width: 46ch; line-height: 1.5; }
 
 /* Hàng thêm dự tính tăng lương trong modal thành viên. */
 .comp-plan-add { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; }

@@ -96,6 +96,25 @@ export async function upsertRevenue(
   if (error) throw error;
 }
 
+/** Doanh thu dự kiến cho NHIỀU tháng một lượt (chế độ "chia đều") — MỘT cú upsert. */
+export async function upsertRevenueBulk(
+  projectId: string,
+  entries: { monthIso: string; amount: number }[],
+  updatedBy: string | null,
+): Promise<void> {
+  if (entries.length === 0) return;
+  const now = new Date().toISOString();
+  const rows = entries.map((e) => ({
+    project_id: projectId,
+    month: e.monthIso,
+    amount: e.amount,
+    updated_at: now,
+    updated_by: updatedBy,
+  }));
+  const { error } = await supabase.from('project_revenue').upsert(rows, { onConflict: 'project_id,month' });
+  if (error) throw error;
+}
+
 /** Các bậc DỰ TÍNH tăng lương của một người (cho MemberModal), sắp theo ngày hiệu lực. */
 export async function fetchSalaryPlans(memberId: string): Promise<SalaryPlanRow[]> {
   const { data, error } = await supabase

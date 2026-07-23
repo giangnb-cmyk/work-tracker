@@ -18,6 +18,7 @@ import {
   updateCostProjection,
   upsertCostSettings,
   upsertRevenue,
+  upsertRevenueBulk,
   type CostItemPatch,
   type CostProjectionPatch,
 } from '../lib/costWrites';
@@ -234,6 +235,23 @@ export default function CostManagement({ projectId }: { projectId: string }) {
               void runOp(
                 () => upsertRevenue(projectId, monthIso(mIdx), amount, createdBy).then(refetchRevenue),
                 'Lưu doanh thu thất bại (cần quyền admin).',
+              );
+            }}
+            onCommitMany={(entries) => {
+              // "Chia đều": đổi local cả loạt ngay, ghi MỘT cú upsert nền.
+              setRevLocal((prev) => {
+                const next = new Map(prev);
+                for (const e of entries) next.set(e.monthIdx, e.amount);
+                return next;
+              });
+              void runOp(
+                () =>
+                  upsertRevenueBulk(
+                    projectId,
+                    entries.map((e) => ({ monthIso: monthIso(e.monthIdx), amount: e.amount })),
+                    createdBy,
+                  ).then(refetchRevenue),
+                'Lưu doanh thu (chia đều) thất bại (cần quyền admin).',
               );
             }}
           />
