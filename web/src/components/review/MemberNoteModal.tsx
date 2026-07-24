@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Avatar from '../Avatar';
 import RatingPicker from './RatingPicker';
+import MemberNoteLog from './MemberNoteLog';
 import { upsertMemberSprintNote } from '../../lib/memberReviewWrites';
 import type { MemberSprintNote, TeamMember } from '../../types';
 
@@ -64,6 +65,8 @@ export default function MemberNoteModal({ member, sprintId, sprintName, note, au
           <span className="field-label">Mức đánh giá</span>
           <RatingPicker value={rating} onChange={setRating} />
         </div>
+
+        <MemberNoteLog memberId={member.uid} />
 
         {error && <p className="error-text">{error}</p>}
 

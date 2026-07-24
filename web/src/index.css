@@ -2913,3 +2913,20 @@ table.data-table { width: 100%; border-collapse: collapse; }
   font-size: 0.9rem;
 }
 .mm-note-row p { font-size: 0.84rem; margin: 0.15rem 0; line-height: 1.45; }
+
+/* Nhật ký ghi chú (dưới form MemberNoteModal) — lọc theo Sprint / Tháng / Quý. */
+.note-log { border-top: 1px dashed var(--border); margin-top: 1.1rem; padding-top: 0.85rem; }
+.note-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+.note-log-filter { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.note-log-select { padding: 0.2rem 0.5rem; font-size: 0.78rem; width: auto; min-width: 140px; }
+/* Cuộn RIÊNG phần nhật ký để form + nút Lưu luôn trong tầm nhìn dù có nhiều kỳ. */
+.note-log-list { max-height: 300px; overflow-y: auto; padding-right: 0.2rem; }
+.note-log-date { font-size: 0.78rem; }
+.note-log-rating { font-size: 0.8rem; margin-bottom: 0.25rem; }
