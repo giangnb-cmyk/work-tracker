@@ -15,6 +15,12 @@ log = logging.getLogger("webhook_notify")
 
 _URL_ENV = "DISCORD_WEBHOOK_URL"
 
+# BAT BUOC: Cloudflare cua Discord CHAN request khong co User-Agent tu te (tra 403 "error
+# code: 1010"). urllib mac dinh gui 'Python-urllib/3.x' -> bi chan, nen thong bao task moi
+# lang le khong gui duoc. Web chay bang fetch (co UA trinh duyet) nen khong dinh. Dat UA
+# theo dung format Discord khuyen nghi 'DiscordBot ($url, $version)'.
+_USER_AGENT = "DiscordBot (https://m-plan.easygoing.vn, 1.0)"
+
 
 def is_configured() -> bool:
     """Đã đặt DISCORD_WEBHOOK_URL hay chưa."""
@@ -37,7 +43,10 @@ def post(content: str = "", user_ids=None, embeds=None) -> bool:
         payload["embeds"] = embeds
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+        url,
+        data=data,
+        headers={"Content-Type": "application/json", "User-Agent": _USER_AGENT},
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
