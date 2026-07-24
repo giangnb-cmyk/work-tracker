@@ -2,7 +2,7 @@
 // Looks up the involved members' Discord ids, then asks the server to post.
 
 import { supabase } from '../supabase';
-import { taskShareUrl } from './router';
+import { taskShareUrl, taskPath, APP_BASE_URL } from './router';
 import { PRIORITY_LABEL } from '../types';
 import type { Task, TaskPriority } from '../types';
 import type { Timestamp } from './time';
@@ -43,6 +43,9 @@ export async function notifyTaskDone(task: Task, sprintName?: string): Promise<v
         title: task.title,
         sprintName,
         assigneeName: task.assigneeName,
+        // Link ĐẦY ĐỦ /tasks/<id>?p=<projectId> trên domain chính tắc — mở đúng dự án khi
+        // bấm từ Discord. Masked link `[tên](url)` trong nội dung tin (không phải short link).
+        url: `${APP_BASE_URL}${taskPath(task.id, task.projectId)}`,
         mentionIds,
       }),
     });

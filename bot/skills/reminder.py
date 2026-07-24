@@ -111,34 +111,34 @@ def _sprint_name(client, sprint_id) -> str:
 
 
 def build_done_message(client, task: dict) -> str:
-    """Tao thong bao task hoan thanh, chi ping nguoi co discordId.
+    """Thong bao task hoan thanh dang MARKDOWN, chi ping nguoi co discordId.
 
-    Tieng Viet co dau. Assignee duoc khen rieng; reporter + watchers vao 'cc',
-    da bo trung id (khong ping 1 nguoi 2 lan).
+    Format: header '##' · ten task la masked link '### [title](url)' bam duoc · hai dong
+    blockquote (nguoi lam / sprint, emoji shortcode :dart:/:person_running:) · roi dong ping.
+    Cung format voi web (_discord.buildDoneMessage) de web va bot bao giong nhau. Ping gom
+    assignee + cc (reporter + watchers), da bo trung id.
     """
     cache = {}
     assignee_did = _discord_id(client, task.get("assigneeId"), cache)
-
-    title = task.get("title", "(không tên)")
-    sprint = _sprint_name(client, task.get("sprintId"))
-    # Tieu de task lam header '##' cho noi bat; sprint trong ngoac neu co that.
-    header = f"## {title}"
-    if sprint and sprint not in ("backlog", "?"):
-        header += f" (sprint {sprint})"
-    lines = ["✅ Task đã hoàn thành:", header]
-
-    # Gom TAT CA nguoi can ping vao MOT dong: assignee truoc, roi cc (reporter + watchers),
-    # da bo trung. Thay cho kieu cu "assignee lam tot lam ... cc ...".
     ping_ids = ([assignee_did] if assignee_did else []) + _cc_discord_ids(
         client, task, cache, exclude=assignee_did
     )
-    if ping_ids:
-        lines.append("Mọi người nắm thông tin nhé " + " ".join(f"<@{d}>" for d in ping_ids))
 
-    # Link task o dong rieng: bam thang vao task khoi phai tu mo web di tim.
-    url = web_link.task_url(task.get("id") or task.get("_id"))
-    if url:
-        lines.append(url)
+    title = task.get("title", "(không tên)")
+    url = web_link.task_url(task.get("id") or task.get("_id"), task.get("projectId"))
+    title_line = f"### [{title}]({url})" if url else f"### {title}"
+    sprint = _sprint_name(client, task.get("sprintId"))
+    sprint_label = sprint if sprint and sprint not in ("backlog", "?") else "Backlog"
+
+    lines = [
+        "## ✅ Task đã hoàn thành",
+        title_line,
+        "",
+        f"> :dart: Người làm: {task.get('assigneeName') or 'chưa giao'}",
+        f"> :person_running: Sprint: {sprint_label}",
+    ]
+    if ping_ids:
+        lines += ["", "Mọi người nắm thông tin nhé " + " ".join(f"<@{d}>" for d in ping_ids)]
     return "\n".join(lines)
 
 

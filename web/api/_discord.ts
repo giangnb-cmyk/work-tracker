@@ -10,6 +10,7 @@ export interface DonePayload {
   title: string;
   sprintName?: string;
   assigneeName?: string;
+  url?: string; // link rút gọn tới task — tên task bấm được
   mentionIds?: string[]; // Discord user ids to ping
 }
 
@@ -26,21 +27,6 @@ export interface CreatedPayload {
   dueLabel?: string;
   url?: string;
   mentionIds?: string[]; // thường chỉ có người được giao
-}
-
-/**
- * Build the "task done" message; only ping ids that are present.
- *
- * Ba dòng: tiêu đề nhắc việc · task làm header '##' (kèm sprint) · dòng ping mọi người.
- * Cùng format với bot (reminder.build_done_message) để web và bot báo giống nhau.
- */
-function buildContent(p: DonePayload): { content: string; users: string[] } {
-  const users = (p.mentionIds ?? []).filter(Boolean);
-  const mentions = users.map((id) => `<@${id}>`).join(' ');
-  const sprint = p.sprintName ? ` (sprint ${p.sprintName})` : '';
-  const lines = ['✅ Task đã hoàn thành:', `## ${p.title}${sprint}`];
-  if (users.length > 0) lines.push(`Mọi người nắm thông tin nhé ${mentions}`);
-  return { content: lines.join('\n'), users };
 }
 
 /** Indigo accent (#6366f1) của design system — dùng làm màu viền embed "task mới". */
@@ -104,9 +90,31 @@ async function postWebhook(content: string, users: string[], embeds?: Embed[]): 
   }
 }
 
+/**
+ * Dựng thông báo "task hoàn thành" dạng MARKDOWN (không dùng embed): header `##` · tên task
+ * là masked link `### [title](url)` bấm được · hai dòng blockquote (người làm / sprint) ·
+ * rồi dòng ping NGOÀI quote. Emoji dùng shortcode `:dart:`/`:person_running:` (Discord tự đổi
+ * ra 🎯/🏃). Cùng format với bot (reminder.build_done_message) để web và bot báo giống nhau.
+ */
+function buildDoneMessage(p: DonePayload): { content: string; users: string[] } {
+  const users = (p.mentionIds ?? []).filter(Boolean);
+  const titleLine = p.url ? `### [${p.title}](${p.url})` : `### ${p.title}`;
+  const lines = [
+    '## ✅ Task đã hoàn thành',
+    titleLine,
+    '',
+    `> :dart: Người làm: ${p.assigneeName || 'chưa giao'}`,
+    `> :person_running: Sprint: ${p.sprintName || 'Backlog'}`,
+  ];
+  if (users.length > 0) {
+    lines.push('', `Mọi người nắm thông tin nhé ${users.map((id) => `<@${id}>`).join(' ')}`);
+  }
+  return { content: lines.join('\n'), users };
+}
+
 /** Send a completion message. Returns true on 2xx. Never throws to the caller. */
 export async function postDone(p: DonePayload): Promise<boolean> {
-  const { content, users } = buildContent(p);
+  const { content, users } = buildDoneMessage(p);
   return postWebhook(content, users);
 }
 
