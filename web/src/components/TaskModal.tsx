@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Timestamp } from '../lib/time';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useFeatureAssignees } from '../hooks/useFeatureAssignees';
+import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { becameDone, createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDateRange, sundayOfWeek, timeAgo, toInputDate } from '../lib/format';
@@ -108,6 +109,14 @@ export default function TaskModal({
   // Mô tả: mặc định hiện dạng ĐỌC (giữ xuống dòng), bấm mới ra ô sửa — tránh textarea gạch
   // đỏ chính tả lúc chỉ xem. Chỉ người sửa được (canEditOwn) mới bấm vào để sửa.
   const [editingDesc, setEditingDesc] = useState(false);
+  const [pasting, setPasting] = useState(false);
+
+  // Ctrl+V trong modal: ẢNH -> Ref (upload Storage), LINK -> Tài liệu. Cùng hook với FeatureModal.
+  // Dạng hàm -> callback ổn định -> usePasteAttachment không gắn lại listener mỗi render.
+  const addAttachment = useCallback((att: Attachment) => setAttachments((prev) => [...prev, att]), []);
+  const showError = useCallback((msg: string) => setError(msg), []);
+  // Chỉ nhận dán khi được sửa tài liệu (khớp AttachmentsField/RefImagesSection) và không đang tạo.
+  usePasteAttachment({ disabled: !canEditOwn || creating, onAdd: addAttachment, onError: showError, onBusy: setPasting });
 
   function copyTaskLink() {
     if (!task) return;
@@ -435,6 +444,11 @@ export default function TaskModal({
 
             {/* Ref — ảnh tham khảo, section riêng ở dưới cùng */}
             <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={!canEditOwn} />
+            {canEditOwn && (
+              <p className="perf-hint tm-paste-hint">
+                {pasting ? 'Đang tải ảnh vừa dán lên…' : 'Ctrl+V để dán thẳng ảnh (vào Ref) hoặc link (vào Tài liệu).'}
+              </p>
+            )}
 
             {/* Ref dùng chung của feature — CHỈ ĐỌC, và đọc thẳng từ feature chứ không
                 sao chép vào task: thêm ref vào feature sau này thì task cũ vẫn thấy ngay,

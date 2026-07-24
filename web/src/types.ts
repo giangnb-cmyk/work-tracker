@@ -615,3 +615,13 @@ export const NOTE_RATING_LABEL: Record<number, string> = NOTE_RATINGS.reduce(
   (acc, r) => ({ ...acc, [r.value]: r.label }),
   {} as Record<number, string>,
 );
+
+/**
+ * Ba mục nội dung của một ghi chú — icon để nhận diện & phân loại nhanh trong nhật ký.
+ * `key` trùng tên trường trong MemberSprintNote để render bằng vòng lặp, không lặp code.
+ */
+export const NOTE_SECTIONS: { key: 'overview' | 'highlights' | 'concerns'; label: string; icon: string }[] = [
+  { key: 'overview', label: 'Tổng quan', icon: '📋' },
+  { key: 'highlights', label: 'Nổi bật', icon: '⭐' },
+  { key: 'concerns', label: 'Lưu ý', icon: '⚠️' },
+];
