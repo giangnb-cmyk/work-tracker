@@ -379,6 +379,8 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
                     <div key={n.id} className="mm-note-row">
                       <div className="mm-note-head">
                         <strong>{n.sprintName || 'Sprint'}</strong>
+                        {/* Ngày GHI entry — nhật ký theo ngày (0062), nhiều dòng một sprint. */}
+                        <span className="muted mono note-log-date">{formatDate(n.createdAt)}</span>
                         {r && <span className="muted">{r.icon} {r.label}</span>}
                       </div>
                       {n.overview && <p><span className="muted">Tổng quan:</span> {n.overview}</p>}

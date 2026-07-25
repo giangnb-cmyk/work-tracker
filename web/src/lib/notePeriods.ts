@@ -1,5 +1,5 @@
 // Gom NHÓM / LỌC ghi chú đánh giá theo kỳ: Sprint / Tháng / Quý. Thuần logic, không side effect —
-// mốc xếp kỳ là ngày BẮT ĐẦU sprint (lui về ngày tạo nếu note lẻ chưa embed sprint).
+// mốc xếp kỳ là NGÀY GHI entry (nhật ký theo ngày, 0062; lui về ngày bắt đầu sprint nếu thiếu).
 
 import type { MemberSprintNote } from '../types';
 
@@ -16,9 +16,9 @@ export interface NoteBucket {
   label: string;
 }
 
-/** Ngày mốc để xếp kỳ: ưu tiên ngày bắt đầu sprint, lui về ngày tạo. Null nếu thiếu cả hai. */
+/** Ngày mốc để xếp kỳ: NGÀY GHI entry (0062), lui về ngày bắt đầu sprint. Null nếu thiếu cả hai. */
 function noteDate(note: MemberSprintNote): Date | null {
-  return note.sprintStart?.toDate() ?? note.createdAt?.toDate() ?? null;
+  return note.createdAt?.toDate() ?? note.sprintStart?.toDate() ?? null;
 }
 
 /** Kỳ (key + nhãn hiển thị) của MỘT note theo chiều lọc đang chọn. Null = không xếp được. */

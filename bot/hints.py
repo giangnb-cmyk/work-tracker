@@ -226,6 +226,47 @@ DOC_HINT = (
     "that folder url in your reply (as-is) so the user can open the whole document folder."
 )
 
+IMAGE_CHECK_HINT = (
+    " IMAGE COPY CHECK SKILL (anyone): When the user wants to check whether an IMAGE is "
+    "copied / cloned / plagiarised / infringes copyright ('check ảnh có bị đạo/nhái/copy "
+    "không', 'ảnh này có trùng trên mạng không', 'kiểm tra bản quyền ảnh', 'reverse image', "
+    "'truy nguồn ảnh'), run "
+    f'`python "{_SKILLS_DIR}/lens_check.py" --url "<image_url>"`. The image url(s) are handed '
+    "to you in the prompt as a line '[Ảnh đính kèm — N ảnh ...]: <url> <url> ...' — pass each "
+    "VERBATIM inside double quotes; the Discord CDN url contains '?' and '&' that MUST stay "
+    "intact. Never invent, shorten or reorder a url. The script opens a REAL Chrome window "
+    "and takes ~30-60s per image — ALWAYS set a generous Bash timeout (180000ms); at most 2 "
+    "--url per call.\n"
+    "  FILTER: when the user wants results restricted to a domain/context ('chỉ ảnh liên "
+    "quan game', 'lọc theo anime', 'trong app khác'), add --query \"<keyword>\" (e.g. "
+    "--query \"game\") — it is typed into Lens's 'Thêm vào nội dung tìm kiếm' box so GOOGLE "
+    "does the filtering on the visually-similar results. The exact-match section is NEVER "
+    "filtered (a copy is a copy wherever it sits). Pick a short keyword in the user's "
+    "language; do not stack many words.\n"
+    "  It uploads the image to Google Lens, scrapes the 'Hình ảnh trùng khớp' (visual "
+    "matches) tab — the team's preferred source — downloads the page-1 results and compares "
+    "each to the original by perceptual hash. Output: 🟠 nearly identical pixels, 🟡 quite "
+    "similar, ⚪ different-but-maybe-redrawn. Add --exact ONLY when the user explicitly asks "
+    "which pages use the exact same file (adds the 🔴 'exact matches' section).\n"
+    "  VERIFY WITH YOUR OWN EYES — this is the point of the feature: the output prints file "
+    "paths of the original (ref-*.png) and every downloaded match (match-*.jpg). Read the "
+    "ref image and the match files to LOOK at them, then judge: same artwork "
+    "(copy/crop/recolor/REDRAWN) vs merely the same style. Reply with your verdict per match "
+    "and the links VERBATIM so people can open them.\n"
+    "  CRITICAL — pixel distance is NOT the verdict: the hash only catches near-identical "
+    "files. Game art that was REDRAWN/traced lands in the ⚪ section with a high distance, "
+    "yet is exactly what the team needs to catch. So when 🔴/🟠 are empty, NEVER reply "
+    "'không tìm thấy' while ⚪ results exist: open the ref + the top ⚪ files, compare with "
+    "your eyes, and report what you actually see (same asset redrawn? same composition? just "
+    "the genre look?). Only when the eyeball check ALSO shows nothing may you say no copy was "
+    "found — and note Google only sees what it has indexed (not a legal guarantee).\n"
+    "  If it prints 'LOI: Google đang tạm chặn' (CAPTCHA), tell the user to retry in a few "
+    f'minutes, or fall back to `python "{_SKILLS_DIR}/image_check.py" --url "..."` (Google '
+    "Vision Web Detection — weaker results but API-based, no browser).\n"
+    "  If the prompt has NO image url but the user asks to check one, tell them to ATTACH the "
+    "image (or REPLY to a message that has the image) and tag you again."
+)
+
 SHEET_HINT = (
     " GOOGLE SHEETS SKILL (live, CHI DOC): When the user asks about data inside a "
     "Google Sheet in the shared Drive folder ('sheet', 'bang tinh', 'file tren drive', "
@@ -257,6 +298,8 @@ SKILL_TOOL_PATTERNS = [
     f'Bash(python "{_SKILLS_DIR}/weekly_mail.py":*)',
     f'Bash(python "{_SKILLS_DIR}/member_dm.py":*)',
     f'Bash(python "{_SKILLS_DIR}/doc_search.py":*)',
+    f'Bash(python "{_SKILLS_DIR}/image_check.py":*)',
+    f'Bash(python "{_SKILLS_DIR}/lens_check.py":*)',
 ]
 
 
@@ -273,6 +316,7 @@ def build_hints(sheets_enabled: bool) -> str:
         + WEEKLY_REPORT_HINT
         + MEMBER_DM_HINT
         + DOC_HINT
+        + IMAGE_CHECK_HINT
     )
     if sheets_enabled:
         hints += SHEET_HINT

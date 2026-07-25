@@ -76,7 +76,8 @@ export default function MemberNoteLog({ memberId, reloadKey = 0 }: Props) {
             <div key={n.id} className="mm-note-row">
               <div className="mm-note-head">
                 <strong>{n.sprintName || 'Sprint'}</strong>
-                <span className="muted mono note-log-date">{formatDate(n.sprintStart ?? n.createdAt)}</span>
+                {/* NGÀY GHI của entry (không phải ngày sprint) — mỗi ngày log một dòng, 0062. */}
+                <span className="muted mono note-log-date">{formatDate(n.createdAt ?? n.sprintStart)}</span>
               </div>
               {r && <div className="note-log-rating muted">{r.icon} {r.label}</div>}
               {NOTE_SECTIONS.map((s) =>

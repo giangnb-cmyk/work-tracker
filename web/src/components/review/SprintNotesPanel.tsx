@@ -8,9 +8,10 @@ import MemberNoteModal from './MemberNoteModal';
 import { NOTE_RATINGS, type TeamMember } from '../../types';
 
 /**
- * Chọn sprint → DANH SÁCH thành viên CỦA DỰ ÁN đang chọn; bấm một người → popup điền ghi chú
- * (điền sẵn note đã có). Members/sprints lấy từ SprintContext (có sẵn ở GlobalAdmin, như CostAdmin)
- * — KHÔNG mở lại channel `profiles`/`sprints`. Lọc theo `project_members` qua useProjectMembers.
+ * Chọn sprint → DANH SÁCH thành viên CỦA DỰ ÁN đang chọn; bấm một người → popup ghi NHẬT KÝ
+ * (form luôn trống — mỗi lần lưu một dòng log, 0062; dòng preview hiện entry MỚI NHẤT).
+ * Members/sprints lấy từ SprintContext (có sẵn ở GlobalAdmin, như CostAdmin) — KHÔNG mở lại
+ * channel `profiles`/`sprints`. Lọc theo `project_members` qua useProjectMembers.
  */
 export default function SprintNotesPanel({ projectId }: { projectId: string | null }) {
   const { profile, isAdmin } = useAuth();
@@ -75,7 +76,6 @@ export default function SprintNotesPanel({ projectId }: { projectId: string | nu
           member={editing}
           sprintId={sprintId}
           sprintName={sprintName}
-          note={byMember.get(editing.uid)}
           authorId={profile?.uid ?? null}
           onClose={() => setEditing(null)}
         />

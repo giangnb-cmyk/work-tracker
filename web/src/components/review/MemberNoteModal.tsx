@@ -2,15 +2,13 @@ import { useState } from 'react';
 import Avatar from '../Avatar';
 import RatingPicker from './RatingPicker';
 import MemberNoteLog from './MemberNoteLog';
-import { upsertMemberSprintNote } from '../../lib/memberReviewWrites';
-import type { MemberSprintNote, TeamMember } from '../../types';
+import { insertMemberSprintNote } from '../../lib/memberReviewWrites';
+import type { TeamMember } from '../../types';
 
 interface Props {
   member: TeamMember;
   sprintId: string;
   sprintName: string;
-  /** Ghi chú đã lưu trước đó của (người, sprint) này — điền sẵn form để xem + sửa. */
-  note?: MemberSprintNote;
   authorId: string | null;
   onClose: () => void;
 }
@@ -18,22 +16,23 @@ interface Props {
 type Tab = 'note' | 'history';
 
 /**
- * Popup ghi chú cho MỘT người trong MỘT sprint, hai tab: "Ghi chú" (form, mô hình một note/sprint,
- * Lưu = ghi đè) và "Lịch sử" (nhật ký các sprint). Lưu xong thì XOÁ TRẮNG form (đã lưu rồi) và nạp
- * lại nhật ký thay vì đóng, để ghi tiếp/đối chiếu ngay. Mở từ danh sách trong `SprintNotesPanel`.
+ * Popup ghi chú cho MỘT người trong MỘT sprint, hai tab: "Ghi chú" (form NHẬT KÝ — luôn mở
+ * TRỐNG, mỗi lần Lưu là MỘT dòng log mới mang ngày hôm đó, 0062) và "Lịch sử" (nhật ký theo
+ * ngày). Lưu xong xoá trắng form + nạp lại nhật ký thay vì đóng, để ghi tiếp/đối chiếu ngay.
+ * Mở từ danh sách trong `SprintNotesPanel`.
  */
-export default function MemberNoteModal({ member, sprintId, sprintName, note, authorId, onClose }: Props) {
+export default function MemberNoteModal({ member, sprintId, sprintName, authorId, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('note');
-  const [overview, setOverview] = useState(note?.overview ?? '');
-  const [highlights, setHighlights] = useState(note?.highlights ?? '');
-  const [concerns, setConcerns] = useState(note?.concerns ?? '');
-  const [rating, setRating] = useState<number | null>(note?.rating ?? null);
+  const [overview, setOverview] = useState('');
+  const [highlights, setHighlights] = useState('');
+  const [concerns, setConcerns] = useState('');
+  const [rating, setRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Tăng để ép tab "Lịch sử" nạp lại sau mỗi lần lưu.
   const [logKey, setLogKey] = useState(0);
 
-  // Form rỗng hoàn toàn → chặn Lưu: tránh ghi đè note đã có bằng nội dung trắng.
+  // Form rỗng hoàn toàn → chặn Lưu: không ghi một dòng log trắng vô nghĩa.
   const isEmpty = !overview.trim() && !highlights.trim() && !concerns.trim() && rating == null;
 
   function clearForm() {
@@ -47,7 +46,7 @@ export default function MemberNoteModal({ member, sprintId, sprintName, note, au
     setSaving(true);
     setError(null);
     try {
-      await upsertMemberSprintNote(member.uid, sprintId, { overview, highlights, concerns, rating }, authorId);
+      await insertMemberSprintNote(member.uid, sprintId, { overview, highlights, concerns, rating }, authorId);
       clearForm();
       setLogKey((k) => k + 1); // nhật ký nạp lại để thấy note vừa lưu
       setTab('history');

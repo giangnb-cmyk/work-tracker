@@ -295,26 +295,27 @@ insert+select, chỉ bot (service role) update.
 
 ---
 
-## `member_sprint_notes` (đánh giá thành viên theo sprint)
+## `member_sprint_notes` (nhật ký đánh giá thành viên theo sprint)
 
-Ghi chú có cấu trúc cho MỘT người trong MỘT sprint (tuần) — migration `0059`. Hiện ở tab **Đánh
-giá** (`Reviews`, view id `reviews`) trong **khu quản trị chung NGOÀI dự án** (`GlobalAdmin`, cạnh
-Thành viên/Chi phí — dữ liệu toàn cục theo người) và tab **Ghi chú** trong `MemberModal`. Nhạy cảm
-(đánh giá của quản lý) → RLS **admin-only cho CẢ ĐỌC lẫn GHI** (`is_admin()` bao owner), y như
-`member_compensation`. Một dòng DÙNG CHUNG cho mỗi `(member_id, sprint_id)` (khoá upsert), sửa-đè;
-`updated_by` = người sửa cuối (KHÔNG lưu tác giả gốc — upsert ghi đè mọi cột truyền vào).
+Ghi chú có cấu trúc cho một người trong một sprint (tuần) — migration `0059`, chuyển thành **NHẬT
+KÝ APPEND-ONLY** ở `0062`: **mỗi lần lưu là MỘT DÒNG MỚI** mang ngày ghi (`created_at`), KHÔNG còn
+unique `(member_id, sprint_id)` / KHÔNG ghi đè — quản lý log hằng ngày trong sprint, form luôn mở
+trống. Hiện ở tab **Đánh giá** (`Reviews`, view id `reviews`) trong **khu quản trị chung NGOÀI dự
+án** (`GlobalAdmin`, cạnh Thành viên/Chi phí — dữ liệu toàn cục theo người) và tab **Ghi chú**
+trong `MemberModal` (nhật ký theo ngày). Nhạy cảm (đánh giá của quản lý) → RLS **admin-only cho CẢ
+ĐỌC lẫn GHI** (`is_admin()` bao owner), y như `member_compensation`.
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | uuid (PK) | `gen_random_uuid()` |
 | `member_id` | uuid | → `profiles.id`, `on delete cascade` (người được đánh giá) |
 | `sprint_id` | uuid | → `sprints.id`, `on delete cascade` |
-| `overview` | text | Tổng quan ("tuần này thế nào") |
+| `overview` | text | Tổng quan ("hôm nay/tuần này thế nào") |
 | `highlights` | text | Điểm nổi bật |
 | `concerns` | text | Điểm cần lưu ý |
 | `rating` | smallint \| null | 1..5 (CHECK); null = chưa chấm. Nhãn: `NOTE_RATINGS` trong `web/src/types.ts` |
-| `updated_at` / `updated_by` | timestamptz / uuid \| null | writer set inline (không trigger như `member_compensation`) |
-| `created_at` | timestamptz | `now()` |
+| `updated_at` / `updated_by` | timestamptz / uuid \| null | người ghi / lúc ghi DÒNG NÀY (append-only từ `0062`) |
+| `created_at` | timestamptz | `now()` — **ngày ghi của entry, hiện ở nhật ký** |
 
 - **RLS**: 4 policy admin-only (select/insert/update/delete). Realtime + `replica identity full`.
 - **Web**: hook `useSprintNotes(sprintId)` (live, `byMember` Map, `enabled=isAdmin`); ghi qua

@@ -88,12 +88,14 @@ def fetch_period_notes(sb, member_id: str, period_start: str, period_end: str) -
             "sprint_name": s.get("name") or "Sprint",
             "start": s.get("start_date"),
             "end": s.get("end_date"),
+            # Ngay GHI entry — tu 0062 moi (member, sprint) co NHIEU dong nhat ky theo ngay.
+            "logged": (r.get("created_at") or "")[:10],
             "rating": r.get("rating"),
             "overview": r.get("overview") or "",
             "highlights": r.get("highlights") or "",
             "concerns": r.get("concerns") or "",
         })
-    out.sort(key=lambda n: n["start"] or "")
+    out.sort(key=lambda n: (n["start"] or "", n["logged"]))
     return out
 
 
@@ -103,7 +105,9 @@ def build_prompt(name: str, label: str, notes: list) -> str:
     for n in notes:
         rating = n.get("rating")
         rating_txt = f"{rating}/5 ({RATING_LABEL.get(rating, '')})" if rating else "chưa chấm"
-        parts = [f"### {n['sprint_name']} ({n['start']} → {n['end']}) — điểm: {rating_txt}"]
+        # Kem ngay ghi: mot sprint co nhieu dong nhat ky (0062), AI can biet dien bien theo ngay.
+        logged = f", ghi ngày {n['logged']}" if n.get("logged") else ""
+        parts = [f"### {n['sprint_name']} ({n['start']} → {n['end']}{logged}) — điểm: {rating_txt}"]
         if n["overview"]:
             parts.append(f"- Tổng quan: {n['overview']}")
         if n["highlights"]:

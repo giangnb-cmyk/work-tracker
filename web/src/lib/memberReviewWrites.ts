@@ -17,28 +17,25 @@ export interface MemberNotePatch {
 }
 
 /**
- * Đặt ghi chú của MỘT người trong MỘT sprint. Một dòng dùng chung (khoá member_id+sprint_id),
- * sửa-đè; updated_by = người sửa cuối. Tạo nếu chưa có, cập nhật nếu đã có.
+ * Ghi MỘT DÒNG NHẬT KÝ mới cho (người, sprint) — append-only từ 0062: mỗi lần lưu là một
+ * entry mang ngày ghi hôm đó (created_at), KHÔNG ghi đè entry cũ. updated_by = người ghi
+ * dòng này. Lịch sử đọc như nhật ký theo ngày ở tab "Lịch sử".
  */
-export async function upsertMemberSprintNote(
+export async function insertMemberSprintNote(
   memberId: string,
   sprintId: string,
   patch: MemberNotePatch,
-  updatedBy: string | null,
+  authorId: string | null,
 ): Promise<void> {
-  const row: Record<string, unknown> = {
+  const { error } = await supabase.from('member_sprint_notes').insert({
     member_id: memberId,
     sprint_id: sprintId,
-    updated_at: new Date().toISOString(),
-    updated_by: updatedBy,
-  };
-  if (patch.overview !== undefined) row.overview = patch.overview;
-  if (patch.highlights !== undefined) row.highlights = patch.highlights;
-  if (patch.concerns !== undefined) row.concerns = patch.concerns;
-  if (patch.rating !== undefined) row.rating = patch.rating; // null = bỏ chấm
-  const { error } = await supabase
-    .from('member_sprint_notes')
-    .upsert(row, { onConflict: 'member_id,sprint_id' });
+    overview: patch.overview ?? '',
+    highlights: patch.highlights ?? '',
+    concerns: patch.concerns ?? '',
+    rating: patch.rating ?? null,
+    updated_by: authorId,
+  });
   if (error) throw error;
 }
 
@@ -48,11 +45,11 @@ export async function deleteMemberSprintNote(id: string): Promise<void> {
 }
 
 /**
- * Lịch sử ghi chú của một người qua các sprint (mới nhất trước). Embed sprints(...) để có
- * tên/ngày sprint mà không cần query thứ hai (RLS sprints mở đọc). Cho tab "Ghi chú" ở
- * MemberModal. Sắp client-side theo ngày bắt đầu sprint — ổn định bất kể thứ tự ghi note.
+ * Nhật ký ghi chú của một người (mới nhất trước, theo NGÀY GHI — mỗi entry một dòng, 0062).
+ * Embed sprints(...) để có tên/ngày sprint mà không cần query thứ hai (RLS sprints mở đọc).
+ * Cho tab "Ghi chú" ở MemberModal + tab "Lịch sử" ở MemberNoteModal.
  */
-export async function fetchMemberNotes(memberId: string, limit = 24): Promise<MemberSprintNote[]> {
+export async function fetchMemberNotes(memberId: string, limit = 60): Promise<MemberSprintNote[]> {
   const { data, error } = await supabase
     .from('member_sprint_notes')
     .select('*, sprints ( name, start_date, end_date )')
@@ -60,8 +57,7 @@ export async function fetchMemberNotes(memberId: string, limit = 24): Promise<Me
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
-  const notes = (data ?? []).map(rowToMemberSprintNote);
-  return notes.sort((a, b) => (b.sprintStart?.toMillis() ?? 0) - (a.sprintStart?.toMillis() ?? 0));
+  return (data ?? []).map(rowToMemberSprintNote);
 }
 
 /* ------------------------------ Hàng đợi AI tổng hợp ------------------------------ */

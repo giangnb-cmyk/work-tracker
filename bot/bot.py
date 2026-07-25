@@ -925,6 +925,48 @@ async def on_ready():
         log.info("Đánh giá AI bật: quét yêu cầu phân tích từ web mỗi %ds", BUG_SYNC_POLL_SECONDS)
 
 
+_IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff")
+
+
+def _image_urls_of(msg: discord.Message) -> list:
+    """URL ảnh trong 1 tin: attachment image/* (hoặc đuôi ảnh) + ảnh trong embed (link unfurl)."""
+    urls = []
+    for a in msg.attachments:
+        ct = (a.content_type or "").lower()
+        if ct.startswith("image/") or a.filename.lower().endswith(_IMAGE_EXT):
+            urls.append(a.url)
+    for e in msg.embeds:
+        if e.image and e.image.url:
+            urls.append(e.image.url)
+        elif e.thumbnail and e.thumbnail.url:
+            urls.append(e.thumbnail.url)
+    return urls
+
+
+async def collect_image_urls(message: discord.Message) -> list:
+    """Ảnh để check = ảnh đính kèm TRỰC TIẾP + ảnh trong tin được REPLY (nếu có). Bỏ trùng, giữ thứ tự.
+
+    Cho phép cả hai cách người dùng nêu: gửi ảnh thẳng kèm tag, hoặc reply một tin có ảnh rồi tag bot.
+    """
+    urls = _image_urls_of(message)
+    ref = message.reference
+    if ref and ref.message_id:
+        replied = ref.resolved if isinstance(ref.resolved, discord.Message) else None
+        if replied is None:  # chua cache -> fetch (best-effort, loi thi bo qua)
+            try:
+                replied = await message.channel.fetch_message(ref.message_id)
+            except Exception as e:
+                log.info("Không lấy được tin được reply để check ảnh: %s", _brief(e))
+        if replied:
+            urls += _image_urls_of(replied)
+    seen, out = set(), []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
 @client.event
 async def on_message(message: discord.Message):
     if message.author.bot:
@@ -936,11 +978,15 @@ async def on_message(message: discord.Message):
         return
 
     question = strip_mentions(message.content)
-    if not question:
+    image_urls = await collect_image_urls(message)
+    if not question and not image_urls:
         await message.reply(
             "Tag tôi kèm yêu cầu nhé, ví dụ: `@bot tạo task Fix login giao cho Nam, gấp`"
         )
         return
+    # Tag + ẢNH nhưng không gõ chữ -> mặc định hiểu là nhờ check bản quyền/đạo nhái ảnh.
+    if not question:
+        question = "Kiểm tra giúp mình các ảnh này có bị copy/đạo nhái/vi phạm bản quyền trên mạng không."
 
     # Lenh nhanh: "@bot sync bug" -> dong bo bug tu forum ngay (khong qua Claude).
     if BUG_FORUMS and SYNC_BUG_RE.search(question) and "bug" in question.lower():
@@ -959,12 +1005,16 @@ async def on_message(message: discord.Message):
     await ack(message)
     try:
         async with typing_best_effort(message.channel):
-            answer = await ask_claude(
+            prompt = (
                 f"Người gửi: {message.author.display_name} (Discord id {message.author.id}). "
-                f"Yêu cầu: {question}",
-                message.channel.id,
-                sender_id=message.author.id,
+                f"Yêu cầu: {question}"
             )
+            if image_urls:
+                prompt += (
+                    f"\n\n[Ảnh đính kèm — {len(image_urls)} ảnh, URL cách nhau bởi dấu cách]: "
+                    + " ".join(image_urls)
+                )
+            answer = await ask_claude(prompt, message.channel.id, sender_id=message.author.id)
         for i, part in enumerate(chunk(answer)):
             if i == 0:
                 await message.reply(part)
