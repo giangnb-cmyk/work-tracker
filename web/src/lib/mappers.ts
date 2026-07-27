@@ -26,6 +26,7 @@ import type {
   Sprint,
   Subtask,
   Task,
+  TaskSprintEntry,
   TeamMember,
 } from '../types';
 
@@ -372,6 +373,14 @@ export function rowToTaskReport(r: Row): TaskReport {
     sprintIds: r.sprint_ids ?? [],
     firstInProgressAt: Timestamp.fromISO(r.first_in_progress_at),
     firstDoneAt: Timestamp.fromISO(r.first_done_at),
+  };
+}
+
+/** Một dòng của `task_sprints` — lịch sử sprint của task (migration 0015). */
+export function rowToTaskSprint(r: Row): TaskSprintEntry {
+  return {
+    sprintId: r.sprint_id,
+    addedAt: Timestamp.fromISO(r.added_at),
   };
 }
 

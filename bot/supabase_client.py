@@ -5,11 +5,32 @@ Service-role BO QUA row level security -> moi kiem tra quyen phai lam trong code
 """
 
 import os
+import time
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
 from supabase import create_client, Client
+
+# ---------------------------------------------------------------------------
+# Ép HTTP/1.1 cho MỌI httpx.Client của tiến trình (supabase-py mặc định bật HTTP/2).
+# WHY: các vòng poll của bot chạy qua asyncio.to_thread và DÙNG CHUNG một client sync
+# (Singleton) — hai thread cùng multiplex trên MỘT connection HTTP/2 là race state-machine
+# h2: socket kẹt giữa chừng, nổ "[WinError 10035] A non-blocking socket operation could
+# not be completed" (2026-07-25: release_sync + cost_export nổ cách nhau 5ms). HTTP/1.1
+# thì pool phát mỗi thread một connection riêng — hết cửa race; còn keep-alive chết đã có
+# _send_with_retry bên dưới lo. Không gì trong bot cần HTTP/2 (requests/aiohttp không đi
+# qua httpx).
+# ---------------------------------------------------------------------------
+_orig_init = httpx.Client.__init__
+
+
+def _init_http1(self, *args, **kwargs):
+    kwargs["http2"] = False  # http2 là keyword-only trong httpx -> ghi đè kwargs là đủ
+    _orig_init(self, *args, **kwargs)
+
+
+httpx.Client.__init__ = _init_http1
 
 # ---------------------------------------------------------------------------
 # Vá lỗi socket keep-alive chết (httpx/HTTP2): bot poll 60s một nhịp, giữa hai nhịp
@@ -37,7 +58,16 @@ def _send_with_retry(self, request, **kwargs):
     except httpx.TransportError:
         if request.method not in ("GET", "HEAD"):
             raise
-        return _orig_send(self, request, **kwargs)
+        # Toi da 2 lan thu lai co NGHI giua chung (0.25s/0.5s) thay vi mot lan lien tay:
+        # WinError 10035 (socket ket non-blocking) can mot nhip de pool nha het connection
+        # hong; thu lai ngay tung van dinh cung mot connection ket.
+        for attempt in (1, 2):
+            time.sleep(0.25 * attempt)
+            try:
+                return _orig_send(self, request, **kwargs)
+            except httpx.TransportError:
+                if attempt == 2:
+                    raise
 
 
 httpx.Client.send = _send_with_retry

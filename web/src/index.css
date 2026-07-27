@@ -1661,6 +1661,24 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .tm-field > span { font-size: 0.75rem; color: var(--muted); }
 .tm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
 
+/* Lịch sử sprint của task (SprintHistory): chuỗi chip sprint + dòng tổng kết tuổi task. */
+.tm-sprints { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.ts-step { display: inline-flex; align-items: center; gap: 0.4rem; }
+.ts-arrow { color: rgba(148, 163, 184, 0.45); user-select: none; }
+.ts-chip {
+  display: inline-flex; align-items: baseline; gap: 0.45rem;
+  padding: 0.28rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+  background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25);
+  color: var(--text);
+}
+.ts-chip small { font-size: 0.7rem; font-weight: 400; color: var(--muted); }
+/* Sprint hiện tại: fill đặc + glow, cùng ngôn ngữ với nav đang active. */
+.ts-chip.now { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 0 12px rgba(99, 102, 241, 0.45); }
+.ts-chip.now small { color: rgba(255, 255, 255, 0.78); }
+.ts-summary { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.ts-summary strong { font-weight: 700; color: var(--text); }
+.ts-summary.warn, .ts-summary.warn strong { color: var(--gold); }
+
 .tmodal-footer { display: flex; align-items: center; gap: 0.6rem; padding: 0.9rem 1.5rem; border-top: 1px solid var(--border-soft); min-height: 56px; }
 .tmodal-foot-spacer { flex: 1; }
 .tm-savehint { font-size: 0.8rem; color: var(--muted); transition: color 0.2s ease; }

@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import discord
+import httpx  # chi de phan loai loi mang thoang qua o cac vong poll (10035, keep-alive chet)
 from discord.ext import tasks
 from dotenv import load_dotenv
 
@@ -883,6 +884,10 @@ async def poll_cost_export_requests():
     try:
         import cost_export
         await asyncio.to_thread(cost_export.process_pending, sb)
+    except (httpx.TransportError, OSError) as e:
+        # Loi mang thoang qua (keep-alive chet / WinError 10035) — nhip sau tu chay lai,
+        # khong can nguyen trang traceback lam nhieu log.
+        log.warning("Xuất chi phí: lỗi mạng thoáng qua, thử lại nhịp sau: %s", str(e)[:150])
     except Exception:
         log.exception("Xử lý hàng đợi xuất chi phí lỗi")
 

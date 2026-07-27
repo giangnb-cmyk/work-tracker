@@ -551,6 +551,16 @@ export interface Task {
   watcherNames: string[];
 }
 
+/**
+ * Một dòng lịch sử sprint của task (bảng `task_sprints`, migration 0015): task đã VÀO
+ * sprint nào, lúc nào. `tasks.sprintId` là sprint hiện tại; bảng này giữ mọi sprint đã qua
+ * (trigger DB ghi, client chỉ đọc) — để thấy task bị đẩy qua mấy sprint.
+ */
+export interface TaskSprintEntry {
+  sprintId: string;
+  addedAt: Timestamp | null;
+}
+
 /** Payload used when creating a task from the UI (server fills timestamps/id). */
 export type NewTaskInput = Pick<
   Task,

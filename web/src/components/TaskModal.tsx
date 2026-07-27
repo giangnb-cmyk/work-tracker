@@ -13,6 +13,7 @@ import WatchersField from './task/WatchersField';
 import PriorityBadge from './task/PriorityBadge';
 import StatusToggle from './task/StatusToggle';
 import RefImagesSection from './task/RefImagesSection';
+import SprintHistory from './task/SprintHistory';
 import TaskActivity from './TaskActivity';
 import ConfirmDialog from './ConfirmDialog';
 import DateInput from './DateInput';
@@ -93,6 +94,25 @@ export default function TaskModal({
     const anchor = sprint?.startDate?.toDate() ?? sprint?.endDate?.toDate();
     return anchor ? toInputDate(Timestamp.fromDate(sundayOfWeek(anchor))) : '';
   });
+  // Hạn chót BÁM THEO sprint: đổi sprint (từ Backlog vào hay sang sprint khác, ở cả tạo
+  // lẫn sửa) là hạn tự nhảy về chủ nhật tuần sprint MỚI — task gánh sang tuần nào thì hạn
+  // tuần đó, không giữ hạn của tuần đã qua (cùng luật moveTaskToSprint). Task done giữ
+  // nguyên: dueDate của nó là NGÀY HOÀN THÀNH THẬT. Hạn nhảy xong vẫn sửa tay được.
+  const prevSprintRef = useRef(task?.sprintId ?? defaultSprintId);
+  useEffect(() => {
+    if (prevSprintRef.current === sprintId) return;
+    prevSprintRef.current = sprintId;
+    if (status === 'done') return;
+    if (!sprintId) {
+      // Về backlog lúc TẠO: bỏ hạn (backlog không hẹn ngày — xem createTask). Lúc SỬA thì
+      // giữ nguyên — xoá ngày người ta đã đặt là quá tay.
+      if (!isEdit) setDue('');
+      return;
+    }
+    const sprint = sprints.find((s) => s.id === sprintId);
+    const anchor = sprint?.startDate?.toDate() ?? sprint?.endDate?.toDate();
+    if (anchor) setDue(toInputDate(Timestamp.fromDate(sundayOfWeek(anchor))));
+  }, [sprintId, status, sprints, isEdit]);
   const [attachments, setAttachments] = useState<Attachment[]>(task?.attachments ?? []);
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
   const [watcherIds, setWatcherIds] = useState<string[]>(task?.watcherIds ?? []);
@@ -418,6 +438,9 @@ export default function TaskModal({
               </div>
               <WatchersField members={members} watcherIds={watcherIds} onChange={setWatcherIds} disabled={!canEditFields} excludeIds={watcherExclude} />
             </section>
+
+            {/* Lịch sử sprint — task từng qua sprint nào + tổng tuổi, để lộ task bị kẹt */}
+            {isEdit && task && <SprintHistory task={task} currentSprintId={sprintId} />}
 
             {/* Tài liệu (chỉ link) */}
             <section className="tm-section">

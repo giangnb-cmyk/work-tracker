@@ -39,14 +39,15 @@ export function descWithLongTitle(title: string, description: string): string {
 
 export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise<string> {
   // Auto due window: starts today. Hạn chót: người tạo chọn thì tôn trọng; không chọn mà
-  // task VÀO SPRINT thì mặc định cuối tuần làm việc; còn task BACKLOG (không sprint) thì
-  // ĐỂ TRỐNG — backlog là chỗ đậu chưa hẹn ngày, tự điền hạn là ra một đống task "trễ" ảo.
+  // task VÀO SPRINT thì mặc định CUỐI SPRINT (chủ nhật tuần sprint — xem defaultSprintDue);
+  // còn task BACKLOG (không sprint) thì ĐỂ TRỐNG — backlog là chỗ đậu chưa hẹn ngày, tự
+  // điền hạn là ra một đống task "trễ" ảo.
   const now = new Date();
   const dueStart = Timestamp.fromDate(now);
   const dueDate = input.dueDate
     ? Timestamp.fromDate(input.dueDate)
     : input.sprintId
-      ? Timestamp.fromDate(endOfWorkWeek(now))
+      ? Timestamp.fromDate(await defaultSprintDue(input.sprintId, now))
       : null;
   // Tên dài mà chưa có mô tả → chép tiêu đề vào mô tả để đọc được ở chi tiết.
   const description = descWithLongTitle(input.title, input.description);
@@ -112,6 +113,28 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     dueDate,
   });
   return id;
+}
+
+/**
+ * Hạn mặc định khi tạo task VÀO SPRINT mà không chọn ngày: CHỦ NHẬT của tuần sprint
+ * (sprint = 1 tuần Mon→Sun; cùng luật với TaskModal, moveTaskToSprint và bot _due_window).
+ * Tra ngày sprint ngay tại đây để MỌI đường tạo task (TaskModal, QuickAddTaskRow…) chung
+ * một luật — `endOfWorkWeek(now)` cũ neo vào tuần HIỆN TẠI, tạo task cho sprint tuần khác
+ * là hạn rơi sai tuần. Sprint không tra được / không có ngày thì lùi về cuối tuần làm việc.
+ */
+async function defaultSprintDue(sprintId: string, now: Date): Promise<Date> {
+  const { data, error } = await supabase
+    .from('sprints')
+    .select('start_date, end_date')
+    .eq('id', sprintId)
+    .maybeSingle();
+  if (error) {
+    // Hạn mặc định là phụ — không vì nó mà chặn việc tạo task, nhưng phải ghi lại để lần ra.
+    console.warn('Không tra được ngày sprint để đặt hạn mặc định, dùng cuối tuần hiện tại:', error.message);
+    return endOfWorkWeek(now);
+  }
+  const anchor = data?.start_date ?? data?.end_date;
+  return anchor ? sundayOfWeek(new Date(anchor)) : endOfWorkWeek(now);
 }
 
 export async function updateTask(
