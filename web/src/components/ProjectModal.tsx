@@ -33,31 +33,46 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const sheetInvalid = sheetInput.trim().length > 0 && !sheetId;
   const costSheetId = extractSheetId(costSheetInput);
   const costSheetInvalid = costSheetInput.trim().length > 0 && !costSheetId;
-  // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
-  const webhookInvalid = dailyWebhook.trim().length > 0 && !dailyWebhook.includes('/api/webhooks/');
+  /**
+   * Webhook chỉ để GỬI THỬ — cố ý KHÔNG lưu vào project.
+   *
+   * Muốn xem thử báo cáo mà phải gõ đè lên ô webhook thật rồi nhớ hoàn nguyên là kiểu rất
+   * dễ lỡ tay bấm Lưu, thế là kênh chính của cả đội chuyển sang kênh nháp. Tách hẳn một ô
+   * riêng: bỏ trống thì gửi vào webhook chính, điền thì gửi vào đúng cái vừa dán.
+   */
+  const [testWebhook, setTestWebhook] = useState('');
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
 
+  // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
+  const isWebhookUrl = (v: string) => v.includes('/api/webhooks/');
+  const webhookInvalid = dailyWebhook.trim().length > 0 && !isWebhookUrl(dailyWebhook);
+  const usingTestHook = testWebhook.trim().length > 0;
+  const testTarget = usingTestHook ? testWebhook.trim() : dailyWebhook.trim();
+  const testTargetInvalid = testTarget.length > 0 && !isWebhookUrl(testTarget);
+  const canTest = isEdit && testTarget.length > 0 && !testTargetInvalid;
+
   /** Gọi Edge Function daily-report ở chế độ TEST cho ĐÚNG project này -> gửi report thử
-   *  (nhãn 🧪) vào webhook đang nhập. Chỉ edit mode (cần project.id) + đã có admin JWT. */
+   *  (nhãn 🧪) vào webhook đích. Chỉ edit mode (cần project.id) + đã có admin JWT. */
   async function handleTest() {
     if (!project) return;
-    if (webhookInvalid || !dailyWebhook.trim()) {
+    if (!canTest) {
       setTestMsg('⚠ Nhập webhook hợp lệ trước khi gửi thử.');
       return;
     }
     setTesting(true);
     setTestMsg(null);
+    const where = usingTestHook ? 'webhook thử' : 'webhook chính';
     try {
       const { data, error } = await supabase.functions.invoke('daily-report', {
-        body: { projectId: project.id, webhook: dailyWebhook.trim() },
+        body: { projectId: project.id, webhook: testTarget },
       });
       if (error) throw error;
       if (data?.ok) {
         setTestMsg(
           data.sent > 0
-            ? `✅ Đã gửi thử (${data.sent} tin) — mở kênh Discord xem thử.`
-            : '⚠ Gửi xong nhưng webhook trả lỗi — kiểm tra lại URL webhook.',
+            ? `✅ Đã gửi ${data.sent} tin vào ${where} — mở kênh Discord xem thử.`
+            : `⚠ Gửi xong nhưng ${where} trả lỗi — kiểm tra lại URL.`,
         );
       } else {
         setTestMsg(`❌ ${data?.message ?? 'Gửi thử thất bại.'}`);
@@ -211,41 +226,68 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           )}
         </p>
 
-        <div className="field">
+        <label className="field">
           <span>Webhook Discord — báo cáo task hằng ngày</span>
-          <div className="row" style={{ gap: '0.5rem', alignItems: 'stretch' }}>
-            <input
-              className="input"
-              style={{ flex: 1 }}
-              value={dailyWebhook}
-              onChange={(e) => setDailyWebhook(e.target.value)}
-              placeholder="https://discord.com/api/webhooks/…"
-            />
-            {/* Gửi thử chỉ khi đang SỬA project (cần id để build report). Tạo mới thì lưu trước. */}
-            {isEdit && (
-              <button
-                type="button"
-                className="btn-sm"
-                onClick={handleTest}
-                disabled={testing || webhookInvalid || !dailyWebhook.trim()}
-                title="Gửi thử báo cáo của project này vào webhook trên"
-              >
-                {testing ? 'Đang gửi…' : '🧪 Gửi thử'}
-              </button>
-            )}
-          </div>
-        </div>
+          <input
+            className="input"
+            value={dailyWebhook}
+            onChange={(e) => setDailyWebhook(e.target.value)}
+            placeholder="https://discord.com/api/webhooks/…"
+          />
+        </label>
         <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
-          {testMsg ? (
-            <span>{testMsg}</span>
-          ) : webhookInvalid ? (
+          {webhookInvalid ? (
             <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
           ) : dailyWebhook.trim() ? (
-            <>✅ 10:30 mỗi ngày làm việc, bot gửi task của project này vào kênh webhook, tag người theo Discord ID.{isEdit && ' Bấm “Gửi thử” để xem trước ngay.'}</>
+            <>✅ 10:30 mỗi ngày làm việc, bot gửi task của project này vào kênh webhook, tag người theo Discord ID.</>
           ) : (
             <>💡 Dán webhook của kênh Discord để nhận báo cáo task hằng ngày (10:30). Rỗng = project này không gửi.</>
           )}
         </p>
+
+        {/* Gửi thử — ô riêng, KHÔNG lưu. Chỉ ở chế độ SỬA vì cần project.id để dựng báo cáo. */}
+        <div className="field dr-test">
+          <span>🧪 Gửi thử báo cáo</span>
+          <div className="row" style={{ gap: '0.5rem', alignItems: 'stretch' }}>
+            <input
+              className="input"
+              style={{ flex: 1 }}
+              value={testWebhook}
+              onChange={(e) => setTestWebhook(e.target.value)}
+              placeholder="Webhook để thử — bỏ trống thì gửi vào webhook chính ở trên"
+              disabled={!isEdit}
+            />
+            <button
+              type="button"
+              className="btn-sm"
+              onClick={handleTest}
+              disabled={testing || !canTest}
+              title={
+                isEdit
+                  ? 'Gửi báo cáo của dự án này ngay bây giờ (mang nhãn 🧪 TEST)'
+                  : 'Tạo dự án xong rồi mở lại để gửi thử'
+              }
+            >
+              {testing ? 'Đang gửi…' : 'Gửi thử'}
+            </button>
+          </div>
+          <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.4rem', marginBottom: 0 }}>
+            {testMsg ? (
+              <span>{testMsg}</span>
+            ) : !isEdit ? (
+              <>💡 Tạo dự án xong rồi mở lại để gửi thử (báo cáo cần id của dự án).</>
+            ) : testTargetInvalid ? (
+              <span className="error-text">⚠ Link webhook thử không đúng dạng (phải chứa /api/webhooks/).</span>
+            ) : (
+              <>
+                Ô này <strong>không được lưu</strong> — dán webhook kênh nháp để xem thử mà không
+                đụng webhook chính. Báo cáo gửi ngay lúc bấm, nội dung y hệt bản 10:30 nhưng mang
+                nhãn <strong>🧪 TEST</strong>.
+                {usingTestHook ? ' Đang nhắm: webhook thử.' : ' Đang nhắm: webhook chính ở trên.'}
+              </>
+            )}
+          </p>
+        </div>
 
         {error && <p className="error-text">{error}</p>}
 

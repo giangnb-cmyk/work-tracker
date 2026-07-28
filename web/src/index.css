@@ -479,6 +479,14 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .st-assignee .ss-opt, .st-assignee .ss-search { text-align: left; }
 .st-row.done .st-assignee .ss-trigger { opacity: 0.7; }
 
+/* Khối "Gửi thử báo cáo" trong popup dự án: lùi vào một chút cho thấy rõ đây là công cụ
+   thử, không phải một trường sẽ được lưu cùng dự án. */
+.dr-test {
+  background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-soft);
+  border-radius: 10px; padding: 0.7rem 0.8rem; margin-bottom: 0.75rem;
+}
+.dr-test > span:first-child { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+
 /* "Subtask của tôi" (MyTasks) — nhóm theo task cha, mỗi nhóm một thẻ. */
 .msub-list { display: flex; flex-direction: column; gap: 0.6rem; }
 .msub-group { padding: 0.75rem 0.9rem; border-radius: 12px; }
