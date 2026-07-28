@@ -108,13 +108,48 @@ def _parse_due(due: str):
         die(f"due phải đúng định dạng YYYY-MM-DD, nhận được '{due}'")
 
 
-def _assignee_fields(client, token: str):
-    """Tra ve (assigneeId, assigneeName) tu ten/mention. None neu khong dua vao."""
-    if not token:
+# Cach nguoi dung tu goi chinh minh. "tao cho toi task X" phai ra CHINH nguoi tag bot,
+# nen phai doi chieu voi BOT_SENDER_ID — KHONG duoc de resolve_user() doan theo ten, vi
+# _match_display_name khop cA MOT PHAN: 'me' se dinh bat ky ai co 'me' trong ten.
+# Chi nhan dai tu NGOI THU NHAT ro rang. Co y BO 'anh'/'chi': "giao cho anh" con co the
+# la nguoi khac (anh Nam), doan lech la gan task cho sai nguoi.
+_SELF_TOKENS = {"me", "myself", "tôi", "toi", "mình", "minh", "tui", "tớ", "em", "iem"}
+
+# Co y de TRONG nguoi nhan (vd nhap hang loat ke hoach cua nguoi khac ma dong do khong
+# neu ten ai). Can mot cach noi ro rang, vi bo trong --assignee bay gio = giao cho nguoi
+# yeu cau (xem default_self ben duoi).
+_NOBODY_TOKENS = {"none", "nobody", "no one", "unassigned", "chưa giao", "chua giao", "không", "khong"}
+
+
+def _assignee_fields(client, token: str, *, default_self: bool = False):
+    """Tra ve (assigneeId, assigneeName) tu ten/mention/dai tu ngoi thu nhat.
+
+    default_self=True (dung cho `create`): KHONG dua --assignee thi giao cho CHINH nguoi
+    tag bot. Truoc day de trong la task khong co nguoi nhan — member nhan "tao cho toi
+    task X" xong task roi vao backlog khong ai nhan, dung cai loi da bi bao.
+    `update` KHONG bat default nay: o do "khong dua --assignee" nghia la "dung doi".
+    """
+    t = (token or "").strip()
+    if t.lower() in _NOBODY_TOKENS:
         return None, ""
-    user = repo.resolve_user(client, token)
+    if not t:
+        if not default_self:
+            return None, ""
+        # Chua link discord_id thi khong doan bua — de trong nhu cu (khong die: viec tao
+        # task khong nen chet chi vi chua ai dien Discord ID cho nguoi nay).
+        me = permissions.current_user(client)
+        return (me["_id"], me.get("displayName", "")) if me else (None, "")
+    if t.lower() in _SELF_TOKENS:
+        me = permissions.current_user(client)
+        if not me:
+            die(
+                "không xác định được bạn là ai (Discord id của bạn chưa liên kết với tài khoản "
+                "nào) — nhờ admin điền Discord ID ở tab Thành viên, hoặc nói rõ tên người nhận."
+            )
+        return me["_id"], me.get("displayName", "")
+    user = repo.resolve_user(client, t)
     if not user:
-        die(f"không tìm thấy người nhận '{token}' trong bảng users")
+        die(f"không tìm thấy người nhận '{t}' trong bảng users")
     return user["_id"], user.get("displayName", "")
 
 
@@ -176,16 +211,27 @@ def cmd_create(args):
         )
 
     priority = _normalize_or_die(normalize_priority, args.priority, "priority", PRIORITY_MEDIUM)
+    # "tao task X, tick done luon" -> tao thang o trang thai done, khong bat nguoi dung
+    # phai nhan them mot cau update.
+    status = _normalize_or_die(normalize_status, args.status, "status", STATUS_TODO)
     # WHY: thieu projectId thi task thanh mo coi — moi view web (Bang Sprint, Backlog,
     # Features) deu loc theo project dang chon, task se khong hien o dau ca.
     project = projects.resolve_project(client, args.project)
     feature = projects.resolve_feature(client, project["_id"], args.feature) if args.feature else None
     sprint = _resolve_sprint(client, args.sprint)
     sprint_id = sprint["_id"] if sprint else None
-    assignee_id, assignee_name = _assignee_fields(client, args.assignee)
+    # default_self: khong noi giao cho ai -> giao cho CHINH nguoi tag bot.
+    assignee_id, assignee_name = _assignee_fields(client, args.assignee, default_self=True)
+    assignee_defaulted = not (args.assignee or "").strip() and assignee_id is not None
     watcher_ids, watcher_names = _watcher_fields(client, args.watchers)
     link_atts = _link_fields(args.link, args.link_name)
     due_start, due_dt, due_from = _due_window(sprint, args.due)
+    # Tao thang o trang thai done: dueDate = HOM NAY, khong phai cuoi sprint. dueDate cua
+    # task done trong he thong nay la NGAY HOAN THANH THAT (web updateTask/moveTask snap ve
+    # do), va bao cao "hom qua da hoan thanh" (Edge Function daily-report) loc theo cot ay
+    # — de nguyen han cuoi sprint la task xong hom nay lai dem vao ngay khac.
+    if status == STATUS_DONE and not args.due:
+        due_dt, due_from = due_start, "hoàn thành hôm nay"
 
     task_doc = {
         "title": title,
@@ -193,7 +239,7 @@ def cmd_create(args):
         "sprintId": sprint_id,
         "projectId": project["_id"],
         "featureId": feature["_id"] if feature else None,
-        "status": STATUS_TODO,
+        "status": status,
         "priority": priority,
         "assigneeId": assignee_id,
         "assigneeName": assignee_name,
@@ -214,12 +260,13 @@ def cmd_create(args):
     short_code = created_row.get("short_code")
 
     where = "backlog" if sprint_id is None else args.sprint
-    who = assignee_name or "chưa giao"
+    # Noi ro khi TU suy ra nguoi nhan, de nguoi dung thay ma sua neu khong y — dung im lang.
+    who = (f"{assignee_name} (người yêu cầu)" if assignee_defaulted else assignee_name) or "chưa giao"
     feat = f", feature: {feature['name']}" if feature else ""
     watch = f", liên quan: {', '.join(watcher_names)}" if watcher_names else ""
     print(
         f"Đã tạo task [{repo.short_id(task_id)}] \"{title}\" "
-        f"(status todo, priority {priority}, giao cho: {who}, "
+        f"(status {status}, priority {priority}, giao cho: {who}, "
         f"project: {project['name']}, sprint: {where}{feat}{watch}, "
         f"hạn: {due_dt:%d/%m} — {due_from})."
     )
@@ -499,13 +546,18 @@ def cmd_show(args):
 # --- Subcommand: list --------------------------------------------------------
 
 def _list_assignee_id(client, token):
-    """None neu khong loc. 'me' -> map tu BOT_SENDER_ID."""
+    """None neu khong loc. 'me'/'tôi'/'mình'… -> map tu BOT_SENDER_ID.
+
+    Dung CHUNG _SELF_TOKENS voi create/update: truoc day cho no rieng mot phep so sanh
+    `== "me"`, nen "xem task cua toi" (Claude truyen 'toi') roi xuong resolve_user va bi
+    khop mot phan theo ten — liet ke task cua nguoi khac.
+    """
     if not token:
         return None
-    if token.strip().lower() == "me":
+    if token.strip().lower() in _SELF_TOKENS:
         user = permissions.current_user(client)
         if not user:
-            die("không xác định được 'me' (chưa liên kết Discord id với tài khoản)")
+            die("không xác định được bạn là ai (chưa liên kết Discord id với tài khoản)")
         return user["_id"]
     user = repo.resolve_user(client, token)
     if not user:
@@ -599,7 +651,8 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--title", required=True, help="Tieu de (bat buoc, 1-140 ky tu)")
     c.add_argument("--project", help="Ten hoac id project (bo trong neu chi co 1 project)")
     c.add_argument("--feature", help="Ten hoac id feature trong project (tuy chon)")
-    c.add_argument("--assignee", help="Ten hoac mention nguoi nhan (khop users)")
+    c.add_argument("--assignee", help="Ten hoac mention nguoi nhan (khop users). Bo trong = giao cho nguoi yeu cau; 'none' = de trong")
+    c.add_argument("--status", help="todo|in_progress|review|done (nhan tieng Viet). Mac dinh todo")
     c.add_argument("--watchers", help="Nguoi lien quan, phan cach bang dau phay: 'Nam, Ánh, <@123>'")
     c.add_argument("--sprint", default="active", help="Ten sprint | 'active' | 'backlog'")
     c.add_argument("--priority", help="low|medium|high|urgent (nhan ca tieng Viet)")

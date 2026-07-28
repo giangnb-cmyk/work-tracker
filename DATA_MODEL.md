@@ -433,6 +433,25 @@ subtasks; if a task has no subtasks, progress falls back to a status stage (`tod
 > Đường này không đẩy checklist sang Notion (chỉ `updateTask` làm) — Notion khớp lại ở lần
 > lưu task kế tiếp từ màn chi tiết.
 
+### Người nhận khi bot tạo task (`assigneeId`)
+
+Bot `task_ops.py create` **mặc định giao cho CHÍNH người tag bot** (`--assignee` bỏ trống →
+`_assignee_fields(..., default_self=True)` tra `BOT_SENDER_ID` ↔ `profiles.discord_id`).
+Trước đây bỏ trống là task không có người nhận, nên "@bot tạo cho tôi task X" ra một task
+nằm im trong Backlog — lỗi đã bị báo.
+
+- Đại từ ngôi thứ nhất (`me` · `tôi` · `mình` · `tui` · `tớ` · `em`) → người gửi. Bộ từ
+  `_SELF_TOKENS` dùng CHUNG cho `create`/`update`/`list`, **không** đi qua
+  `repo.resolve_user()`: hàm đó khớp `display_name` cả một phần, nên `'me'` sẽ dính bất kỳ
+  ai có "me" trong tên. Cố ý KHÔNG nhận `anh`/`chị` — "giao cho anh" còn có thể là người khác.
+- `--assignee none` (hoặc `chưa giao`/`không`) = **cố ý** để trống. Chỉ dùng khi nhập hàng
+  loạt kế hoạch của người khác mà dòng đó không nêu tên ai.
+- `update` **không** bật mặc định này: ở đó "không đưa `--assignee`" nghĩa là "đừng đổi".
+- `create --status` (mặc định `todo`) cho "tạo task X, tick done luôn" xong trong MỘT lượt.
+  Tạo thẳng ở `done` thì `dueDate` = HÔM NAY chứ không phải cuối sprint — `dueDate` của task
+  done là ngày hoàn thành thật, và Edge Function `daily-report` lọc mục "hôm qua đã hoàn
+  thành" theo đúng cột đó.
+
 ### Status columns (Kanban)
 
 `todo` → `in_progress` → `review` → `done`. The board renders one column per status.
