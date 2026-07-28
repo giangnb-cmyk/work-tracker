@@ -64,17 +64,23 @@ export default function MyTasks() {
   );
   const open = scoped.filter((t) => t.status !== 'done').length;
 
-  // Subtask cũng bám sprint ĐANG CHỌN qua task cha, cùng luật với danh sách task ở trên —
-  // không thì mục này lại phơi ra việc của mọi sprint trong khi phần trên đã lọc.
-  const scopedSubtasks = useMemo(
+  // Subtask của tôi TRONG DỰ ÁN này, tách làm hai: thuộc sprint đang chọn (hiện ra) và
+  // thuộc sprint khác (chỉ đếm). Bám sprint cùng luật với danh sách task ở trên — không thì
+  // mục này lại phơi việc của mọi sprint trong khi phần trên đã lọc.
+  const projectSubtasks = useMemo(
     () =>
       mySubtasks.filter(
-        ({ task }) =>
-          (task.sprintId ?? null) === (selectedSprintId ?? null) &&
-          (selectedProjectId === null || task.projectId === selectedProjectId),
+        ({ task }) => selectedProjectId === null || task.projectId === selectedProjectId,
       ),
-    [mySubtasks, selectedSprintId, selectedProjectId],
+    [mySubtasks, selectedProjectId],
   );
+  const scopedSubtasks = useMemo(
+    () => projectSubtasks.filter(({ task }) => (task.sprintId ?? null) === (selectedSprintId ?? null)),
+    [projectSubtasks, selectedSprintId],
+  );
+  // Có subtask ở sprint khác thì vẫn hiện TIÊU ĐỀ mục kèm số, không ẩn sạch: mục biến mất
+  // hoàn toàn thì không phân biệt được "mình không có subtask nào" với "tính năng hỏng".
+  const otherSprintSubtasks = projectSubtasks.length - scopedSubtasks.length;
   const openSubtasks = scopedSubtasks.filter(({ subtask }) => !subtask.done).length;
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
@@ -153,18 +159,22 @@ export default function MyTasks() {
 
       {/* Subtask được giao — đứng riêng vì task cha có thể là của người khác, khi đó nó
           KHÔNG nằm trong danh sách task ở trên. */}
-      {scopedSubtasks.length > 0 && (
+      {projectSubtasks.length > 0 && (
         <section className="mt-bugs">
           <div className="mt-subhead row between">
             <div>
               <h2>☑️ Subtask của tôi</h2>
               <p className="muted">
-                {openSubtasks} subtask chưa xong · {scopedSubtasks.length - openSubtasks} đã xong ·{' '}
-                {sprintName(selectedSprintId)}
+                {scopedSubtasks.length > 0
+                  ? `${openSubtasks} subtask chưa xong · ${scopedSubtasks.length - openSubtasks} đã xong · ${sprintName(selectedSprintId)}`
+                  : `Không có subtask nào trong ${sprintName(selectedSprintId)}`}
+                {otherSprintSubtasks > 0 && ` · ${otherSprintSubtasks} ở sprint khác`}
               </p>
             </div>
           </div>
-          <MySubtaskList items={scopedSubtasks} sprintName={sprintName} onOpenTask={setEditing} />
+          {scopedSubtasks.length > 0 && (
+            <MySubtaskList items={scopedSubtasks} sprintName={sprintName} onOpenTask={setEditing} />
+          )}
         </section>
       )}
 

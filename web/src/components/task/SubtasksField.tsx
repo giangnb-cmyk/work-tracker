@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import SearchableSelect from '../SearchableSelect';
+import { useRef, useState } from 'react';
+import AssigneePicker from './AssigneePicker';
 import type { Subtask, TeamMember } from '../../types';
 
 interface Props {
@@ -27,10 +27,6 @@ export default function SubtasksField({
   const done = subtasks.filter((s) => s.done).length;
   const pct = subtasks.length ? Math.round((done / subtasks.length) * 100) : 0;
 
-  const memberOpts = useMemo(
-    () => members.map((m) => ({ value: m.uid, label: m.displayName })),
-    [members],
-  );
   const nameOf = (uid: string | null | undefined) =>
     (uid ? members.find((m) => m.uid === uid)?.displayName : '') ?? '';
 
@@ -61,10 +57,10 @@ export default function SubtasksField({
   }
 
   /** Đổi người làm subtask. Ghi kèm tên (denormalize) như tasks.assigneeName. */
-  function assign(id: string, uid: string) {
+  function assign(id: string, uid: string | null) {
     onChange(
       subtasks.map((s) =>
-        s.id === id ? { ...s, assigneeId: uid || null, assigneeName: nameOf(uid) } : s,
+        s.id === id ? { ...s, assigneeId: uid, assigneeName: nameOf(uid) } : s,
       ),
     );
   }
@@ -110,20 +106,14 @@ export default function SubtasksField({
                 </span>
                 <span className="st-title">{s.title}</span>
               </label>
-              {/* Người làm subtask. `panel="overlay"` là bắt buộc: .st-row là hàng flex, panel
-                  in-flow (mặc định) sẽ nong hàng ra và xô cả danh sách xuống mỗi lần mở. */}
-              <div className="st-assignee">
-                <SearchableSelect
-                  value={s.assigneeId ?? ''}
-                  onChange={(v) => assign(s.id, v)}
-                  options={memberOpts}
-                  disabled={!canEdit}
-                  allowEmpty
-                  emptyLabel="Chưa giao"
-                  placeholder="Chưa giao"
-                  panel="overlay"
-                />
-              </div>
+              {/* Người làm subtask — chỉ AVATAR, không kèm tên: tên người chiếm gần hết
+                  chiều ngang và bóp tên subtask lại. Tên vẫn có ở tooltip + danh sách chọn. */}
+              <AssigneePicker
+                value={s.assigneeId ?? null}
+                onChange={(uid) => assign(s.id, uid)}
+                members={members}
+                disabled={!canEdit}
+              />
               {canEdit && (
                 <button type="button" className="st-del" onClick={() => remove(s.id)} title="Xoá subtask">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">

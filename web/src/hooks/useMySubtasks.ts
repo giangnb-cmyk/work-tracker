@@ -21,7 +21,11 @@ export function useMySubtasks(uid: string) {
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
-      .contains('subtasks', [{ assigneeId: uid }])
+      // PHẢI truyền CHUỖI JSON, không phải mảng JS: postgrest-js thấy Array là dịch thành
+      // mảng Postgres `cs.{...}` bằng value.join(',') — với mảng object thì ra
+      // `cs.{[object Object]}`, một filter vô nghĩa khớp 0 dòng mà KHÔNG báo lỗi (đã cắn
+      // thật: mục "Subtask của tôi" trống trơn). Chuỗi thì nó gửi thẳng: `cs.[{...}]` = @> jsonb.
+      .contains('subtasks', JSON.stringify([{ assigneeId: uid }]))
       .order('order', { ascending: true });
     if (error) throw error;
     return (data ?? []).map(rowToTask);
