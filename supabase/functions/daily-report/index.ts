@@ -11,6 +11,8 @@
 //  🌙 Hôm qua đã hoàn thành (task trong sprint, done ngày làm việc trước).
 //  ☀️ Hôm nay cần làm = task CHƯA xong TRONG SPRINT (⚠️ đánh dấu quá hạn).
 // Mỗi task là link Discord [tiêu đề](WEB_BASE_URL/tasks/<id>) — LINK WEB, không dùng Notion.
+// Task có checklist thì kèm số (đã xong/tổng), và ở mục "hôm nay" liệt kê từng subtask ở
+// dòng dưới, mở đầu bằng `└` (việc đã xong gạch ngang) — xem renderSubtasks.
 // Tin dài > 2000 ký tự (giới hạn Discord) được cắt theo dòng thành nhiều tin (hàm chunk).
 //
 // Chạy trong Supabase (không cần máy self-host). Đọc DB bằng service_role (auto-inject),
@@ -32,14 +34,26 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const TASK_FIELDS = 'id,title,assignee_id,project_id,due_date';
+const TASK_FIELDS = 'id,title,assignee_id,project_id,due_date,subtasks';
+/** Task nhiều subtask thì cắt bớt cho khỏi ngập tin — phần dư gộp thành một dòng "…và N nữa". */
+const MAX_SUBTASKS_SHOWN = 10;
 
+interface Subtask {
+  id: string;
+  title: string | null;
+  done: boolean;
+  /** Người làm subtask — có thể KHÁC người nhận task (giao chéo). Subtask cũ không có. */
+  assigneeId?: string | null;
+  assigneeName?: string;
+}
 interface Task {
   id: string;
   title: string | null;
   assignee_id: string | null;
   project_id: string | null;
   due_date: string | null;
+  /** Checklist trong task (cột jsonb `tasks.subtasks`). Task cũ có thể là null. */
+  subtasks: Subtask[] | null;
 }
 interface Profile {
   id: string;
@@ -95,12 +109,46 @@ function groupByAssignee(tasks: Task[]): Map<string | null, Task[]> {
   return g;
 }
 
+/** Checklist của task, đã lọc rác (cột jsonb nên không có ràng buộc kiểu ở DB). */
+function subtasksOf(t: Task): Subtask[] {
+  return Array.isArray(t.subtasks) ? t.subtasks.filter((s) => s && (s.title ?? '').trim()) : [];
+}
+
+/**
+ * Các dòng subtask nằm DƯỚI dòng task chính, mở đầu bằng `└` để thấy ngay là con của nó.
+ * Việc đã xong gạch ngang — vẫn liệt kê chứ không giấu, vì "còn lại gì" chỉ đọc được khi
+ * thấy cả hai. Task nhiều subtask thì cắt ở MAX_SUBTASKS_SHOWN và nói rõ còn bao nhiêu:
+ * cắt âm thầm thì người đọc tưởng đã thấy hết.
+ *
+ * Subtask giao cho NGƯỜI KHÁC người nhận task thì ghi kèm tên — cả mục đang nằm dưới tên
+ * người nhận task, không ghi ra thì đọc thành "việc của người đó" mà thật ra không phải.
+ * Cố ý ghi TÊN TRẦN chứ không `<@id>`: mention là ping thật (postWebhook cho parse users),
+ * mà báo cáo này xưa nay chỉ ping người có task — đừng lặng lẽ mở rộng ai bị réo.
+ */
+function renderSubtasks(subs: Subtask[], taskAssigneeId: string | null): string {
+  let out = '';
+  for (const s of subs.slice(0, MAX_SUBTASKS_SHOWN)) {
+    const name = (s.title ?? '').trim();
+    const owner =
+      s.assigneeId && s.assigneeId !== taskAssigneeId && (s.assigneeName ?? '').trim()
+        ? ` — ${s.assigneeName}`
+        : '';
+    out += `  └ ${s.done ? `~~${name}~~` : name}${owner}\n`;
+  }
+  const rest = subs.length - MAX_SUBTASKS_SHOWN;
+  if (rest > 0) out += `  └ _…và ${rest} subtask nữa_\n`;
+  return out;
+}
+
 function renderSection(
   icon: string,
   title: string,
   tasks: Task[],
   profiles: Map<string, Profile>,
   todayNum: number | null,
+  /** Liệt kê checklist dưới mỗi task. Tắt ở mục "đã hoàn thành": ở đó subtask nào cũng
+   *  xong nên liệt kê ra chỉ tổ dài tin, con số (5/5) trên dòng task đã đủ. */
+  listSubtasks: boolean,
 ): string {
   let msg = `\n${icon} **${title}**\n`;
   if (tasks.length === 0) return msg + '_Không có task nào_\n';
@@ -112,6 +160,8 @@ function renderSection(
       const titleTxt = t.title || '(không tên)';
       const url = taskLink(t);
       let line = url ? `[${titleTxt}](${url})` : titleTxt;
+      const subs = subtasksOf(t);
+      if (subs.length > 0) line += ` (${subs.filter((s) => s.done).length}/${subs.length})`;
       if (todayNum !== null) {
         const dn = dueVnNum(t.due_date);
         if (dn !== null && dn < todayNum) {
@@ -120,6 +170,7 @@ function renderSection(
         }
       }
       msg += `- ${line}\n`;
+      if (listSubtasks && subs.length > 0) msg += renderSubtasks(subs, t.assignee_id);
     }
   }
   return msg;
@@ -139,9 +190,9 @@ function buildMessage(
   const tag = test ? '🧪 (TEST) ' : '';
   const sp = sprintName ? ` · ${sprintName}` : '';
   let msg = `\n# 📢 **${tag}DAILY REPORT: ${prjName.toUpperCase()}**${sp}\n`;
-  msg += renderSection('🌙', `TASK HÔM QUA (ĐÃ HOÀN THÀNH) — ${yLabel}`, done, profiles, null);
+  msg += renderSection('🌙', `TASK HÔM QUA (ĐÃ HOÀN THÀNH) — ${yLabel}`, done, profiles, null, false);
   msg += '\n─────────────────────────────\n';
-  msg += renderSection('☀️', `TASK HÔM NAY (CHƯA XONG) — ${tLabel}`, open, profiles, todayNum);
+  msg += renderSection('☀️', `TASK HÔM NAY (CHƯA XONG) — ${tLabel}`, open, profiles, todayNum, true);
   if (!sprintName) msg += '\n_(Chưa có sprint nào đang chạy tuần này.)_\n';
   return msg;
 }

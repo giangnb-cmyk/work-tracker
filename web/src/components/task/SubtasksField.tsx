@@ -1,25 +1,55 @@
-import { useRef, useState } from 'react';
-import type { Subtask } from '../../types';
+import { useMemo, useRef, useState } from 'react';
+import SearchableSelect from '../SearchableSelect';
+import type { Subtask, TeamMember } from '../../types';
 
 interface Props {
   subtasks: Subtask[];
   onChange: (next: Subtask[]) => void;
-  canEdit: boolean; // add/remove (admin)
+  canEdit: boolean; // add/remove/đổi người nhận (admin hoặc người tạo task)
   canToggle: boolean; // tick done (owner or admin)
+  members: TeamMember[];
+  /** Người đang đăng nhập — subtask mới tự giao cho chính họ. */
+  currentUserId: string;
 }
 
 /** Checklist of subtasks; the tick ratio drives the task progress bar. */
-export default function SubtasksField({ subtasks, onChange, canEdit, canToggle }: Props) {
+export default function SubtasksField({
+  subtasks,
+  onChange,
+  canEdit,
+  canToggle,
+  members,
+  currentUserId,
+}: Props) {
   const [title, setTitle] = useState('');
   const [adding, setAdding] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const done = subtasks.filter((s) => s.done).length;
   const pct = subtasks.length ? Math.round((done / subtasks.length) * 100) : 0;
 
+  const memberOpts = useMemo(
+    () => members.map((m) => ({ value: m.uid, label: m.displayName })),
+    [members],
+  );
+  const nameOf = (uid: string | null | undefined) =>
+    (uid ? members.find((m) => m.uid === uid)?.displayName : '') ?? '';
+
   function add() {
     const t = title.trim();
     if (!t) return;
-    onChange([...subtasks, { id: crypto.randomUUID(), title: t, done: false }]);
+    // Tự giao cho CHÍNH NGƯỜI THÊM: gần như luôn đúng (người ta bẻ nhỏ việc của mình ra),
+    // và subtask không có người nhận thì không lọt vào "Task của tôi" lẫn thống kê theo
+    // người — mặc định "chưa giao" là mặc định vô hình. Đổi lại được ngay ở ô bên cạnh.
+    onChange([
+      ...subtasks,
+      {
+        id: crypto.randomUUID(),
+        title: t,
+        done: false,
+        assigneeId: currentUserId || null,
+        assigneeName: nameOf(currentUserId),
+      },
+    ]);
     setTitle('');
     // Keep the composer open & focused so adding several in a row is fast; the
     // growing list pushes the composer down naturally.
@@ -28,6 +58,15 @@ export default function SubtasksField({ subtasks, onChange, canEdit, canToggle }
 
   function toggle(id: string) {
     onChange(subtasks.map((s) => (s.id === id ? { ...s, done: !s.done } : s)));
+  }
+
+  /** Đổi người làm subtask. Ghi kèm tên (denormalize) như tasks.assigneeName. */
+  function assign(id: string, uid: string) {
+    onChange(
+      subtasks.map((s) =>
+        s.id === id ? { ...s, assigneeId: uid || null, assigneeName: nameOf(uid) } : s,
+      ),
+    );
   }
 
   function remove(id: string) {
@@ -71,6 +110,20 @@ export default function SubtasksField({ subtasks, onChange, canEdit, canToggle }
                 </span>
                 <span className="st-title">{s.title}</span>
               </label>
+              {/* Người làm subtask. `panel="overlay"` là bắt buộc: .st-row là hàng flex, panel
+                  in-flow (mặc định) sẽ nong hàng ra và xô cả danh sách xuống mỗi lần mở. */}
+              <div className="st-assignee">
+                <SearchableSelect
+                  value={s.assigneeId ?? ''}
+                  onChange={(v) => assign(s.id, v)}
+                  options={memberOpts}
+                  disabled={!canEdit}
+                  allowEmpty
+                  emptyLabel="Chưa giao"
+                  placeholder="Chưa giao"
+                  panel="overlay"
+                />
+              </div>
               {canEdit && (
                 <button type="button" className="st-del" onClick={() => remove(s.id)} title="Xoá subtask">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
@@ -98,7 +151,7 @@ export default function SubtasksField({ subtasks, onChange, canEdit, canToggle }
                 if (e.key === 'Enter') { e.preventDefault(); add(); }
                 if (e.key === 'Escape') { setAdding(false); setTitle(''); }
               }}
-              placeholder="Tên subtask… (Enter để thêm)"
+              placeholder="Tên subtask… (Enter để thêm — tự giao cho bạn)"
             />
             <button type="button" className="btn-sm" onClick={add}>Thêm</button>
           </div>

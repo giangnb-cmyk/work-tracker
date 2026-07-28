@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useMyTasks } from '../hooks/useMyTasks';
+import { useMySubtasks } from '../hooks/useMySubtasks';
 import { useMyBugs } from '../hooks/useMyBugs';
 import { useBugLabels } from '../hooks/useBugLabels';
 import { useStoredView } from '../hooks/useStoredView';
@@ -9,6 +10,7 @@ import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import TaskRow from './TaskRow';
 import TaskListRow from './TaskListRow';
+import MySubtaskList from './task/MySubtaskList';
 import TaskModal from './TaskModal';
 import CreateTaskCard from './CreateTaskCard';
 import BugList from './bug/BugList';
@@ -28,6 +30,7 @@ export default function MyTasks() {
   const { sprints, members, selectedSprintId, selectedProjectId, selectedProject } = useSprintContext();
   const { confirmDoneNotify } = useNotify();
   const { tasks, loading } = useMyTasks(user?.uid ?? '');
+  const { items: mySubtasks } = useMySubtasks(user?.uid ?? '');
   const { bugs } = useMyBugs(user?.uid ?? '', selectedProjectId);
   const { labels } = useBugLabels(selectedProjectId);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -60,6 +63,19 @@ export default function MyTasks() {
     [scoped],
   );
   const open = scoped.filter((t) => t.status !== 'done').length;
+
+  // Subtask cũng bám sprint ĐANG CHỌN qua task cha, cùng luật với danh sách task ở trên —
+  // không thì mục này lại phơi ra việc của mọi sprint trong khi phần trên đã lọc.
+  const scopedSubtasks = useMemo(
+    () =>
+      mySubtasks.filter(
+        ({ task }) =>
+          (task.sprintId ?? null) === (selectedSprintId ?? null) &&
+          (selectedProjectId === null || task.projectId === selectedProjectId),
+      ),
+    [mySubtasks, selectedSprintId, selectedProjectId],
+  );
+  const openSubtasks = scopedSubtasks.filter(({ subtask }) => !subtask.done).length;
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const openBugs = bugs.filter((b) => b.status !== 'done').length;
@@ -133,6 +149,23 @@ export default function MyTasks() {
             <div className="glass empty">Không có task nào trong {sprintName(selectedSprintId)}.</div>
           )}
         </>
+      )}
+
+      {/* Subtask được giao — đứng riêng vì task cha có thể là của người khác, khi đó nó
+          KHÔNG nằm trong danh sách task ở trên. */}
+      {scopedSubtasks.length > 0 && (
+        <section className="mt-bugs">
+          <div className="mt-subhead row between">
+            <div>
+              <h2>☑️ Subtask của tôi</h2>
+              <p className="muted">
+                {openSubtasks} subtask chưa xong · {scopedSubtasks.length - openSubtasks} đã xong ·{' '}
+                {sprintName(selectedSprintId)}
+              </p>
+            </div>
+          </div>
+          <MySubtaskList items={scopedSubtasks} sprintName={sprintName} onOpenTask={setEditing} />
+        </section>
       )}
 
       {/* Bug được giao — tách hẳn khỏi task, tiêu đề riêng cho dễ nhìn. */}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Avatar from '../Avatar';
+import MemberAvatar from '../MemberAvatar';
 import BugLabelChip from './BugLabelChip';
 import { BUG_STATUSES, BUG_STATUS_LABEL, type Bug, type BugLabel, type BugStatus } from '../../types';
 
@@ -54,7 +54,7 @@ export default function BugKanban({ bugs, labelsById, onOpen, onMove, canEditBug
                   >
                     <div className="bug-card-top">
                       <span className="bug-num mono">#{b.number}</span>
-                      {b.assigneeName && <Avatar name={b.assigneeName} size="sm" />}
+                      {b.assigneeName && <MemberAvatar uid={b.assigneeId} name={b.assigneeName} size="sm" />}
                     </div>
                     <div className="bug-card-title">{b.title}</div>
                     {b.labelIds.length > 0 && (

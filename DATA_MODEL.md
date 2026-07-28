@@ -407,8 +407,31 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 URL) and picks the icon shown on the task card. `storagePath` is set for images uploaded to
 Firebase Storage (kept so the file can be deleted).
 
-**Subtask**: `{ id, title, done }`. Task progress = done/total subtasks; if a task has no
-subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `review`, `done`=100%).
+**Subtask**: `{ id, title, done, assigneeId?, assigneeName? }`. Task progress = done/total
+subtasks; if a task has no subtasks, progress falls back to a status stage (`todo`=0,
+`in_progress`, `review`, `done`=100%).
+
+> `assigneeId` (→ `profiles.id`) + `assigneeName` (denormalize, như `tasks.assigneeName`):
+> **người làm subtask**, có thể KHÁC người nhận task — giao chéo là chuyện thường. Thêm
+> subtask thì mặc định giao cho CHÍNH NGƯỜI THÊM (`SubtasksField`), đổi được ngay tại chỗ.
+> Hai trường này **tuỳ chọn**: `subtasks` là jsonb nên subtask cũ không có chúng và không có
+> migration nào backfill — mọi chỗ đọc phải chịu được `undefined` (coi như "chưa giao").
+> Dùng ở: **Task của tôi** (mục "Subtask của tôi" — `useMySubtasks` lọc bằng `contains`
+> jsonb `[{"assigneeId": uid}]`, KHÔNG lọc theo `tasks.assignee_id` vì task cha có thể của
+> người khác), **Thống kê** (`workloadRows` gộp task + subtask theo người; thẻ ☑️ Subtask),
+> và **daily report** (Edge Function `daily-report` liệt kê subtask dưới task, ghi kèm tên
+> khi người làm khác người nhận task).
+>
+> **RPC `toggle_my_subtask(p_task_id, p_subtask_id, p_done)`** (migration `0064`) — đường
+> DUY NHẤT để người chỉ-giữ-subtask tick việc của mình. RLS `tasks_update` chỉ cho
+> admin/reporter/assignee của TASK ghi, nên subtask giao chéo sẽ bị chặn nếu ghi thẳng.
+> Cố ý KHÔNG nới `tasks_update`: RLS theo HÀNG chứ không theo cột, nới ra là mở luôn cho
+> họ sửa tiêu đề/hạn/sprint task người khác. Hàm này `SECURITY DEFINER` + `grant execute`
+> cho `authenticated` (khác các definer khác trong repo) vì cổng nằm trong thân hàm: chỉ
+> lật đúng cờ `done` của đúng subtask mang `assigneeId` = người gọi, trả `false` nếu không.
+> Advisor than "signed-in users can execute SECURITY DEFINER" là **chủ đích**, đừng "sửa".
+> Đường này không đẩy checklist sang Notion (chỉ `updateTask` làm) — Notion khớp lại ở lần
+> lưu task kế tiếp từ màn chi tiết.
 
 ### Status columns (Kanban)
 
@@ -566,6 +589,31 @@ Triggers: daily (default 09:00 `Asia/Ho_Chi_Minh`), `@bot sync bug`, or the web
 "Sync Discord" button (queues `bug_sync_requests`, admin-only insert; the service-role
 bot drains it and also pushes pending label edits every `bug_sync_poll_seconds`).
 The bot needs **Manage Threads** (edit thread tags) and **Manage Channels** (create tags).
+
+### `bug_status_notices` (báo lên thread ai đổi trạng thái)
+
+`{ id, bug_id→bugs, project_id→projects, thread_id, from_status, to_status, actor_id→profiles,
+actor_name, status (pending|done|error|skipped), result, created_at, processed_at }` —
+migration `0063`. Đổi trạng thái bug **trên web** → bot đăng một dòng vào ĐÚNG thread forum
+của bug đó: `🔄 <ai> đổi trạng thái trên web: **Fixing** → **Done**`.
+
+Ghi bằng **trigger** `bugs_log_status_change` (`after update of status`), không phải phía
+client — cùng lý do `activity` (0007) / `task_sprints` (0015): status đổi từ NHIỀU đường
+(kéo thẻ Kanban ở `Bugs.tsx`, ô trạng thái trong `BugModal`), ghi ở app là sớm muộn cũng
+quên một đường. RLS: select cho mọi user đã đăng nhập; **không có policy ghi** → client
+không bịa được thông báo mạo danh người khác, chỉ trigger (SECURITY DEFINER) và bot
+(service-role) ghi.
+
+> ⚠️ Trigger chỉ ghi khi `auth.uid() is not null` — bot dùng service-role nên lượt sync
+> Discord→app (bot suy status từ tag) KHÔNG sinh thông báo. Bỏ chốt này là bot tự báo về
+> chính thay đổi nó vừa đọc từ Discord.
+> ⚠️ Bug chưa có `discord_thread_id` thì không ghi gì (chưa có chỗ để báo).
+> Bot: `bug_sync.push_status_notices`, chạy cùng nhịp `push_pending` mỗi
+> `bug_sync_poll_seconds`. Nhiều lượt đổi LIÊN TIẾP của **cùng một người** trên cùng bug
+> được gộp thành MỘT tin (`Fixing → Done`, không phải ba tin); đổi qua đổi lại về chỗ cũ
+> thì bỏ hẳn (`skipped`). Tối đa 20 tin/nhịp, phần dư để nhịp sau (tránh rate limit).
+> Tên người hiện bằng `<@discord_id>` nhưng gửi kèm `AllowedMentions.none()` — hiện đúng
+> danh tính Discord mà KHÔNG ping ai.
 
 ---
 

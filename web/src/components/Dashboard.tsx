@@ -17,10 +17,10 @@ import { useTasks } from '../hooks/useTasks';
 import {
   burndownSeries,
   computeStats,
-  groupByAssignee,
   rankByDone,
   splitLeaders,
   sprintHealth,
+  workloadRows,
 } from '../lib/sprint';
 import DepartmentDonuts from './DepartmentDonuts';
 import MemberLeaderboard from './MemberLeaderboard';
@@ -62,7 +62,7 @@ export default function Dashboard() {
     () => (selectedSprint ? sprintHealth(selectedSprint, tasks) : null),
     [selectedSprint, tasks],
   );
-  const perAssignee = useMemo(() => [...groupByAssignee(tasks).entries()], [tasks]);
+  const perAssignee = useMemo(() => workloadRows(tasks), [tasks]);
   const leaders = useMemo(() => splitLeaders(rankByDone(tasks, members)), [tasks, members]);
   const daysLeft = selectedSprint ? daysUntil(selectedSprint.endDate) : null;
 
@@ -90,6 +90,7 @@ export default function Dashboard() {
       <div className="stats-row">
         <StatTile icon="📦" value={stats.total} label="Tổng task" />
         <StatTile icon="✅" value={`${stats.percentDone}%`} label="Hoàn thành" />
+        <StatTile icon="☑️" value={`${stats.subtasksDone}/${stats.subtasksTotal}`} label="Subtask" />
         <StatTile icon="⭐" value={`${stats.donePoints}/${stats.totalPoints}`} label="Story points" />
         <StatTile
           icon={stats.overdue > 0 ? '⚠️' : '⏱️'}
@@ -210,22 +211,25 @@ export default function Dashboard() {
                   <th>Tổng</th>
                   <th>Đang làm</th>
                   <th>Xong</th>
+                  <th>Subtask</th>
                   <th>Points</th>
                   <th>Tiến độ</th>
                 </tr>
               </thead>
               <tbody>
-                {perAssignee.map(([name, list]) => {
-                  const done = list.filter((t) => t.status === 'done').length;
+                {perAssignee.map((row) => {
                   // Làm tròn xuống: 9/10 mà hiện 100% thì người đọc tưởng đã xong hết.
-                  const pct = list.length === 0 ? 0 : Math.floor((done / list.length) * 100);
+                  const pct = row.tasks.length === 0 ? 0 : Math.floor((row.taskDone / row.tasks.length) * 100);
                   return (
-                    <tr key={name}>
-                      <td>{name}</td>
-                      <td className="mono">{list.length}</td>
-                      <td className="mono">{list.length - done}</td>
-                      <td className="mono">{done}</td>
-                      <td className="mono">{list.reduce((sum, t) => sum + (t.points ?? 0), 0)}</td>
+                    <tr key={row.name}>
+                      <td>{row.name}</td>
+                      <td className="mono">{row.tasks.length}</td>
+                      <td className="mono">{row.tasks.length - row.taskDone}</td>
+                      <td className="mono">{row.taskDone}</td>
+                      <td className="mono" title="Subtask được giao cho người này (đã xong/tổng)">
+                        {row.subtaskTotal === 0 ? '—' : `${row.subtaskDone}/${row.subtaskTotal}`}
+                      </td>
+                      <td className="mono">{row.points}</td>
                       <td>
                         <div className="wl-prog">
                           <span className="progress" aria-hidden>

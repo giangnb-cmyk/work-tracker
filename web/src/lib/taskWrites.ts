@@ -196,6 +196,33 @@ export async function moveTaskToSprint(task: Task, sprint: Sprint): Promise<void
   if (error) throw error;
 }
 
+/**
+ * Tick/bỏ tick MỘT subtask được giao cho chính người đang đăng nhập — dùng ở mục
+ * "Subtask của tôi" (Task của tôi), nơi task cha có thể là của người khác.
+ *
+ * Đi qua RPC `toggle_my_subtask` (migration 0064) chứ không `updateTask`: RLS `tasks_update`
+ * chỉ cho admin/reporter/assignee của TASK ghi, nên người chỉ giữ một subtask sẽ bị chặn.
+ * RPC hẹp hơn RLS ở chiều ngược lại — nó chỉ lật đúng cờ `done` của đúng subtask mình giữ.
+ *
+ * Trả về false khi server từ chối (subtask không phải của mình / task đã bị xoá).
+ *
+ * LƯU Ý: đường này KHÔNG đẩy checklist sang Notion (updateTask mới làm). Notion sẽ khớp lại
+ * ở lần lưu task kế tiếp từ màn chi tiết; Postgres vẫn là nguồn sự thật.
+ */
+export async function toggleMySubtask(
+  taskId: string,
+  subtaskId: string,
+  done: boolean,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('toggle_my_subtask', {
+    p_task_id: taskId,
+    p_subtask_id: subtaskId,
+    p_done: done,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 /** True only on the transition into `done` (avoids re-notifying already-done tasks). */
 export function becameDone(prev: TaskStatus, next: TaskStatus | undefined): boolean {
   return next === 'done' && prev !== 'done';

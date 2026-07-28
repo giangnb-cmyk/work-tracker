@@ -168,6 +168,14 @@ export interface Subtask {
   id: string;
   title: string;
   done: boolean;
+  /**
+   * Người làm subtask này (→ `profiles.id`). Mặc định = người THÊM nó, đổi được sau.
+   * `null`/thiếu = chưa giao — subtask có trước khi thêm trường này đều rơi vào đây, nên
+   * mọi chỗ đọc phải chịu được `undefined` (jsonb, không có migration để backfill).
+   */
+  assigneeId?: string | null;
+  /** Tên hiển thị denormalize, y như `tasks.assigneeName` — render khỏi phải join profiles. */
+  assigneeName?: string;
 }
 
 export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'review', 'done'];

@@ -706,6 +706,15 @@ async def poll_bug_sync_requests():
             log.info("Đã đẩy %d bug (nhãn) lên Discord", n)
     except Exception:
         log.exception("Đẩy nhãn lên Discord lỗi")
+    # (1b) bao vao thread ai vua doi TRANG THAI bug tren web (bang bug_status_notices,
+    # trigger DB ghi — xem migration 0063). Chay TRUOC sync Discord->app cho cung nhip
+    # voi push_pending: nhan da khop roi moi keo ve.
+    try:
+        n = await bug_sync.push_status_notices(client, sb)
+        if n:
+            log.info("Đã báo %d lượt đổi trạng thái lên thread Discord", n)
+    except Exception:
+        log.exception("Báo đổi trạng thái lên Discord lỗi")
     # (2) web -> yeu cau sync (nut 'Sync Discord').
     try:
         pending = await asyncio.to_thread(

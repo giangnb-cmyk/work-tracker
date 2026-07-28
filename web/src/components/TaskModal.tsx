@@ -384,7 +384,14 @@ export default function TaskModal({
 
             {/* Subtasks — ngay dưới thanh tiến độ (tiến độ tính từ đây) */}
             <section className="tm-section">
-              <SubtasksField subtasks={subtasks} onChange={setSubtasks} canEdit={canEditOwn} canToggle={canChangeStatus} />
+              <SubtasksField
+                subtasks={subtasks}
+                onChange={setSubtasks}
+                canEdit={canEditOwn}
+                canToggle={canChangeStatus}
+                members={members}
+                currentUserId={user?.uid ?? ''}
+              />
             </section>
 
             {/* Thông tin — status & priority sống ở header, không lặp lại ở đây */}
