@@ -87,12 +87,12 @@ export default function DocCard({
 
       <div className="doclib-actions">
         {copied && <span className="doclib-copied">Đã chép link</span>}
-        <button type="button" className="doclib-iconbtn" onClick={copy} title="Sao chép link">
+        <button type="button" className="doclib-iconbtn sky" onClick={copy} title="Sao chép link">
           <CopyIcon size={15} />
         </button>
         {canEdit && (
           <>
-            <button type="button" className="doclib-iconbtn" onClick={() => onEdit(doc)} title="Sửa tài liệu">
+            <button type="button" className="doclib-iconbtn indigo" onClick={() => onEdit(doc)} title="Sửa tài liệu">
               <PencilIcon size={15} />
             </button>
             <button

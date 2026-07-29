@@ -570,24 +570,54 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 /* Hàng hành động riêng ở chân thẻ (sao chép / sửa / xoá) — nút RỜI, một cú bấm. Tách hàng
    vì thẻ hẹp 300px không đủ chỗ xếp cùng nhóm + tác giả mà không tràn dòng. */
 .doclib-actions {
-  display: flex; align-items: center; justify-content: flex-end; gap: 0.2rem;
-  padding-top: 0.45rem; border-top: 1px solid var(--border-soft);
+  display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem;
+  padding-top: 0.5rem; border-top: 1px solid var(--border-soft);
 }
 .doclib-copied { font-size: 0.7rem; color: var(--green); margin-right: auto; }
-/* Giống y .bugm-iconbtn (nút icon compact của app) — cùng cỡ, cùng cách sáng lên khi hover.
-   Khai riêng thay vì dùng lại class 'bugm-' cho khỏi mang tên bug modal sang tab tài liệu. */
+/* Nút hành động ĐÓNG KHUNG (viền + nền mờ, kiểu .tmodal-x) và icon CÓ MÀU theo việc:
+   chép = sky, sửa = indigo, xoá = đỏ, ghim = vàng. Nút trần màu xám lẫn vào nền glass,
+   nhìn không ra chỗ bấm được. */
 .doclib-iconbtn {
-  width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0;
-  background: none; border: none; border-radius: 8px; color: var(--muted); cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  width: 30px; height: 30px; display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 9px;
+  color: var(--muted); cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 .doclib-iconbtn:hover { background: rgba(255, 255, 255, 0.07); color: var(--text); }
-.doclib-iconbtn.danger:hover { background: rgba(239, 68, 68, 0.14); color: var(--red); }
-/* Ghim: đang ghim thì vàng và luôn rõ; chưa ghim thì mờ, sáng lên khi trỏ vào thẻ. */
-.doclib-pin { opacity: 0.45; }
-.doclib-card:hover .doclib-pin { opacity: 1; }
-.doclib-pin.on { opacity: 1; color: var(--gold); }
-.doclib-pin.on:hover { background: rgba(251, 191, 36, 0.14); color: var(--gold); }
+.doclib-iconbtn.sky { color: var(--sky); border-color: rgba(56, 189, 248, 0.32); }
+.doclib-iconbtn.sky:hover { background: rgba(56, 189, 248, 0.12); color: var(--sky); }
+/* indigo-300 chứ không #6366f1 đặc: nét icon mảnh trên nền tối cần sáng hơn một nấc. */
+.doclib-iconbtn.indigo { color: #a5b4fc; border-color: rgba(99, 102, 241, 0.4); }
+.doclib-iconbtn.indigo:hover { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
+.doclib-iconbtn.danger { color: var(--red); border-color: rgba(239, 68, 68, 0.3); }
+.doclib-iconbtn.danger:hover { background: rgba(239, 68, 68, 0.12); color: var(--red); }
+/* Ghim: chưa ghim thì mờ, rõ lên khi trỏ vào thẻ/dòng; đã ghim thì vàng cả khung. */
+.doclib-pin { opacity: 0.5; }
+.doclib-card:hover .doclib-pin, .doclib-row:hover .doclib-pin { opacity: 1; }
+.doclib-pin.on { opacity: 1; color: var(--gold); border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); }
+.doclib-pin.on:hover { background: rgba(251, 191, 36, 0.16); color: var(--gold); }
+
+/* Khu "Ghim của bạn" trên đầu + divider ngăn với phần còn lại. */
+.doclib-sechead {
+  display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.75rem;
+  font-size: 0.85rem; font-weight: 600; color: var(--muted);
+}
+.doclib-sechead .mono { color: var(--gold); }
+.doclib-divider { height: 1px; background: var(--border-soft); margin: 1.25rem 0; }
+
+/* Chế độ DANH SÁCH: một hàng/tài liệu trong một khối glass, kẻ dòng bằng border-top. */
+.doclib-rows { border-radius: 14px; padding: 0.3rem 0.4rem; }
+.doclib-row { display: flex; align-items: center; gap: 0.55rem; padding: 0.5rem; border-radius: 10px; }
+.doclib-row + .doclib-row { border-top: 1px solid var(--border-soft); }
+.doclib-row:hover { background: rgba(255, 255, 255, 0.04); }
+.doclib-row.pinned { background: rgba(251, 191, 36, 0.04); }
+.doclib-row .doc-body:hover { text-decoration: none; }
+.doclib-row .doc-body:hover .doc-name { color: var(--sky); }
+.doclib-row .doclib-cat { flex-shrink: 0; }
+.doclib-row .doclib-by { white-space: nowrap; flex-shrink: 0; }
+.doclib-row .doclib-copied { margin-right: 0; }
+/* Màn hẹp: bỏ cột người thêm · ngày — giữ tên + nút, đừng để hàng gãy dòng. */
+@media (max-width: 700px) { .doclib-row .doclib-by { display: none; } }
 
 /* Ô chọn tài liệu từ thư viện */
 .docpick-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0.8rem 0; }

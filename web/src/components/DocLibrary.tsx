@@ -3,16 +3,24 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectDocs } from '../hooks/useProjectDocs';
 import { useMyDocPins } from '../hooks/useMyDocPins';
+import { useStoredView } from '../hooks/useStoredView';
 import { deleteProjectDoc, setDocPinned } from '../lib/projectDocWrites';
 import { reportError } from '../lib/errorBus';
 import { foldDiacritics } from '../lib/text';
 import ConfirmDialog from './ConfirmDialog';
 import DocCard from './doc/DocCard';
+import DocRow from './doc/DocRow';
 import DocEditModal from './doc/DocEditModal';
 import type { ProjectDoc } from '../types';
 
 /** Chip "Tất cả" của bộ lọc nhóm — không phải một nhóm thật. */
 const ALL = '__all__';
+
+type ViewMode = 'card' | 'list';
+
+const VIEW_MODES: readonly ViewMode[] = ['card', 'list'];
+/** Nhớ kiểu xem qua các lần vào — sở thích cá nhân, cùng khuôn với tab Bugs/Task của tôi. */
+const MODE_KEY = 'docLibView';
 
 /**
  * Tab **Tài liệu**: thư viện link tài liệu của dự án (`project_docs`).
@@ -30,6 +38,7 @@ export default function DocLibrary() {
   const [editing, setEditing] = useState<ProjectDoc | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDel, setConfirmDel] = useState<ProjectDoc | null>(null);
+  const [mode, selectMode] = useStoredView<ViewMode>(MODE_KEY, VIEW_MODES, 'card');
 
   const nameOf = useMemo(() => {
     const map = new Map(members.map((m) => [m.uid, m.displayName]));
@@ -44,24 +53,18 @@ export default function DocLibrary() {
 
   const shown = useMemo(() => {
     const q = foldDiacritics(query.trim());
-    const matched = docs.filter((d) => {
+    return docs.filter((d) => {
       if (group !== ALL && d.category.trim() !== group) return false;
       if (!q) return true;
       // Tìm cả trong URL: người ta hay nhớ "cái sheet timeline" qua đường link.
       return foldDiacritics(`${d.name} ${d.description} ${d.category} ${d.url}`).includes(q);
     });
-    // Ghim lên đầu. Sắp ở ĐÂY chứ không ở SQL: ghim là bảng riêng theo người, gộp vào một
-    // câu query là phải join thêm chỉ để đổi thứ tự vài chục dòng. `sort` của JS là stable
-    // nên trong mỗi khối, thứ tự gốc (sort_order → mới nhất) giữ nguyên.
-    return [...matched].sort(
-      (a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)),
-    );
-  }, [docs, query, group, pinnedIds]);
+  }, [docs, query, group]);
 
-  const pinnedCount = useMemo(
-    () => shown.filter((d) => pinnedIds.has(d.id)).length,
-    [shown, pinnedIds],
-  );
+  // Ghim tách hẳn thành KHU RIÊNG trên đầu (có divider) chứ không chỉ sắp lên trước —
+  // nhìn phát biết đâu là lối tắt của mình. Bộ lọc/tìm áp cho cả hai khu như nhau.
+  const pinnedDocs = useMemo(() => shown.filter((d) => pinnedIds.has(d.id)), [shown, pinnedIds]);
+  const otherDocs = useMemo(() => shown.filter((d) => !pinnedIds.has(d.id)), [shown, pinnedIds]);
 
   async function togglePin(d: ProjectDoc) {
     const next = !pinnedIds.has(d.id);
@@ -85,6 +88,28 @@ export default function DocLibrary() {
     }
   }
 
+  /** Một khối tài liệu theo kiểu xem đang chọn — dùng cho cả khu ghim lẫn phần còn lại. */
+  const renderDocs = (list: ProjectDoc[]) => {
+    const itemProps = (d: ProjectDoc) => ({
+      doc: d,
+      authorName: nameOf(d.createdBy),
+      canEdit: canEdit(d),
+      pinned: pinnedIds.has(d.id),
+      onTogglePin: (doc: ProjectDoc) => void togglePin(doc),
+      onEdit: setEditing,
+      onDelete: setConfirmDel,
+    });
+    return mode === 'card' ? (
+      <div className="doclib-grid">
+        {list.map((d) => <DocCard key={d.id} {...itemProps(d)} />)}
+      </div>
+    ) : (
+      <div className="doclib-rows glass">
+        {list.map((d) => <DocRow key={d.id} {...itemProps(d)} />)}
+      </div>
+    );
+  };
+
   if (!selectedProjectId) {
     return <div className="glass empty">Hãy chọn một dự án trước.</div>;
   }
@@ -96,11 +121,17 @@ export default function DocLibrary() {
           <h1>📚 Tài liệu</h1>
           <p>
             {docs.length} tài liệu
-            {pinnedCount > 0 && ` · ${pinnedCount} bạn đã ghim`} · {selectedProject?.name ?? 'dự án'}
+            {pinnedDocs.length > 0 && ` · ${pinnedDocs.length} bạn đã ghim`} · {selectedProject?.name ?? 'dự án'}
             {' '}— gắn vào task/feature bằng nút “📚 Thư viện” ở ô Tài liệu.
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setCreating(true)}>＋ Thêm tài liệu</button>
+        <div className="row" style={{ gap: '0.6rem', alignItems: 'center' }}>
+          <div className="seg-toggle" role="group" aria-label="Kiểu hiển thị">
+            <button className={`seg${mode === 'card' ? ' on' : ''}`} onClick={() => selectMode('card')}>Thẻ</button>
+            <button className={`seg${mode === 'list' ? ' on' : ''}`} onClick={() => selectMode('list')}>Danh sách</button>
+          </div>
+          <button className="btn-primary" onClick={() => setCreating(true)}>＋ Thêm tài liệu</button>
+        </div>
       </div>
 
       <div className="doclib-bar">
@@ -136,20 +167,17 @@ export default function DocLibrary() {
             : 'Không có tài liệu nào khớp bộ lọc.'}
         </div>
       ) : (
-        <div className="doclib-grid">
-          {shown.map((d) => (
-            <DocCard
-              key={d.id}
-              doc={d}
-              authorName={nameOf(d.createdBy)}
-              canEdit={canEdit(d)}
-              pinned={pinnedIds.has(d.id)}
-              onTogglePin={(doc) => void togglePin(doc)}
-              onEdit={setEditing}
-              onDelete={setConfirmDel}
-            />
-          ))}
-        </div>
+        <>
+          {/* Khu ghim của TÔI đứng riêng trên đầu, divider ngăn với phần còn lại. */}
+          {pinnedDocs.length > 0 && (
+            <>
+              <h3 className="doclib-sechead">📌 Ghim của bạn <span className="mono">{pinnedDocs.length}</span></h3>
+              {renderDocs(pinnedDocs)}
+              {otherDocs.length > 0 && <div className="doclib-divider" aria-hidden />}
+            </>
+          )}
+          {otherDocs.length > 0 && renderDocs(otherDocs)}
+        </>
       )}
 
       {(creating || editing) && (
