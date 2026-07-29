@@ -5,6 +5,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useFeatureAssignees } from '../hooks/useFeatureAssignees';
 import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { becameDone, createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
+import { notifySubtaskDone } from '../lib/discordNotify';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDateRange, sundayOfWeek, timeAgo, toInputDate } from '../lib/format';
 import AttachmentsField from './task/AttachmentsField';
@@ -212,6 +213,11 @@ export default function TaskModal({
       attachments, subtasks, watcherIds, watcherNames,
     };
     const justFinished = becameDone(base.status, status);
+    // Subtask VỪA chuyển sang done ở lượt lưu này. Phải diff chứ không bắt từng cú bấm:
+    // autosave gom 700ms nên tick liền mấy cái là về cùng một lượt. `=== false` (không phải
+    // falsy) để subtask MỚI thêm vào mà đã tick sẵn không bị tính là "vừa xong".
+    const wasDone = new Map((base.subtasks ?? []).map((s) => [s.id, s.done]));
+    const newlyDoneSubs = subtasks.filter((s) => s.done && wasDone.get(s.id) === false).map((s) => s.title);
     try {
       await updateTask(base, patch, assignee?.notionUserId ?? null, notionProjectId);
       const merged = { ...base, ...patch } as Task;
@@ -219,6 +225,9 @@ export default function TaskModal({
       lastSavedRef.current = snapshot();
       setSaveState('saved');
       if (justFinished) confirmDoneNotify(merged, sprintName);
+      // Task xong thì đã có tin "task hoàn thành" rồi — đừng bắn thêm tin subtask cho cùng
+      // một lượt lưu, người đọc kênh sẽ thấy hai tin nói cùng một chuyện.
+      if (newlyDoneSubs.length > 0 && !justFinished) void notifySubtaskDone(merged, newlyDoneSubs);
     } catch (err) {
       console.error('Tự động lưu thất bại', err);
       setSaveState('error');

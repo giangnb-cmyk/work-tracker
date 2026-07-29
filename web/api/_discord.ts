@@ -29,6 +29,27 @@ export interface CreatedPayload {
   mentionIds?: string[]; // thường chỉ có người được giao
 }
 
+/**
+ * Thông báo TICK XONG SUBTASK. `title` là tên TASK CHA (giữ đúng tên field mà handler
+ * dùng để validate); subtask nằm ở `subtaskTitles`.
+ *
+ * Nhận MỘT MẢNG chứ không một tên: ô sửa subtask trong TaskModal lưu theo kiểu debounce,
+ * tick liền 3 cái là gộp vào một lượt ghi — bắn 3 tin rời thì ngập kênh.
+ */
+export interface SubtaskDonePayload {
+  event: 'subtask_done';
+  title: string;
+  subtaskTitles: string[];
+  /** Tiến độ checklist SAU khi tick (3/5). Thiếu thì bỏ dòng đó. */
+  doneCount?: number;
+  totalCount?: number;
+  /** Người vừa tick. */
+  doerName?: string;
+  sprintName?: string;
+  url?: string;
+  mentionIds?: string[];
+}
+
 /** Indigo accent (#6366f1) của design system — dùng làm màu viền embed "task mới". */
 const CREATED_COLOR = 0x6366f1;
 
@@ -112,9 +133,43 @@ function buildDoneMessage(p: DonePayload): { content: string; users: string[] } 
   return { content: lines.join('\n'), users };
 }
 
+/**
+ * Dựng thông báo "xong subtask" — CÙNG khuôn markdown với `buildDoneMessage` (header `##`,
+ * tên task là masked link `###`, thông tin trong blockquote) để hai loại tin đọc liền mạch,
+ * chỉ khác header và một dòng liệt kê subtask. Cố ý KHÔNG dùng embed: tin subtask bắn nhiều
+ * hơn tin task, embed to sẽ chiếm cả kênh.
+ */
+function buildSubtaskDoneMessage(p: SubtaskDonePayload): { content: string; users: string[] } {
+  const users = (p.mentionIds ?? []).filter(Boolean);
+  const items = p.subtaskTitles.filter(Boolean);
+  const titleLine = p.url ? `### [${p.title}](${p.url})` : `### ${p.title}`;
+  const lines = [
+    // Tiêu đề cố định, không đếm số: tick liền mấy cái thì các dòng bên dưới đã liệt kê đủ.
+    '## ☑️ Hoàn thành SubTask',
+    titleLine,
+    '',
+    ...items.map((t) => `> :ballot_box_with_check: ${t}`),
+    `> :dart: Người làm: ${p.doerName || '—'}`,
+  ];
+  if (p.totalCount) {
+    lines.push(`> :bar_chart: Tiến độ: ${p.doneCount ?? 0}/${p.totalCount} subtask`);
+  }
+  lines.push(`> :person_running: Sprint: ${p.sprintName || 'Backlog'}`);
+  if (users.length > 0) {
+    lines.push('', users.map((id) => `<@${id}>`).join(' '));
+  }
+  return { content: lines.join('\n'), users };
+}
+
 /** Send a completion message. Returns true on 2xx. Never throws to the caller. */
 export async function postDone(p: DonePayload): Promise<boolean> {
   const { content, users } = buildDoneMessage(p);
+  return postWebhook(content, users);
+}
+
+/** Send a "subtask ticked done" message. Returns true on 2xx. Never throws to the caller. */
+export async function postSubtaskDone(p: SubtaskDonePayload): Promise<boolean> {
+  const { content, users } = buildSubtaskDoneMessage(p);
   return postWebhook(content, users);
 }
 

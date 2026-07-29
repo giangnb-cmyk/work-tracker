@@ -54,6 +54,65 @@ export async function notifyTaskDone(task: Task, sprintName?: string): Promise<v
   }
 }
 
+/**
+ * Báo Discord vừa TICK XONG subtask của một task.
+ *
+ * Gọi từ UI (TaskModal / mục "Subtask của tôi") chứ không từ tầng ghi — cùng quy ước với
+ * thông báo task-done (xem chú thích cuối `updateTask`): tầng ghi lo dữ liệu, UI lo thông báo.
+ *
+ * Chỉ cần task + tên các subtask vừa xong; phần còn lại (tên sprint, người liên quan, tiến
+ * độ) tự tra ở đây để hai chỗ gọi không phải lặp lại cùng một mớ truy vấn.
+ * Best-effort: mọi lỗi chỉ log, không bao giờ chặn việc tick.
+ *
+ * @param task Task cha SAU khi đã tick (dùng `subtasks` để đếm tiến độ).
+ * @param subtaskTitles Tên các subtask VỪA chuyển sang done ở lượt này.
+ */
+export async function notifySubtaskDone(task: Task, subtaskTitles: string[]): Promise<void> {
+  if (subtaskTitles.length === 0) return;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    const meId = sessionData.session?.user?.id ?? null;
+
+    // Ping người nhận + người tạo TASK để họ nắm tiến độ, nhưng BỎ chính người vừa tick:
+    // họ vừa làm việc đó, réo lại là thừa.
+    const targets = [task.assigneeId, task.reporterId].filter((id) => id && id !== meId) as string[];
+    const [ids, sprintName, doerName] = await Promise.all([
+      Promise.all([...new Set(targets)].map(discordIdOf)),
+      nameOf('sprints', task.sprintId),
+      displayNameOf(meId),
+    ]);
+    const mentionIds = [...new Set(ids.filter(Boolean))] as string[];
+
+    const subs = task.subtasks ?? [];
+    await fetch('/api/notify-discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        event: 'subtask_done',
+        title: task.title,
+        subtaskTitles,
+        doneCount: subs.filter((s) => s.done).length,
+        totalCount: subs.length,
+        doerName,
+        sprintName,
+        url: taskShareUrl(task.shortCode, task.id),
+        mentionIds,
+      }),
+    });
+  } catch (err) {
+    console.error('Thông báo Discord (xong subtask) thất bại', err);
+  }
+}
+
+/** Tên hiển thị của một uid — dùng cho "người vừa tick". */
+async function displayNameOf(uid: string | null): Promise<string | undefined> {
+  if (!uid) return undefined;
+  const { data } = await supabase.from('profiles').select('display_name').eq('id', uid).maybeSingle();
+  return data?.display_name ?? undefined;
+}
+
 /** Dữ liệu tối thiểu để báo "task mới" — createTask có sẵn id + các field này. */
 export interface CreatedInfo {
   taskId: string;

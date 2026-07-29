@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toggleMySubtask } from '../../lib/taskWrites';
+import { notifySubtaskDone } from '../../lib/discordNotify';
 import { reportError } from '../../lib/errorBus';
 import type { MySubtask } from '../../hooks/useMySubtasks';
 import type { Subtask, Task } from '../../types';
@@ -66,6 +67,14 @@ export default function MySubtaskList({ items, sprintName, onOpenTask }: Props) 
       });
     try {
       const ok = await toggleMySubtask(task.id, subtask.id, next);
+      if (ok && next) {
+        // Truyền task ĐÃ cập nhật để tiến độ trong tin nhắn (3/5) là con số sau khi tick.
+        const merged = {
+          ...task,
+          subtasks: (task.subtasks ?? []).map((s) => (s.id === subtask.id ? { ...s, done: true } : s)),
+        };
+        void notifySubtaskDone(merged, [subtask.title]);
+      }
       if (!ok) {
         rollback();
         reportError(
