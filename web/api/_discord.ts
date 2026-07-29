@@ -64,10 +64,16 @@ export interface DocCreatedPayload {
   projectName?: string;
 }
 
-/** Indigo accent (#6366f1) của design system — dùng làm màu viền embed "task mới". */
+/**
+ * CẢ BỐN loại tin đều là EMBED cùng khuôn (author = loại tin, title = tên bấm được, mỗi
+ * thông tin một dòng giãn '\n\n') — phân biệt bằng MÀU VIỀN + header, không bằng format:
+ * 🆕 task mới = indigo · ✅ task xong = xanh lá · ☑️ subtask xong = sky · 📚 tài liệu = vàng.
+ * Màu lấy từ design system (--primary/--green/--sky/--gold).
+ */
 const CREATED_COLOR = 0x6366f1;
-/** Sky (#38bdf8) — màu chip nhóm của tab Tài liệu, dùng cho embed "tài liệu mới". */
-const DOC_COLOR = 0x38bdf8;
+const DONE_COLOR = 0x22c55e;
+const SUBTASK_COLOR = 0x38bdf8;
+const DOC_COLOR = 0xfbbf24;
 
 interface Embed {
   author?: { name: string };
@@ -128,65 +134,64 @@ async function postWebhook(content: string, users: string[], embeds?: Embed[]): 
 }
 
 /**
- * Dựng thông báo "task hoàn thành" dạng MARKDOWN (không dùng embed): header `##` · tên task
- * là masked link `### [title](url)` bấm được · hai dòng blockquote (người làm / sprint) ·
- * rồi dòng ping NGOÀI quote. Emoji dùng shortcode `:dart:`/`:person_running:` (Discord tự đổi
- * ra 🎯/🏃). Cùng format với bot (reminder.build_done_message) để web và bot báo giống nhau.
+ * "Task hoàn thành" — EMBED viền XANH LÁ, cùng khuôn với "task mới" (xem chú thích màu ở
+ * trên). Ping nằm ở `content` NGOÀI embed — mention trong embed không báo. Cùng format
+ * với bot (reminder.build_done_message) để web và bot báo giống nhau.
  */
-function buildDoneMessage(p: DonePayload): { content: string; users: string[] } {
+function buildDoneMessage(p: DonePayload): { content: string; embeds: Embed[]; users: string[] } {
   const users = (p.mentionIds ?? []).filter(Boolean);
-  const titleLine = p.url ? `### [${p.title}](${p.url})` : `### ${p.title}`;
   const lines = [
-    '## ✅ Task đã hoàn thành',
-    titleLine,
-    '',
-    `> :dart: Người làm: ${p.assigneeName || 'chưa giao'}`,
-    `> :person_running: Sprint: ${p.sprintName || 'Backlog'}`,
+    `🎯 **Người làm:** ${p.assigneeName || 'chưa giao'}`,
+    `🏃 **Sprint:** ${p.sprintName || 'Backlog'}`,
   ];
-  if (users.length > 0) {
-    lines.push('', `Mọi người nắm thông tin nhé ${users.map((id) => `<@${id}>`).join(' ')}`);
-  }
-  return { content: lines.join('\n'), users };
+  const embed: Embed = {
+    author: { name: '✅ Task đã hoàn thành' },
+    title: p.title,
+    color: DONE_COLOR,
+    description: lines.join('\n\n'),
+  };
+  if (p.url) embed.url = p.url;
+  const content =
+    users.length > 0 ? `Mọi người nắm thông tin nhé ${users.map((id) => `<@${id}>`).join(' ')}` : '';
+  return { content, embeds: [embed], users };
 }
 
 /**
- * Dựng thông báo "xong subtask" — CÙNG khuôn markdown với `buildDoneMessage` (header `##`,
- * tên task là masked link `###`, thông tin trong blockquote) để hai loại tin đọc liền mạch,
- * chỉ khác header và một dòng liệt kê subtask. Cố ý KHÔNG dùng embed: tin subtask bắn nhiều
- * hơn tin task, embed to sẽ chiếm cả kênh.
+ * "Hoàn thành SubTask" — EMBED viền SKY, cùng khuôn với hai tin task (xem chú thích màu ở
+ * trên): title = tên TASK CHA bấm được, các subtask vừa xong liệt kê trong description.
+ * Tiêu đề cố định, không đếm số — tick liền mấy cái thì các dòng ☑️ đã liệt kê đủ.
  */
-function buildSubtaskDoneMessage(p: SubtaskDonePayload): { content: string; users: string[] } {
+function buildSubtaskDoneMessage(p: SubtaskDonePayload): { content: string; embeds: Embed[]; users: string[] } {
   const users = (p.mentionIds ?? []).filter(Boolean);
   const items = p.subtaskTitles.filter(Boolean);
-  const titleLine = p.url ? `### [${p.title}](${p.url})` : `### ${p.title}`;
   const lines = [
-    // Tiêu đề cố định, không đếm số: tick liền mấy cái thì các dòng bên dưới đã liệt kê đủ.
-    '## ☑️ Hoàn thành SubTask',
-    titleLine,
-    '',
-    ...items.map((t) => `> :ballot_box_with_check: ${t}`),
-    `> :dart: Người làm: ${p.doerName || '—'}`,
+    ...items.map((t) => `☑️ **${t}**`),
+    `🎯 **Người làm:** ${p.doerName || '—'}`,
   ];
-  if (p.totalCount) {
-    lines.push(`> :bar_chart: Tiến độ: ${p.doneCount ?? 0}/${p.totalCount} subtask`);
-  }
-  lines.push(`> :person_running: Sprint: ${p.sprintName || 'Backlog'}`);
-  if (users.length > 0) {
-    lines.push('', users.map((id) => `<@${id}>`).join(' '));
-  }
-  return { content: lines.join('\n'), users };
+  if (p.totalCount) lines.push(`📊 **Tiến độ:** ${p.doneCount ?? 0}/${p.totalCount} subtask`);
+  lines.push(`🏃 **Sprint:** ${p.sprintName || 'Backlog'}`);
+
+  const embed: Embed = {
+    author: { name: '☑️ Hoàn thành SubTask' },
+    title: p.title,
+    color: SUBTASK_COLOR,
+    description: lines.join('\n\n'),
+  };
+  if (p.url) embed.url = p.url;
+  const content = users.length > 0 ? users.map((id) => `<@${id}>`).join(' ') : '';
+  return { content, embeds: [embed], users };
 }
 
 /** Send a completion message. Returns true on 2xx. Never throws to the caller. */
 export async function postDone(p: DonePayload): Promise<boolean> {
-  const { content, users } = buildDoneMessage(p);
-  return postWebhook(content, users);
+  const { content, embeds, users } = buildDoneMessage(p);
+  return postWebhook(content, users, embeds);
 }
 
 /** Send a "subtask ticked done" message. Returns true on 2xx. Never throws to the caller. */
 export async function postSubtaskDone(p: SubtaskDonePayload): Promise<boolean> {
-  const { content, users } = buildSubtaskDoneMessage(p);
-  return postWebhook(content, users);
+  const { content, embeds, users } = buildSubtaskDoneMessage(p);
+  return postWebhook(content, users, embeds);
 }
 
 /** Send a "task created" message. Returns true on 2xx. Never throws to the caller. */
@@ -196,9 +201,8 @@ export async function postCreated(p: CreatedPayload): Promise<boolean> {
 }
 
 /**
- * Dựng thông báo "tài liệu mới" — EMBED cùng khuôn với "task mới" (tiêu đề bấm được, mỗi
- * thông tin một dòng) nhưng viền sky và KHÔNG có dòng ping: tin chỉ để cả kênh biết thư
- * viện vừa có gì, không réo ai cả.
+ * Dựng thông báo "tài liệu mới" — EMBED cùng khuôn, viền VÀNG (xem chú thích màu ở trên)
+ * và KHÔNG có dòng ping: tin chỉ để cả kênh biết thư viện vừa có gì, không réo ai cả.
  */
 function buildDocCreatedMessage(p: DocCreatedPayload): Embed {
   const lines = [

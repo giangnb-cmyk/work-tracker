@@ -300,6 +300,10 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
               {done && wasDone && feature?.doneAt
                 ? `Đã đánh dấu hoàn thành ${formatDate(feature.doneAt)}.`
                 : 'Bật nếu feature đã xong nhưng không có task nào để tính (import từ dự án chạy trước đó).'}
+              {/* Luật ưu tiên (isFeatureDone): có task thì task quyết định — nói rõ ở đây
+                  để người bật công tắc không thắc mắc vì sao card vẫn "chưa xong". */}
+              {' '}Feature đang có task thì tiến độ tính theo task — thêm task mới vào feature
+              đã xong là nó tự mở lại cho tới khi task đó xong.
             </p>
           </div>
         )}

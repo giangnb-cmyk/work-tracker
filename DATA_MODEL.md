@@ -359,7 +359,7 @@ liên tục không bao giờ xong (Polish…) vẫn là feature nhưng mang `kin
 | `labelIds`    | string[]  | ids into `feature_labels` — nhóm + version, dùng để lọc |
 | `attachments` | jsonb     | link tài liệu + ảnh ref dùng chung mọi task của feature (0019) |
 | `memberIds`   | uuid[]    | **người tham gia thêm tay** (→ `profiles.id`), migration 0046. UI gộp với người suy từ task; task mới thuộc feature auto-gắn cả hai nhóm vào `tasks.watcherIds`. Denormalize, không FK từng phần tử |
-| `doneAt`      | Timestamp \| null | mốc đánh dấu TAY là đã xong (0031); `null` = suy từ task |
+| `doneAt`      | Timestamp \| null | mốc đánh dấu TAY là đã xong (0031) — CHỈ có nghĩa khi feature 0 task. Feature CÓ task thì task quyết định (`isFeatureDone`): thêm task mới vào feature đã xong là nó tự mở lại — 2/3 task mà hiện 100% là bug đã sửa |
 | `createdAt`   | Timestamp | creation time                                    |
 | `createdBy`   | string    | uid of creator                                   |
 
