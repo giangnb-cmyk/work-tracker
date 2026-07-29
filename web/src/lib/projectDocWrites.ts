@@ -54,6 +54,29 @@ export async function deleteProjectDoc(id: string): Promise<void> {
 }
 
 /**
+ * Ghim / bỏ ghim một tài liệu cho CHÍNH người đang đăng nhập (migration 0067).
+ *
+ * `user_id` phải là người gọi — RLS chốt điều kiện đó ở cả insert lẫn delete, nên không
+ * ghim hộ (hay bỏ ghim của) người khác được.
+ */
+export async function setDocPinned(docId: string, userId: string, pinned: boolean): Promise<void> {
+  if (pinned) {
+    const { error } = await supabase
+      .from('project_doc_pins')
+      // Bấm ghim hai lần (hoặc hai tab cùng bấm) không được ném lỗi trùng khoá chính.
+      .upsert({ user_id: userId, doc_id: docId }, { onConflict: 'user_id,doc_id' });
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase
+    .from('project_doc_pins')
+    .delete()
+    .eq('user_id', userId)
+    .eq('doc_id', docId);
+  if (error) throw error;
+}
+
+/**
  * Một mục thư viện → attachment để đính vào task/feature.
  *
  * COPY chứ không trỏ: `Attachment.id` sinh mới nên xoá mục khỏi thư viện sau này không làm

@@ -111,6 +111,40 @@ export function PencilIcon({ size = 20, className }: IconProps) {
   );
 }
 
+/** Thùng rác — xoá. Cùng nét với nút xoá subtask (trước đây vẽ inline trong SubtasksField). */
+export function TrashIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+    </svg>
+  );
+}
+
+/** Hai tờ chồng nhau — sao chép (link, nội dung…). */
+export function CopyIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+}
+
+/**
+ * Cái ghim — ghim tài liệu hay dùng lên đầu (riêng từng người).
+ *
+ * `filled` tô đặc để phân biệt ĐANG ghim với chưa ghim mà không cần đổi hình: cùng một
+ * đường nét, chỉ khác đầy/rỗng — kiểu của bộ icon này (stroke currentColor).
+ */
+export function PinIcon({ size = 20, className, filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <svg {...base(size)} className={className} fill={filled ? 'currentColor' : 'none'}>
+      <path d="M12 17v5" />
+      <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z" />
+    </svg>
+  );
+}
+
 export function MoreVerticalIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className}>

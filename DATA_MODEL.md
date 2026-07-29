@@ -405,6 +405,27 @@ Danh mục link tài liệu dùng chung của MỘT dự án — migration `0066
 - Web: `useProjectDocs` (live) · `lib/projectDocWrites.ts` (`DuplicateDocError` bọc lỗi
   `23505` của unique index thành câu tiếng Việt). Bot KHÔNG đụng bảng này.
 
+### `project_doc_pins` (ghim tài liệu — RIÊNG từng người)
+
+`{ user_id → profiles, doc_id → project_docs, pinned_at }`, PK `(user_id, doc_id)` —
+migration `0067`. Ghim đẩy tài liệu lên đầu thư viện **và** lên đầu ô chọn khi gắn vào
+task/feature ("hay dùng" = hay gắn nhất).
+
+> **Vì sao bảng riêng, không thêm cột `pinned` vào `project_docs`**: ghim là sở thích CÁ
+> NHÂN. Một cột trên hàng tài liệu là ghim dùng chung — một người ghim thì cả đội bị đảo
+> thứ tự.
+
+- **RLS chặt hơn cả thư viện**: cả `select`/`insert`/`delete` đều `user_id = auth.uid()`.
+  Người khác **không đọc được** ghim của tôi (kể cả owner — đã kiểm chứng), và không sửa
+  được danh sách của tôi. Không có policy `update`: ghim chỉ có/không. Realtime +
+  `replica identity full` để event DELETE (bỏ ghim) mang đủ cột cho bộ lọc `user_id`.
+- Sắp thứ tự **ở client** (`DocLibrary` / `DocPickerModal`), không ở SQL: gộp vào query là
+  phải join thêm chỉ để đổi thứ tự vài chục dòng. `Array.sort` của JS là stable nên trong
+  mỗi khối (ghim / không ghim) thứ tự gốc `sort_order → mới nhất` giữ nguyên.
+- Web: `useMyDocPins(uid)` trả `Set<docId>` (không lọc theo dự án — RLS đã bó về đúng người,
+  và một người chỉ ghim vài mục) · `setDocPinned` (`upsert` để bấm hai lần / hai tab không
+  ném lỗi trùng khoá).
+
 ---
 
 ## `tasks/{taskId}`

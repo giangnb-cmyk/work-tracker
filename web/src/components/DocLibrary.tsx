@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectDocs } from '../hooks/useProjectDocs';
-import { deleteProjectDoc } from '../lib/projectDocWrites';
+import { useMyDocPins } from '../hooks/useMyDocPins';
+import { deleteProjectDoc, setDocPinned } from '../lib/projectDocWrites';
+import { reportError } from '../lib/errorBus';
 import { foldDiacritics } from '../lib/text';
 import ConfirmDialog from './ConfirmDialog';
 import DocCard from './doc/DocCard';
@@ -22,6 +24,7 @@ export default function DocLibrary() {
   const { user, isAdmin } = useAuth();
   const { selectedProjectId, selectedProject, members } = useSprintContext();
   const { docs, loading } = useProjectDocs(selectedProjectId);
+  const { pinnedIds } = useMyDocPins(user?.uid ?? '');
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState<string>(ALL);
   const [editing, setEditing] = useState<ProjectDoc | null>(null);
@@ -41,13 +44,33 @@ export default function DocLibrary() {
 
   const shown = useMemo(() => {
     const q = foldDiacritics(query.trim());
-    return docs.filter((d) => {
+    const matched = docs.filter((d) => {
       if (group !== ALL && d.category.trim() !== group) return false;
       if (!q) return true;
       // Tìm cả trong URL: người ta hay nhớ "cái sheet timeline" qua đường link.
       return foldDiacritics(`${d.name} ${d.description} ${d.category} ${d.url}`).includes(q);
     });
-  }, [docs, query, group]);
+    // Ghim lên đầu. Sắp ở ĐÂY chứ không ở SQL: ghim là bảng riêng theo người, gộp vào một
+    // câu query là phải join thêm chỉ để đổi thứ tự vài chục dòng. `sort` của JS là stable
+    // nên trong mỗi khối, thứ tự gốc (sort_order → mới nhất) giữ nguyên.
+    return [...matched].sort(
+      (a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)),
+    );
+  }, [docs, query, group, pinnedIds]);
+
+  const pinnedCount = useMemo(
+    () => shown.filter((d) => pinnedIds.has(d.id)).length,
+    [shown, pinnedIds],
+  );
+
+  async function togglePin(d: ProjectDoc) {
+    const next = !pinnedIds.has(d.id);
+    try {
+      await setDocPinned(d.id, user?.uid ?? '', next);
+    } catch (err) {
+      reportError('Ghim tài liệu', err, next ? 'Không ghim được tài liệu này.' : 'Không bỏ ghim được.');
+    }
+  }
 
   /** Sửa/xoá được khi: admin, hoặc chính người đã thêm (khớp RLS 0066). */
   const canEdit = (d: ProjectDoc) => isAdmin || d.createdBy === user?.uid;
@@ -72,8 +95,9 @@ export default function DocLibrary() {
         <div>
           <h1>📚 Tài liệu</h1>
           <p>
-            {docs.length} tài liệu · {selectedProject?.name ?? 'dự án'} — gắn vào task/feature
-            bằng nút “📚 Thư viện” ở ô Tài liệu.
+            {docs.length} tài liệu
+            {pinnedCount > 0 && ` · ${pinnedCount} bạn đã ghim`} · {selectedProject?.name ?? 'dự án'}
+            {' '}— gắn vào task/feature bằng nút “📚 Thư viện” ở ô Tài liệu.
           </p>
         </div>
         <button className="btn-primary" onClick={() => setCreating(true)}>＋ Thêm tài liệu</button>
@@ -119,6 +143,8 @@ export default function DocLibrary() {
               doc={d}
               authorName={nameOf(d.createdBy)}
               canEdit={canEdit(d)}
+              pinned={pinnedIds.has(d.id)}
+              onTogglePin={(doc) => void togglePin(doc)}
               onEdit={setEditing}
               onDelete={setConfirmDel}
             />

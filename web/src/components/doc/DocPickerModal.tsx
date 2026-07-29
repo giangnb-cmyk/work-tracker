@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useProjectDocs } from '../../hooks/useProjectDocs';
+import { useMyDocPins } from '../../hooks/useMyDocPins';
 import { hostOf, providerMeta } from '../../lib/attachments';
 import { foldDiacritics } from '../../lib/text';
+import { PinIcon } from '../icons';
 import ProviderIcon from '../task/ProviderIcon';
 import type { ProjectDoc } from '../../types';
 
@@ -18,7 +21,9 @@ interface Props {
  * liệu mà phải mở lại popup 3 lần thì thà đi dán link.
  */
 export default function DocPickerModal({ projectId, attachedUrls, onPick, onClose }: Props) {
+  const { user } = useAuth();
   const { docs, loading } = useProjectDocs(projectId);
+  const { pinnedIds } = useMyDocPins(user?.uid ?? '');
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
@@ -27,9 +32,12 @@ export default function DocPickerModal({ projectId, attachedUrls, onPick, onClos
 
   const shown = useMemo(() => {
     const q = foldDiacritics(query.trim());
-    if (!q) return docs;
-    return docs.filter((d) => foldDiacritics(`${d.name} ${d.category} ${d.description} ${d.url}`).includes(q));
-  }, [docs, query]);
+    const matched = q
+      ? docs.filter((d) => foldDiacritics(`${d.name} ${d.category} ${d.description} ${d.url}`).includes(q))
+      : docs;
+    // Tài liệu mình đã ghim lên đầu — chính là "hay dùng", nên cũng là thứ hay gắn nhất.
+    return [...matched].sort((a, b) => Number(pinnedIds.has(b.id)) - Number(pinnedIds.has(a.id)));
+  }, [docs, query, pinnedIds]);
 
   function toggle(id: string) {
     setPicked((prev) => {
@@ -85,7 +93,13 @@ export default function DocPickerModal({ projectId, attachedUrls, onPick, onClos
                       y hệt nhau ở mọi chỗ trong app. */}
                   <span className="doc-icon" aria-hidden><ProviderIcon provider={d.provider} size={18} /></span>
                   <span className="docpick-text">
-                    <span className="doc-name">{d.name}</span>
+                    <span className="doc-name">
+                      {/* Ghim hiện ra ở đây để giải thích vì sao mục này nằm trên đầu. */}
+                      {pinnedIds.has(d.id) && (
+                        <PinIcon size={12} filled className="docpick-pinmark" />
+                      )}
+                      {d.name}
+                    </span>
                     <span className="doc-sub">
                       {d.category ? `${d.category} · ` : ''}
                       {hostOf(d.url) || providerMeta(d.provider).label}
