@@ -4,7 +4,6 @@ import { useProjectDocs } from '../../hooks/useProjectDocs';
 import { useMyDocPins } from '../../hooks/useMyDocPins';
 import { hostOf, providerMeta } from '../../lib/attachments';
 import { foldDiacritics } from '../../lib/text';
-import { PinIcon } from '../icons';
 import ProviderIcon from '../task/ProviderIcon';
 import type { ProjectDoc } from '../../types';
 
@@ -96,7 +95,7 @@ export default function DocPickerModal({ projectId, attachedUrls, onPick, onClos
                     <span className="doc-name">
                       {/* Ghim hiện ra ở đây để giải thích vì sao mục này nằm trên đầu. */}
                       {pinnedIds.has(d.id) && (
-                        <PinIcon size={12} filled className="docpick-pinmark" />
+                        <span className="docpick-pinmark" aria-hidden>📌</span>
                       )}
                       {d.name}
                     </span>

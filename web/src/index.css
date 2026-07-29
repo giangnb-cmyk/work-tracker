@@ -580,7 +580,9 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .doclib-iconbtn {
   width: 30px; height: 30px; display: grid; place-items: center; flex-shrink: 0;
   background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 9px;
-  color: var(--muted); cursor: pointer;
+  /* Ruột nút là EMOJI (cùng họ icon màu với sidebar), không phải SVG stroke — nên cỡ
+     icon chỉnh bằng font-size. `color` vẫn giữ cho chữ phụ (nếu có). */
+  color: var(--muted); font-size: 0.82rem; line-height: 1; cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 .doclib-iconbtn:hover { background: rgba(255, 255, 255, 0.07); color: var(--text); }
@@ -591,11 +593,13 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .doclib-iconbtn.indigo:hover { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
 .doclib-iconbtn.danger { color: var(--red); border-color: rgba(239, 68, 68, 0.3); }
 .doclib-iconbtn.danger:hover { background: rgba(239, 68, 68, 0.12); color: var(--red); }
-/* Ghim: chưa ghim thì mờ, rõ lên khi trỏ vào thẻ/dòng; đã ghim thì vàng cả khung. */
-.doclib-pin { opacity: 0.5; }
+/* Ghim: cùng một emoji 📌 cho cả hai trạng thái — CHƯA ghim thì xám (grayscale) + mờ,
+   ĐÃ ghim thì lên màu thật kèm khung vàng. Đổi bằng filter chứ không đổi glyph để mắt
+   không phải học hai ký hiệu. */
+.doclib-pin { opacity: 0.5; filter: grayscale(1); }
 .doclib-card:hover .doclib-pin, .doclib-row:hover .doclib-pin { opacity: 1; }
-.doclib-pin.on { opacity: 1; color: var(--gold); border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); }
-.doclib-pin.on:hover { background: rgba(251, 191, 36, 0.16); color: var(--gold); }
+.doclib-pin.on { opacity: 1; filter: none; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); }
+.doclib-pin.on:hover { background: rgba(251, 191, 36, 0.16); }
 
 /* Khu "Ghim của bạn" trên đầu + divider ngăn với phần còn lại. */
 .doclib-sechead {
@@ -634,8 +638,8 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .docpick-row.on .docpick-check { color: var(--primary); }
 .docpick-text { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 0.1rem; }
 .docpick-note { font-size: 0.72rem; flex-shrink: 0; }
-/* Dấu ghim đứng trước tên trong ô chọn — vertical-align để nó khớp đường chân chữ. */
-.docpick-pinmark { color: var(--gold); margin-right: 0.3rem; vertical-align: -1px; }
+/* Dấu ghim 📌 đứng trước tên trong ô chọn. */
+.docpick-pinmark { margin-right: 0.3rem; font-size: 0.75rem; }
 .docpick-empty { font-size: 0.85rem; margin: 1rem 0; }
 
 /* Khối "Gửi thử báo cáo" trong popup dự án: lùi vào một chút cho thấy rõ đây là công cụ

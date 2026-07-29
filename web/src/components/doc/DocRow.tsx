@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { hostOf, providerMeta } from '../../lib/attachments';
 import { formatDate } from '../../lib/format';
-import { CopyIcon, PencilIcon, PinIcon, TrashIcon } from '../icons';
 import ProviderIcon from '../task/ProviderIcon';
 import type { ProjectDoc } from '../../types';
 
@@ -63,18 +62,18 @@ export default function DocRow({
         title={pinned ? 'Bỏ ghim (chỉ ảnh hưởng tới bạn)' : 'Ghim lên đầu — chỉ bạn thấy'}
         aria-pressed={pinned}
       >
-        <PinIcon size={14} filled={pinned} />
+        <span aria-hidden>📌</span>
       </button>
       <button type="button" className="doclib-iconbtn sky" onClick={copy} title="Sao chép link">
-        <CopyIcon size={14} />
+        <span aria-hidden>🔗</span>
       </button>
       {canEdit && (
         <>
           <button type="button" className="doclib-iconbtn indigo" onClick={() => onEdit(doc)} title="Sửa tài liệu">
-            <PencilIcon size={14} />
+            <span aria-hidden>✏️</span>
           </button>
           <button type="button" className="doclib-iconbtn danger" onClick={() => onDelete(doc)} title="Xoá khỏi thư viện">
-            <TrashIcon size={14} />
+            <span aria-hidden>🗑️</span>
           </button>
         </>
       )}

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { hostOf, providerMeta } from '../../lib/attachments';
 import { formatDate } from '../../lib/format';
-import { CopyIcon, PencilIcon, PinIcon, TrashIcon } from '../icons';
 import ProviderIcon from '../task/ProviderIcon';
 import type { ProjectDoc } from '../../types';
 
@@ -66,7 +65,7 @@ export default function DocCard({
           title={pinned ? 'Bỏ ghim (chỉ ảnh hưởng tới bạn)' : 'Ghim lên đầu — chỉ bạn thấy'}
           aria-pressed={pinned}
         >
-          <PinIcon size={15} filled={pinned} />
+          <span aria-hidden>📌</span>
         </button>
       </div>
 
@@ -87,13 +86,15 @@ export default function DocCard({
 
       <div className="doclib-actions">
         {copied && <span className="doclib-copied">Đã chép link</span>}
+        {/* Emoji chứ không icon nét đơn — cùng họ với icon màu ở sidebar (📊 📋 🧩…),
+            khung màu theo việc vẫn giữ để nhìn ra chỗ bấm. */}
         <button type="button" className="doclib-iconbtn sky" onClick={copy} title="Sao chép link">
-          <CopyIcon size={15} />
+          <span aria-hidden>🔗</span>
         </button>
         {canEdit && (
           <>
             <button type="button" className="doclib-iconbtn indigo" onClick={() => onEdit(doc)} title="Sửa tài liệu">
-              <PencilIcon size={15} />
+              <span aria-hidden>✏️</span>
             </button>
             <button
               type="button"
@@ -101,7 +102,7 @@ export default function DocCard({
               onClick={() => onDelete(doc)}
               title="Xoá khỏi thư viện"
             >
-              <TrashIcon size={15} />
+              <span aria-hidden>🗑️</span>
             </button>
           </>
         )}
