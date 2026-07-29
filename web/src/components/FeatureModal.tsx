@@ -346,7 +346,12 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
         </div>
 
         <div className="field">
-          <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={saving} />
+          <AttachmentsField
+            attachments={attachments}
+            onChange={setAttachments}
+            disabled={saving}
+            projectId={projectId}
+          />
         </div>
         <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={saving} />
         <p className="perf-hint" style={{ marginTop: '0.75rem' }}>

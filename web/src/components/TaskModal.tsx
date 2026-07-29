@@ -452,7 +452,12 @@ export default function TaskModal({
             {/* Tài liệu (chỉ link) */}
             <section className="tm-section">
               <h4 className="tm-h"><PaperclipIcon size={16} /> Tài liệu</h4>
-              <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={!canEditOwn} />
+              <AttachmentsField
+                attachments={attachments}
+                onChange={setAttachments}
+                disabled={!canEditOwn}
+                projectId={projectId}
+              />
               {isEdit && task?.notionUrl && (
                 <a className="notion-row" href={task.notionUrl} target="_blank" rel="noreferrer">📝 Mở task trên Notion →</a>
               )}

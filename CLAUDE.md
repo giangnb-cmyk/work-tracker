@@ -37,6 +37,10 @@ Project is the entry gate (`ProjectSelect`); everything below is scoped to the s
 - **Timeline** (`Timeline`) — Gantt CẢ DỰ ÁN gộp theo feature (một hàng/feature, xổ ra
   task); khoảng thời gian chọn bằng `DateRangePicker` (bộ preset `TIMELINE_PRESETS`,
   `allowFuture` — khác tab Truy cập vốn khoá tương lai).
+- **Tài liệu** (`DocLibrary`) — thư viện link tài liệu của dự án (`project_docs`): tìm/lọc
+  theo nhóm, ai cũng thêm được, sửa/xoá thì admin hoặc người thêm. Gắn vào task/feature
+  bằng nút "📚 Thư viện" trong ô Tài liệu (gắn = COPY sang `attachments`, không trỏ FK).
+  KHÁC bảng `documents` (store RAG của bot).
 - **Thống kê / Quản lý Sprint / Thành viên / Cấu hình** — charts, admin.
 
 ### Discord bug sync (`bot/skills/bug_sync.py`)

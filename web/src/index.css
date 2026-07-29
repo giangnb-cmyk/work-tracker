@@ -346,6 +346,10 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 }
 .doc-addbtn:hover { border-color: var(--primary); color: var(--text); background: rgba(99, 102, 241, 0.06); }
 
+/* Hai nút thêm tài liệu nằm cạnh nhau (Thư viện | Dán link) — .doc-addbtn vốn
+   align-self:flex-start nên phải bọc trong hàng flex, không thì chúng xuống dòng. */
+.doc-addbar { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+
 .doc-list { display: flex; flex-direction: column; gap: 0.45rem; }
 .doc-card {
   position: relative; display: flex; align-items: center; gap: 0.25rem;
@@ -502,6 +506,72 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .apick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apick-role { font-size: 0.7rem; flex-shrink: 0; }
 .apick-none { display: block; padding: 0.5rem 0.45rem; font-size: 0.82rem; }
+
+/* ==========================================================================
+   Tab 📚 Tài liệu — thư viện link của dự án (components/DocLibrary.tsx) và ô chọn
+   để gắn vào task/feature (components/doc/DocPickerModal.tsx).
+   ========================================================================== */
+.doclib-bar { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1.1rem; }
+.doclib-search { max-width: 420px; }
+.doclib-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+/* .chip trong repo đang bị bó trong .log-filters — khai lại cho phạm vi này thay vì nới
+   selector kia ra toàn cục (sẽ đổi hình mọi chip đang có). */
+.doclib-chips .chip {
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.35rem 0.8rem;
+  color: var(--muted); font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+.doclib-chips .chip:hover { border-color: rgba(99, 102, 241, 0.5); color: var(--text); }
+.doclib-chips .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.doclib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.9rem; }
+.doclib-card {
+  display: flex; flex-direction: column; gap: 0.55rem; padding: 0.9rem;
+  border-radius: 14px; transition: border-color 0.18s ease, transform 0.18s ease;
+}
+.doclib-card:hover { border-color: rgba(99, 102, 241, 0.45); transform: translateY(-2px); }
+.doclib-main { display: flex; align-items: center; gap: 0.65rem; min-width: 0; color: var(--text); }
+.doclib-main:hover { text-decoration: none; }
+.doclib-main:hover .doclib-name { color: var(--sky); }
+.doclib-icon {
+  display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-soft);
+  border-radius: 10px; color: var(--muted);
+}
+.doclib-text { display: flex; flex-direction: column; min-width: 0; gap: 0.1rem; }
+.doclib-name { font-weight: 600; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doclib-sub { font-size: 0.73rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Ghi chú cắt ở 2 dòng: thẻ trong lưới phải cao đều nhau, một ghi chú dài không được
+   kéo cả hàng giãn ra. */
+.doclib-desc {
+  margin: 0; font-size: 0.82rem; color: var(--muted); line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.doclib-foot { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.doclib-cat {
+  padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+  background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--sky);
+}
+.doclib-by { font-size: 0.72rem; }
+.doclib-spacer { flex: 1; }
+
+/* Ô chọn tài liệu từ thư viện */
+.docpick-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0.8rem 0; }
+.docpick-row {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.5rem 0.55rem;
+  background: none; border: 1px solid transparent; border-radius: 10px;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.docpick-row:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+.docpick-row.on { background: rgba(99, 102, 241, 0.16); border-color: rgba(99, 102, 241, 0.45); }
+.docpick-row.already { opacity: 0.5; cursor: default; }
+.docpick-check { width: 18px; flex-shrink: 0; color: var(--muted); font-size: 1rem; }
+.docpick-row.on .docpick-check { color: var(--primary); }
+.docpick-text { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 0.1rem; }
+.docpick-note { font-size: 0.72rem; flex-shrink: 0; }
+.docpick-empty { font-size: 0.85rem; margin: 1rem 0; }
 
 /* Khối "Gửi thử báo cáo" trong popup dự án: lùi vào một chút cho thấy rõ đây là công cụ
    thử, không phải một trường sẽ được lưu cùng dự án. */

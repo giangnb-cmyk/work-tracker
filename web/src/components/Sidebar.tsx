@@ -26,6 +26,8 @@ const NAV: NavDef[] = [
   { id: 'backlog', label: 'Backlog', icon: '📥' },
   { id: 'bugs', label: 'Bugs', icon: '🐞' },
   { id: 'timeline', label: 'Timeline', icon: '📆' },
+  // Thư viện tài liệu của dự án — nguồn để gắn link vào task/feature.
+  { id: 'docs', label: 'Tài liệu', icon: '📚' },
   // Roster CỦA dự án này (ai cũng xem được ai đang trong dự án). Toàn bộ hồ sơ web,
   // Cấu hình, Hệ thống là việc bao quát cả web → nằm NGOÀI dự án (trang chọn dự án).
   { id: 'members', label: 'Thành viên', icon: '👥' },

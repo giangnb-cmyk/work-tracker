@@ -164,6 +164,32 @@ export interface Attachment {
   storagePath?: string;
 }
 
+/**
+ * Một mục trong THƯ VIỆN TÀI LIỆU của dự án (`project_docs`, migration 0066): link tài
+ * liệu dùng chung, chọn ra để gắn vào feature/task.
+ *
+ * ĐỪNG lẫn với `Attachment`: attachment là bản đã ĐÍNH VÀO một task/feature (sống trong
+ * cột jsonb của nó), còn đây là danh mục để chọn. Gắn = copy sang Attachment, không trỏ
+ * FK — xoá một mục trong thư viện không được làm rỗng tài liệu của hàng loạt task cũ.
+ */
+export interface ProjectDoc {
+  id: string;
+  projectId: string;
+  name: string;
+  url: string;
+  /** Suy từ URL (`detectProvider`) rồi lưu lại — dùng cho icon và bộ lọc. */
+  provider: string;
+  description: string;
+  /** Nhóm tự do do người dùng gõ (GDD, Art, Kỹ thuật…). Rỗng = chưa phân nhóm. */
+  category: string;
+  sortOrder: number;
+  createdAt?: Timestamp;
+  createdBy: string | null;
+}
+
+/** Dữ liệu form thêm/sửa một mục thư viện (id/thời gian do DB lo). */
+export type ProjectDocInput = Pick<ProjectDoc, 'name' | 'url' | 'description' | 'category'>;
+
 export interface Subtask {
   id: string;
   title: string;

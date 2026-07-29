@@ -369,6 +369,44 @@ RLS: read all signed-in, write admin). Fields: `id`, `projectId`, `name` (1–40
 
 ---
 
+## `project_docs` (thư viện tài liệu của dự án)
+
+Danh mục link tài liệu dùng chung của MỘT dự án — migration `0066`. Tab **📚 Tài liệu**
+(`DocLibrary`, view id `docs`) để curate; gắn vào task/feature bằng nút **📚 Thư viện** trong
+ô Tài liệu của `TaskModal`/`FeatureModal` (`DocPickerModal`).
+
+> ⚠️ **KHÔNG phải bảng `documents`.** `documents` (0014…0050) là store RAG (chunk +
+> embedding bge-m3) cho doc search của bot — chỉ mục do máy sinh. `project_docs` là thư
+> viện do người curate. Hai thứ khác nhau, đừng nhồi vào nhau.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid (PK) | `gen_random_uuid()` |
+| `project_id` | uuid | → `projects.id`, `on delete cascade` |
+| `name` | text | tên hiển thị (1–160 ký tự); web để trống thì lấy hostname của URL |
+| `url` | text | CHECK `~* '^https?://'`; **unique theo `(project_id, url)`** — dán trùng là rác |
+| `provider` | text | suy từ URL bằng `detectProvider` rồi LƯU LẠI (icon + bộ lọc), mặc định `link` |
+| `description` | text | ghi chú: tài liệu dùng để làm gì |
+| `category` | text | nhóm **tự do** (GDD, Art, Kỹ thuật…). Rỗng = chưa phân nhóm. Cố ý không dựng bảng palette: thư viện một dự án chỉ tầm vài chục mục |
+| `sort_order` | int | thứ tự (mặc định 0) |
+| `created_at` / `created_by` | timestamptz / uuid \| null | → `profiles.id` (`on delete set null`) |
+
+- **RLS**: `select` mọi user đã đăng nhập (như `bug_labels`); **`insert` MỞ cho mọi user**
+  (gương `tasks_insert` — thư viện chỉ hữu ích khi ai tìm được tài liệu cũng bỏ vào được),
+  nhưng `with check (created_by = auth.uid())` nên không mạo danh người khác;
+  `update`/`delete` = `is_admin()` HOẶC chính người đã thêm (như bug do mình báo).
+  Realtime + `replica identity full`.
+- **Gắn = COPY, không trỏ FK**: `docToAttachment` sinh một `Attachment` mới (id mới) rồi ghi
+  vào `tasks.attachments` / `features.attachments`. Cố ý: trỏ FK thì xoá một mục trong thư
+  viện sẽ làm rỗng tài liệu của hàng loạt task cũ. Đổi lại, sửa tên trong thư viện KHÔNG
+  cập nhật các task đã gắn — đó là cái giá đã chọn.
+- Trùng lặp nhận diện theo **URL** chứ không theo id (attachment là bản copy nên id khác):
+  `DocPickerModal` khoá mục đã gắn, `AttachmentsField.addFromLibrary` chốt thêm lần nữa.
+- Web: `useProjectDocs` (live) · `lib/projectDocWrites.ts` (`DuplicateDocError` bọc lỗi
+  `23505` của unique index thành câu tiếng Việt). Bot KHÔNG đụng bảng này.
+
+---
+
 ## `tasks/{taskId}`
 
 A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the **backlog**.

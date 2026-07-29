@@ -23,6 +23,7 @@ import type {
   Feature,
   FeatureLabel,
   Project,
+  ProjectDoc,
   Sprint,
   Subtask,
   Task,
@@ -373,6 +374,22 @@ export function rowToTaskReport(r: Row): TaskReport {
     sprintIds: r.sprint_ids ?? [],
     firstInProgressAt: Timestamp.fromISO(r.first_in_progress_at),
     firstDoneAt: Timestamp.fromISO(r.first_done_at),
+  };
+}
+
+/** Một mục thư viện tài liệu của dự án (`project_docs`, migration 0066). */
+export function rowToProjectDoc(r: Row): ProjectDoc {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name ?? '',
+    url: r.url ?? '',
+    provider: r.provider ?? 'link',
+    description: r.description ?? '',
+    category: r.category ?? '',
+    sortOrder: r.sort_order ?? 0,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? null,
   };
 }
 
