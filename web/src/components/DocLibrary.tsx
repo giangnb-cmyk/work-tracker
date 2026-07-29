@@ -3,11 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectDocs } from '../hooks/useProjectDocs';
 import { deleteProjectDoc } from '../lib/projectDocWrites';
-import { hostOf, providerMeta } from '../lib/attachments';
 import { foldDiacritics } from '../lib/text';
-import { formatDate } from '../lib/format';
-import ProviderIcon from './task/ProviderIcon';
 import ConfirmDialog from './ConfirmDialog';
+import DocCard from './doc/DocCard';
 import DocEditModal from './doc/DocEditModal';
 import type { ProjectDoc } from '../types';
 
@@ -29,7 +27,6 @@ export default function DocLibrary() {
   const [editing, setEditing] = useState<ProjectDoc | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmDel, setConfirmDel] = useState<ProjectDoc | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const nameOf = useMemo(() => {
     const map = new Map(members.map((m) => [m.uid, m.displayName]));
@@ -54,12 +51,6 @@ export default function DocLibrary() {
 
   /** Sửa/xoá được khi: admin, hoặc chính người đã thêm (khớp RLS 0066). */
   const canEdit = (d: ProjectDoc) => isAdmin || d.createdBy === user?.uid;
-
-  function copy(d: ProjectDoc) {
-    void navigator.clipboard?.writeText(d.url);
-    setCopiedId(d.id);
-    setTimeout(() => setCopiedId(null), 1500);
-  }
 
   async function handleDelete() {
     if (!confirmDel) return;
@@ -122,38 +113,16 @@ export default function DocLibrary() {
         </div>
       ) : (
         <div className="doclib-grid">
-          {shown.map((d) => {
-            const meta = providerMeta(d.provider);
-            const host = hostOf(d.url);
-            return (
-              <div key={d.id} className="doclib-card glass">
-                <a className="doclib-main" href={d.url} target="_blank" rel="noreferrer" title={d.url}>
-                  <span className="doclib-icon" aria-hidden><ProviderIcon provider={d.provider} size={22} /></span>
-                  <span className="doclib-text">
-                    <span className="doclib-name">{d.name}</span>
-                    <span className="doclib-sub">{meta.label}{host && host !== meta.label ? ` · ${host}` : ''}</span>
-                  </span>
-                </a>
-                {d.description && <p className="doclib-desc">{d.description}</p>}
-                <div className="doclib-foot">
-                  {d.category && <span className="doclib-cat">{d.category}</span>}
-                  <span className="doclib-by muted">
-                    {nameOf(d.createdBy)} · {formatDate(d.createdAt)}
-                  </span>
-                  <span className="doclib-spacer" />
-                  <button className="btn-sm" onClick={() => copy(d)} title="Sao chép link">
-                    {copiedId === d.id ? '✓' : '⧉'}
-                  </button>
-                  {canEdit(d) && (
-                    <>
-                      <button className="btn-sm" onClick={() => setEditing(d)} title="Sửa">✏️</button>
-                      <button className="btn-sm btn-danger" onClick={() => setConfirmDel(d)} title="Xoá">🗑</button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {shown.map((d) => (
+            <DocCard
+              key={d.id}
+              doc={d}
+              authorName={nameOf(d.createdBy)}
+              canEdit={canEdit(d)}
+              onEdit={setEditing}
+              onDelete={setConfirmDel}
+            />
+          ))}
         </div>
       )}
 

@@ -81,10 +81,12 @@ export default function DocPickerModal({ projectId, attachedUrls, onPick, onClos
                   title={already ? 'Đã gắn rồi' : d.url}
                 >
                   <span className="docpick-check" aria-hidden>{already ? '✓' : on ? '☑' : '☐'}</span>
-                  <span className="doclib-icon" aria-hidden><ProviderIcon provider={d.provider} size={18} /></span>
+                  {/* Cùng class với AttachmentCard/DocCard — một link tài liệu phải nhìn
+                      y hệt nhau ở mọi chỗ trong app. */}
+                  <span className="doc-icon" aria-hidden><ProviderIcon provider={d.provider} size={18} /></span>
                   <span className="docpick-text">
-                    <span className="doclib-name">{d.name}</span>
-                    <span className="doclib-sub">
+                    <span className="doc-name">{d.name}</span>
+                    <span className="doc-sub">
                       {d.category ? `${d.category} · ` : ''}
                       {hostOf(d.url) || providerMeta(d.provider).label}
                     </span>
