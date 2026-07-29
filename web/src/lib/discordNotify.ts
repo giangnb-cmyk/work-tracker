@@ -3,6 +3,7 @@
 
 import { supabase } from '../supabase';
 import { taskShareUrl, taskPath, APP_BASE_URL } from './router';
+import { providerMeta } from './attachments';
 import { PRIORITY_LABEL } from '../types';
 import type { Task, TaskPriority } from '../types';
 import type { Timestamp } from './time';
@@ -103,6 +104,54 @@ export async function notifySubtaskDone(task: Task, subtaskTitles: string[]): Pr
     });
   } catch (err) {
     console.error('Thông báo Discord (xong subtask) thất bại', err);
+  }
+}
+
+/** Dữ liệu tối thiểu để báo "tài liệu mới" — createProjectDoc có sẵn các field này. */
+export interface DocCreatedInfo {
+  name: string;
+  url: string;
+  provider: string;
+  category: string;
+  description: string;
+  projectId: string;
+  createdBy: string;
+}
+
+/**
+ * Báo Discord thư viện vừa có TÀI LIỆU MỚI. Gọi từ `createProjectDoc` (fire-and-forget,
+ * cùng chỗ đứng với notifyTaskCreated trong createTask) — đường tạo duy nhất là
+ * DocEditModal nên móc ở tầng ghi là phủ hết. Best-effort: lỗi chỉ log, không chặn việc thêm.
+ */
+export async function notifyDocCreated(info: DocCreatedInfo): Promise<void> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+
+    const [creatorName, projectName] = await Promise.all([
+      displayNameOf(info.createdBy),
+      nameOf('projects', info.projectId),
+    ]);
+
+    // Ghi chú dài cắt bớt: embed là tin báo, không phải chỗ đọc trọn tài liệu.
+    const desc = info.description.trim();
+    await fetch('/api/notify-discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        event: 'doc_created',
+        title: info.name,
+        url: info.url,
+        providerLabel: providerMeta(info.provider).label,
+        category: info.category,
+        description: desc.length > 300 ? `${desc.slice(0, 300)}…` : desc,
+        creatorName,
+        projectName,
+      }),
+    });
+  } catch (err) {
+    console.error('Thông báo Discord (tài liệu mới) thất bại', err);
   }
 }
 

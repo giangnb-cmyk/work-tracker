@@ -50,8 +50,24 @@ export interface SubtaskDonePayload {
   mentionIds?: string[];
 }
 
+/** Thông báo TÀI LIỆU MỚI vừa vào thư viện dự án (`project_docs`). Không ping ai —
+ *  thêm tài liệu không nhắm vào một người cụ thể như giao task. */
+export interface DocCreatedPayload {
+  event: 'doc_created';
+  /** Tên tài liệu (giữ tên field `title` để handler validate chung một chỗ). */
+  title: string;
+  url?: string;
+  providerLabel?: string; // Google Drive / Figma / Notion…
+  category?: string;
+  description?: string;
+  creatorName?: string;
+  projectName?: string;
+}
+
 /** Indigo accent (#6366f1) của design system — dùng làm màu viền embed "task mới". */
 const CREATED_COLOR = 0x6366f1;
+/** Sky (#38bdf8) — màu chip nhóm của tab Tài liệu, dùng cho embed "tài liệu mới". */
+const DOC_COLOR = 0x38bdf8;
 
 interface Embed {
   author?: { name: string };
@@ -177,4 +193,33 @@ export async function postSubtaskDone(p: SubtaskDonePayload): Promise<boolean> {
 export async function postCreated(p: CreatedPayload): Promise<boolean> {
   const { content, embeds, users } = buildCreatedMessage(p);
   return postWebhook(content, users, embeds);
+}
+
+/**
+ * Dựng thông báo "tài liệu mới" — EMBED cùng khuôn với "task mới" (tiêu đề bấm được, mỗi
+ * thông tin một dòng) nhưng viền sky và KHÔNG có dòng ping: tin chỉ để cả kênh biết thư
+ * viện vừa có gì, không réo ai cả.
+ */
+function buildDocCreatedMessage(p: DocCreatedPayload): Embed {
+  const lines = [
+    `👤 **Người thêm:** ${p.creatorName || '—'}`,
+    `📦 **Dự án:** ${p.projectName || '—'}`,
+    `🔖 **Nhóm:** ${p.category || '—'}`,
+    `🌐 **Nguồn:** ${p.providerLabel || '—'}`,
+  ];
+  if (p.description) lines.push(`📝 ${p.description}`);
+  const embed: Embed = {
+    author: { name: '📚 Tài liệu mới trong thư viện' },
+    title: p.title,
+    color: DOC_COLOR,
+    description: lines.join('\n\n'),
+  };
+  if (p.url) embed.url = p.url; // tên tài liệu bấm được → mở thẳng tài liệu
+  return embed;
+}
+
+/** Send a "doc added to library" message. Returns true on 2xx. Never throws to the caller. */
+export async function postDocCreated(p: DocCreatedPayload): Promise<boolean> {
+  // content rỗng + embeds là hợp lệ với Discord (chỉ cần một trong hai có nội dung).
+  return postWebhook('', [], [buildDocCreatedMessage(p)]);
 }

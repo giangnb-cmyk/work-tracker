@@ -7,9 +7,11 @@ import { authorize } from './_auth.js';
 import {
   DISCORD_ENABLED,
   postCreated,
+  postDocCreated,
   postDone,
   postSubtaskDone,
   type CreatedPayload,
+  type DocCreatedPayload,
   type DonePayload,
   type SubtaskDonePayload,
 } from './_discord.js';
@@ -36,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const payload = req.body as DonePayload | CreatedPayload | SubtaskDonePayload;
+  const payload = req.body as DonePayload | CreatedPayload | SubtaskDonePayload | DocCreatedPayload;
   if (!payload?.title) return res.status(400).json({ error: 'title required' });
 
   // 'event' vắng mặt = payload "done" cũ (giữ tương thích ngược với client đang chạy).
@@ -46,6 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await postCreated(payload as CreatedPayload)
       : event === 'subtask_done'
         ? await postSubtaskDone(payload as SubtaskDonePayload)
-        : await postDone(payload as DonePayload);
+        : event === 'doc_created'
+          ? await postDocCreated(payload as DocCreatedPayload)
+          : await postDone(payload as DonePayload);
   return res.status(200).json({ notified: ok });
 }

@@ -404,6 +404,9 @@ Danh mục link tài liệu dùng chung của MỘT dự án — migration `0066
   `DocPickerModal` khoá mục đã gắn, `AttachmentsField.addFromLibrary` chốt thêm lần nữa.
 - Web: `useProjectDocs` (live) · `lib/projectDocWrites.ts` (`DuplicateDocError` bọc lỗi
   `23505` của unique index thành câu tiếng Việt). Bot KHÔNG đụng bảng này.
+- **Tạo tài liệu mới bắn thông báo Discord** (`/api/notify-discord`, event `doc_created`,
+  embed viền sky, tiêu đề bấm được mở thẳng tài liệu) — fire-and-forget từ
+  `createProjectDoc`, KHÔNG ping ai và KHÔNG bắn khi sửa.
 
 ### `project_doc_pins` (ghim tài liệu — RIÊNG từng người)
 

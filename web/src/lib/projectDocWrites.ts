@@ -3,6 +3,7 @@
 
 import { supabase } from '../supabase';
 import { detectProvider, makeLinkAttachment } from './attachments';
+import { notifyDocCreated } from './discordNotify';
 import type { Attachment, ProjectDoc, ProjectDocInput } from '../types';
 
 /** Lỗi trùng link trong cùng dự án (unique index project_docs_project_url_key). */
@@ -32,14 +33,19 @@ export async function createProjectDoc(
   input: ProjectDocInput,
   createdBy: string,
 ): Promise<string> {
+  const row = toRow(input);
   const { data, error } = await supabase
     .from('project_docs')
     // created_by PHẢI là chính người gọi — RLS project_docs_insert chốt điều kiện này,
     // truyền sai (hoặc rỗng) là bị từ chối chứ không âm thầm ghi.
-    .insert({ project_id: projectId, created_by: createdBy, ...toRow(input) })
+    .insert({ project_id: projectId, created_by: createdBy, ...row })
     .select('id')
     .single();
   if (error) throw error.code === DUPLICATE_CODE ? new DuplicateDocError() : error;
+  // Báo Discord thư viện vừa có gì — fire-and-forget, cùng chỗ đứng với notifyTaskCreated
+  // trong createTask: webhook hỏng không được chặn việc thêm tài liệu. CHỈ lúc tạo, không
+  // lúc sửa — sửa tên/nhóm mà cũng bắn tin thì kênh thành nhật ký chỉnh tả.
+  void notifyDocCreated({ ...row, projectId, createdBy });
   return data.id as string;
 }
 
