@@ -166,7 +166,7 @@ export default function Bugs() {
               onClick={() => setFixedRange(presetRange('month_full', Date.now()))}
               title="Chỉ hiện bug đã fix trong một khoảng thời gian"
             >
-              📅 Đã fix trong khoảng…
+              📅 Chọn khoảng
             </button>
           )}
           <div className="seg-toggle">
