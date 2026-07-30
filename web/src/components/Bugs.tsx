@@ -9,10 +9,12 @@ import { updateBug } from '../lib/bugWrites';
 import { ensureStatusLabel, seedDefaultBugLabels } from '../lib/bugLabelWrites';
 import { requestBugSync } from '../lib/bugSyncWrites';
 import { labelsForStatus } from '../lib/bugStatus';
+import { TIMELINE_PRESETS, presetRange, type DateRange } from '../lib/dateRange';
 import BugKanban from './bug/BugKanban';
 import BugList from './bug/BugList';
 import BugModal from './bug/BugModal';
 import BugFilterBar, { matchBug, type BugFilterToken } from './bug/BugFilterBar';
+import DateRangePicker from './DateRangePicker';
 import type { Bug, BugStatus } from '../types';
 
 type ViewMode = 'kanban' | 'list';
@@ -34,6 +36,13 @@ export default function Bugs() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [tokens, setTokens] = useState<BugFilterToken[]>([]);
+  /**
+   * Khoảng "đã fix trong…" — null = tắt (danh sách đầy đủ như cũ). Bật lên thì chỉ còn
+   * bug có `doneAt` RƠI TRONG khoảng: doneAt do trigger DB ghi lúc bug sang done (0018)
+   * và bị xoá khi reopen (0055), nên đây đúng nghĩa "fix xong và fix đó còn đứng" —
+   * bug fix rồi mở lại không được tính là đã fix.
+   */
+  const [fixedRange, setFixedRange] = useState<DateRange | null>(null);
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const canEditBug = (b: Bug) => isAdmin || b.reporterId === user?.uid || b.assigneeId === user?.uid;
@@ -57,11 +66,15 @@ export default function Bugs() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return bugs.filter((b) => {
+      if (fixedRange) {
+        const at = b.doneAt?.toMillis();
+        if (at === undefined || at < fixedRange.fromMs || at > fixedRange.toMs) return false;
+      }
       if (!matchBug(b, tokens, meId)) return false;
       if (!q) return true;
       return b.title.toLowerCase().includes(q) || `#${b.number}`.includes(q) || String(b.number) === q;
     });
-  }, [bugs, query, tokens, meId]);
+  }, [bugs, query, tokens, meId, fixedRange]);
 
   /** Move on the kanban: set status AND swap the matching workflow tag, so the
    *  card's tag stays consistent (and the change pushes back to Discord). */
@@ -117,7 +130,11 @@ export default function Bugs() {
       <div className="view-header row between">
         <div>
           <h1>🐞 Bugs</h1>
-          <p>{bugs.length} bug · {selectedProject?.name ?? 'dự án'}</p>
+          <p>
+            {fixedRange
+              ? `✅ ${filtered.length} bug đã fix trong khoảng đã chọn · ${selectedProject?.name ?? 'dự án'}`
+              : `${bugs.length} bug · ${selectedProject?.name ?? 'dự án'}`}
+          </p>
         </div>
         <div className="row" style={{ gap: '0.6rem', alignItems: 'center' }}>
           {isAdmin && labels.length === 0 && (
@@ -127,6 +144,30 @@ export default function Bugs() {
           )}
           {isAdmin && (
             <button className="btn-sm" onClick={syncDiscord} title="Kéo bug mới nhất từ forum Discord">🔄 Sync Discord</button>
+          )}
+          {/* Lọc "đã fix trong khoảng": TẮT thì chỉ là một nút — picker luôn phải hiện một
+              khoảng ngày, mà hiện khoảng KHÔNG được áp thì nhìn như đang lọc (dối). Bấm nút
+              là bật với "Tháng này" rồi chỉnh tiếp bằng đúng bộ DateRangePicker của Timeline. */}
+          {fixedRange ? (
+            <>
+              <button className="btn-sm" onClick={() => setFixedRange(null)} title="Bỏ lọc theo ngày fix">
+                ✕ Tất cả bug
+              </button>
+              <DateRangePicker
+                value={fixedRange}
+                onChange={setFixedRange}
+                presets={TIMELINE_PRESETS}
+                allowFuture
+              />
+            </>
+          ) : (
+            <button
+              className="btn-sm"
+              onClick={() => setFixedRange(presetRange('month_full', Date.now()))}
+              title="Chỉ hiện bug đã fix trong một khoảng thời gian"
+            >
+              📅 Đã fix trong khoảng…
+            </button>
           )}
           <div className="seg-toggle">
             <button className={`seg${mode === 'kanban' ? ' on' : ''}`} onClick={() => selectMode('kanban')}>Kanban</button>
