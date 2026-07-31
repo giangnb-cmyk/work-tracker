@@ -33,7 +33,7 @@ export default function SprintBoard() {
   const { user, isAdmin } = useAuth();
   const { selectedSprintId, selectedSprint, selectedProjectId, members, sprints, features } =
     useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const { tasks, loading } = useTasks(selectedSprintId);
   const { everTasks } = useSprintHistory(selectedSprintId);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -91,7 +91,7 @@ export default function SprintBoard() {
     if (status === task.status) return;
     const justFinished = becameDone(task.status, status);
     void moveTask(task, status, task.order);
-    if (justFinished) confirmDoneNotify({ ...task, status }, selectedSprint?.name);
+    if (justFinished) notifyDone({ ...task, status }, selectedSprint?.name);
   }
 
   return (

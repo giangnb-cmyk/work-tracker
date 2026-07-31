@@ -83,7 +83,7 @@ interface DetailProps {
 function ProjectDetail({ project, onBack, onEdit, editingProject, onCloseEdit }: DetailProps) {
   const { user, isAdmin } = useAuth();
   const { members } = useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const { tasks, loading } = useProjectTasks(project.id);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
@@ -100,7 +100,7 @@ function ProjectDetail({ project, onBack, onEdit, editingProject, onCloseEdit }:
     if (status === task.status) return;
     const justFinished = becameDone(task.status, status);
     void moveTask(task, status, task.order);
-    if (justFinished) confirmDoneNotify({ ...task, status });
+    if (justFinished) notifyDone({ ...task, status });
   }
 
   return (

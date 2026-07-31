@@ -28,7 +28,7 @@ const MODE_KEY = 'myTasksView';
 export default function MyTasks() {
   const { user } = useAuth();
   const { sprints, members, selectedSprintId, selectedProjectId, selectedProject } = useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const { tasks, loading } = useMyTasks(user?.uid ?? '');
   const { items: mySubtasks } = useMySubtasks(user?.uid ?? '');
   const { bugs } = useMyBugs(user?.uid ?? '', selectedProjectId);
@@ -94,7 +94,7 @@ export default function MyTasks() {
     if (status === task.status) return;
     const justFinished = becameDone(task.status, status);
     void moveTask(task, status, task.order);
-    if (justFinished) confirmDoneNotify({ ...task, status }, sprintName(task.sprintId));
+    if (justFinished) notifyDone({ ...task, status }, sprintName(task.sprintId));
   }
 
   if (loading) {

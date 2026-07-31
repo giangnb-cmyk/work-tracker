@@ -1,74 +1,43 @@
-// NotifyContext — owns the "task done → ask, then notify" flow in one place so
-// every status-change site (MyTasks, board, task modal) reuses the same popup and
-// dispatch logic. On confirm it fires BOTH channels: Discord + in-app web notices.
+// NotifyContext — owns the "task done → notify" flow in one place so every
+// status-change site (MyTasks, board, backlog, task modal…) reuses the same dispatch.
+// Fires BOTH channels: Discord + in-app web notices.
+//
+// Gửi NGAY, không hỏi confirm: trước đây có popup "Gửi thông báo?" nhưng thực tế lần nào
+// cũng bấm Gửi — hỏi chỉ thêm một cú bấm cho mọi task (đã bỏ theo yêu cầu). Đường subtask
+// (notifySubtaskDone) vốn đã tự gửi, giờ hai đường đồng nhất.
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { notifyTaskDone } from '../lib/discordNotify';
 import { createDoneNotifications } from '../lib/webNotify';
 import type { Task } from '../types';
 
-interface Pending {
-  task: Task;
-  sprintName?: string;
-}
-
 interface NotifyContextState {
-  /** Ask the user whether to notify related people that `task` is done. */
-  confirmDoneNotify: (task: Task, sprintName?: string) => void;
+  /** Báo người liên quan rằng `task` đã xong — bắn liền cả Discord lẫn thông báo web. */
+  notifyDone: (task: Task, sprintName?: string) => void;
 }
 
 const NotifyContext = createContext<NotifyContextState | null>(null);
 
 export function NotifyProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
-  const [pending, setPending] = useState<Pending | null>(null);
-  const [sending, setSending] = useState(false);
+  const uid = profile?.uid ?? '';
+  const displayName = profile?.displayName ?? 'Ai đó';
 
   const value = useMemo<NotifyContextState>(
-    () => ({ confirmDoneNotify: (task, sprintName) => setPending({ task, sprintName }) }),
-    [],
+    () => ({
+      notifyDone: (task, sprintName) => {
+        // Cả hai kênh đều fire-and-forget: thông báo hỏng không được chặn việc đổi status.
+        void notifyTaskDone(task, sprintName);
+        void createDoneNotifications(task, uid, displayName).catch((err) => {
+          console.error('Gửi thông báo web thất bại', err);
+        });
+      },
+    }),
+    [uid, displayName],
   );
 
-  async function dispatch() {
-    if (!pending) return;
-    const { task, sprintName } = pending;
-    setSending(true);
-    void notifyTaskDone(task, sprintName); // Discord — fire-and-forget
-    try {
-      await createDoneNotifications(task, profile?.uid ?? '', profile?.displayName ?? 'Ai đó');
-    } catch (err) {
-      console.error('Gửi thông báo web thất bại', err);
-    } finally {
-      setSending(false);
-      setPending(null);
-    }
-  }
-
-  return (
-    <NotifyContext.Provider value={value}>
-      {children}
-      {pending && (
-        <div className="modal-overlay">
-          <div className="modal fade-in" style={{ width: 'min(440px, 100%)' }}>
-            <h2>Task đã hoàn thành 🎉</h2>
-            <p className="muted" style={{ margin: '0.5rem 0 1.25rem' }}>
-              Gửi thông báo cho những người liên quan (người thực hiện, người tạo, người theo dõi)
-              về task <strong>“{pending.task.title}”</strong>?
-            </p>
-            <div className="row" style={{ gap: '0.75rem', justifyContent: 'flex-end' }}>
-              <button className="btn-ghost" disabled={sending} onClick={() => setPending(null)}>
-                Không gửi
-              </button>
-              <button className="btn-primary" disabled={sending} onClick={dispatch}>
-                {sending ? 'Đang gửi…' : 'Gửi thông báo'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </NotifyContext.Provider>
-  );
+  return <NotifyContext.Provider value={value}>{children}</NotifyContext.Provider>;
 }
 
 export function useNotify(): NotifyContextState {

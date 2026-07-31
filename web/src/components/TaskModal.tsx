@@ -51,7 +51,7 @@ export default function TaskModal({
 }: TaskModalProps) {
   const { user, profile, isAdmin, can } = useAuth();
   const { members, sprints, projects, features } = useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const isEdit = Boolean(task);
 
   // 3 mức quyền, từ hẹp đến rộng:
@@ -224,7 +224,7 @@ export default function TaskModal({
       savedTaskRef.current = merged;
       lastSavedRef.current = snapshot();
       setSaveState('saved');
-      if (justFinished) confirmDoneNotify(merged, sprintName);
+      if (justFinished) notifyDone(merged, sprintName);
       // Task xong thì đã có tin "task hoàn thành" rồi — đừng bắn thêm tin subtask cho cùng
       // một lượt lưu, người đọc kênh sẽ thấy hai tin nói cùng một chuyện.
       if (newlyDoneSubs.length > 0 && !justFinished) void notifySubtaskDone(merged, newlyDoneSubs);
