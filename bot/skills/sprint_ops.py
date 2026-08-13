@@ -1,14 +1,15 @@
 """Skill CLI: tao / cap nhat / liet ke sprint (bang `sprints`).
 
-Sprint la TOAN CUC — khong gan project (xem supabase/migrations/0001_init.sql).
+Sprint thuoc TUNG DU AN (0068 — het toan cuc): tao/sua/liet ke deu theo mot project.
+Cron `ensure_week_sprint` tu tao moi du an mot sprint/tuan; skill nay cho sprint dat tay.
 
 Quyen: GHI can admin (khop RLS sprints_insert/update); liet ke thi ai cung xem duoc.
 In ket qua de doc de Claude thuat lai; loi thi in 'LOI: ...' va thoat != 0.
 
 Vi du:
-    python sprint_ops.py create --name "Sprint 12" --goal "Xong đăng nhập" --start 2026-07-20 --end 2026-08-02
+    python sprint_ops.py create --name "Sprint 12" --project "M1" --start 2026-07-20 --end 2026-08-02
     python sprint_ops.py update --sprint "Sprint 12" --status "dang chay"
-    python sprint_ops.py list
+    python sprint_ops.py list --project "M1"
 """
 
 import argparse
@@ -21,6 +22,7 @@ except Exception:
     pass
 
 import permissions
+import project_repo as projects
 import task_repo as repo
 from constants import SPRINT_ACTIVE, SPRINT_PLANNING, normalize_sprint_status, parse_ymd
 from errors import PermissionDenied, ResolveError
@@ -52,8 +54,8 @@ def _normalize_status_or_die(value, default=None):
     return status
 
 
-def _guard_single_active(client, status, force: bool, exclude_id=None):
-    """Chan viec co 2 sprint active cung luc.
+def _guard_single_active(client, status, force: bool, project_id, exclude_id=None):
+    """Chan viec co 2 sprint active cung luc TRONG MOT DU AN (0068).
 
     WHY: khong co rang buoc DB nao ep dieu nay, ma resolve_sprint('active') va web
     deu chi lay CAI DAU TIEN -> hai sprint active se lam '--sprint active' thanh hen xui.
@@ -61,10 +63,10 @@ def _guard_single_active(client, status, force: bool, exclude_id=None):
     """
     if status != SPRINT_ACTIVE or force:
         return
-    current = repo.active_sprint(client)
+    current = repo.active_sprint(client, project_id)
     if current and current["_id"] != exclude_id:
         die(
-            f"'{current['name']}' đang là sprint active rồi. Đóng nó trước "
+            f"'{current['name']}' đang là sprint active của dự án này rồi. Đóng nó trước "
             f"(update --sprint \"{current['name']}\" --status xong), "
             "hoặc thêm --force nếu thật sự muốn hai sprint active cùng lúc."
         )
@@ -77,8 +79,11 @@ def cmd_create(args):
     if not name:
         die("name bắt buộc")
 
+    # 0068: sprint thuoc mot du an (NOT NULL). Bo --project khi he thong chi co 1 du an
+    # thi resolve_project tu lay du an do; nhieu du an -> no bao ro de Claude hoi lai.
+    project = projects.resolve_project(client, args.project)
     status = _normalize_status_or_die(args.status, SPRINT_PLANNING)
-    _guard_single_active(client, status, args.force)
+    _guard_single_active(client, status, args.force, project["_id"])
 
     sprint_id = repo.insert_sprint(client, {
         "name": name,
@@ -87,19 +92,23 @@ def cmd_create(args):
         "startDate": _parse_date(args.start, "start"),
         "endDate": _parse_date(args.end, "end"),
         "createdBy": admin["_id"],
+        "projectId": project["_id"],
     })
-    print(f"Đã tạo sprint \"{name}\" (status {status}, id {sprint_id[:8]}).")
+    print(f"Đã tạo sprint \"{name}\" cho dự án {project['name']} (status {status}, id {sprint_id[:8]}).")
 
 
 def cmd_update(args):
     client = repo.db()
     permissions.require_admin(client, "sửa sprint")
-    sprint = repo.resolve_sprint(client, args.sprint)
+    # --project tuy chon: co thi khoanh vung ten sprint trong du an do (ten sprint tuan
+    # giong het nhau giua cac du an), khong thi tim toan cuc nhu cu.
+    project = projects.resolve_project(client, args.project) if args.project else None
+    sprint = repo.resolve_sprint(client, args.sprint, project["_id"] if project else None)
 
     updates = _build_updates(args)
     if not updates:
         die("không có trường nào để cập nhật (dùng --name/--goal/--status/--start/--end)")
-    _guard_single_active(client, updates.get("status"), args.force, exclude_id=sprint["_id"])
+    _guard_single_active(client, updates.get("status"), args.force, sprint["projectId"], exclude_id=sprint["_id"])
     repo.update_sprint(client, sprint["_id"], updates)
 
     changed = ", ".join(f"{k}={v}" for k, v in updates.items())
@@ -127,12 +136,14 @@ def _build_updates(args) -> dict:
 
 def cmd_list(args):
     client = repo.db()
-    sprints = repo.list_sprints(client)
+    project = projects.resolve_project(client, args.project) if args.project else None
+    sprints = repo.list_sprints(client, project["_id"] if project else None)
     if not sprints:
-        print("Chưa có sprint nào.")
+        print("Chưa có sprint nào" + (f" trong dự án {project['name']}" if project else "") + ".")
         return
 
-    print(f"Có {len(sprints)} sprint:")
+    where = f" của dự án {project['name']}" if project else ""
+    print(f"Có {len(sprints)} sprint{where}:")
     for s in sprints:
         window = _window(s)
         goal = f" — {s['goal']}" if s.get("goal") else ""
@@ -153,6 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("create", help="Tao sprint moi (admin)")
     c.add_argument("--name", required=True, help="Ten sprint (bat buoc)")
+    c.add_argument("--project", help="Ten hoac id du an (bo trong neu chi co 1 du an)")
     c.add_argument("--goal", help="Muc tieu sprint")
     c.add_argument("--status", help="planning|active|completed (nhan tieng Viet: chuan bi/dang chay/xong)")
     c.add_argument("--start", help="Ngay bat dau YYYY-MM-DD")
@@ -162,6 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     u = sub.add_parser("update", help="Cap nhat sprint (admin)")
     u.add_argument("--sprint", required=True, help="Ten sprint | 'active'")
+    u.add_argument("--project", help="Khoanh vung du an khi ten sprint trung nhau giua cac du an")
     u.add_argument("--name", help="Doi ten")
     u.add_argument("--goal", help="Doi muc tieu")
     u.add_argument("--status", help="Doi trang thai (planning|active|completed)")
@@ -170,7 +183,8 @@ def build_parser() -> argparse.ArgumentParser:
     u.add_argument("--force", action="store_true", help="Cho phep active thu hai (mac dinh chan)")
     u.set_defaults(func=cmd_update)
 
-    l = sub.add_parser("list", help="Liet ke moi sprint")
+    l = sub.add_parser("list", help="Liet ke sprint")
+    l.add_argument("--project", help="Chi sprint cua du an nay (bo trong = tat ca)")
     l.set_defaults(func=cmd_list)
     return parser
 

@@ -76,8 +76,10 @@ TASK_HINT = (
     "--watchers \"Anh, Thuy\". On update --watchers REPLACES the whole list (it does not "
     "append), and --watchers \"\" clears it - so when the user wants to ADD someone, list "
     "the existing watchers too.\n"
-    "- list (anyone): [--assignee <name|me>] [--sprint <name|active|backlog>] [--status <...>]. "
-    "'me' maps to the sender. Example 'xem task cua toi' -> list --assignee me.\n"
+    "- list (anyone): [--assignee <name|me>] [--sprint <name|active|backlog>] "
+    "[--project <name|id>] [--status <...>]. 'me' maps to the sender. Sprints belong to one "
+    "project each, so pass --project together with --sprint when there are several projects. "
+    "Example 'xem task cua toi' -> list --assignee me.\n"
     "Relay the script's printed output. The task id in [brackets] is a short id you can reuse.\n"
     "When the script prints a 'Link: <url>' line, that is the task's page on the web app: "
     "ALWAYS include that url in your reply (as-is, never shortened or relabelled) so people "
@@ -153,15 +155,19 @@ FEATURE_HINT = (
 SPRINT_OPS_HINT = (
     " SPRINT ADMIN SKILL: When the user wants to CREATE / UPDATE / LIST sprints themselves "
     "(NOT a progress report - that is the sprint report skill below), run "
-    f'`python "{_SKILLS_DIR}/sprint_ops.py" <subcommand> ...`. Sprints are global, they are '
-    "NOT tied to a project. Subcommands:\n"
-    "- create (ADMIN ONLY): --name (required) [--goal ...] [--status <planning|active|"
-    "completed, accepts 'chuan bi'/'dang chay'/'xong'>] [--start YYYY-MM-DD] [--end YYYY-MM-DD].\n"
-    "- update (ADMIN ONLY): --sprint <name|active> and any of --name --goal --status --start --end.\n"
-    "- list (anyone): no arguments.\n"
-    "Only ONE sprint should be active: the skill refuses a second one and names the current "
-    "active sprint. Relay that refusal and ask the user whether to close the old sprint - do "
-    "NOT pass --force on your own initiative."
+    f'`python "{_SKILLS_DIR}/sprint_ops.py" <subcommand> ...`. Sprints BELONG TO ONE PROJECT '
+    "(each project has its own independent sprint list; a weekly sprint is auto-created per "
+    "project every Monday). Subcommands:\n"
+    "- create (ADMIN ONLY): --name (required) [--project <name|id>] [--goal ...] [--status "
+    "<planning|active|completed, accepts 'chuan bi'/'dang chay'/'xong'>] [--start YYYY-MM-DD] "
+    "[--end YYYY-MM-DD]. Omit --project only if the team has a single project.\n"
+    "- update (ADMIN ONLY): --sprint <name|active> [--project <name|id>] and any of --name "
+    "--goal --status --start --end. Pass --project when sprint names repeat across projects "
+    "(weekly sprints share the same name).\n"
+    "- list (anyone): [--project <name|id>] — omit to list every project's sprints.\n"
+    "Only ONE sprint per project should be active: the skill refuses a second one and names "
+    "the current active sprint. Relay that refusal and ask the user whether to close the old "
+    "sprint - do NOT pass --force on your own initiative."
 )
 
 PROJECT_HINT = (
@@ -180,8 +186,9 @@ PROJECT_HINT = (
 SPRINT_REPORT_HINT = (
     " SPRINT REPORT SKILL: When the user asks for a sprint report / progress "
     "('bao cao sprint', 'tien do sprint', 'sprint dang chay the nao'), run "
-    f'`python "{_SKILLS_DIR}/sprint_report.py" [--sprint <name|active>]` (omit --sprint '
-    "for the active sprint). Relay the printed report as-is."
+    f'`python "{_SKILLS_DIR}/sprint_report.py" [--sprint <name|active>] [--project <name|id>]` '
+    "(omit --sprint for the active sprint; omit --project only if the team has a single "
+    "project - sprints belong to one project each). Relay the printed report as-is."
 )
 
 WEEKLY_REPORT_HINT = (

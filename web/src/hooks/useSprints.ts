@@ -26,17 +26,29 @@ function sprintPatchToRow(patch: Partial<Sprint>): Record<string, unknown> {
   return row;
 }
 
-export function useSprints(currentUid: string) {
+/**
+ * Sprint CỦA MỘT DỰ ÁN (0068) — trước đây toàn cục nên dự án mới thấy nguyên list của dự
+ * án cũ. `projectId` null (chưa vào dự án nào, vd màn chọn dự án) thì tắt hẳn: không có
+ * "sprint chung" để mà hiện.
+ */
+export function useSprints(currentUid: string, projectId: string | null) {
   const fetcher = useCallback(async () => {
     const { data, error } = await supabase
       .from('sprints')
       .select('*')
+      .eq('project_id', projectId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []).map(rowToSprint);
-  }, []);
+  }, [projectId]);
 
-  const { data: sprints, loading, refetch } = useLiveQuery<Sprint>({ table: 'sprints', fetcher, deps: [] });
+  const { data: sprints, loading, refetch } = useLiveQuery<Sprint>({
+    table: 'sprints',
+    fetcher,
+    filter: projectId ? `project_id=eq.${projectId}` : undefined,
+    deps: [projectId],
+    enabled: Boolean(projectId),
+  });
 
   // Sprint đang chạy theo THỜI GIAN (khoảng ngày chứa hôm nay), không theo cột status —
   // xem activeSprintAt. Đổi sprints là tính lại; qua ranh giới tuần lúc app đang mở thì
@@ -45,6 +57,8 @@ export function useSprints(currentUid: string) {
 
   const createSprint = useCallback(
     async (input: NewSprintInput) => {
+      // DB đã khoá NOT NULL — chặn sớm ở đây cho ra câu lỗi người đọc hiểu được.
+      if (!projectId) throw new Error('Chưa chọn dự án — sprint phải thuộc về một dự án.');
       const { data, error } = await supabase
         .from('sprints')
         .insert({
@@ -54,6 +68,7 @@ export function useSprints(currentUid: string) {
           start_date: toISO(input.startDate),
           end_date: toISO(input.endDate),
           created_by: currentUid || null,
+          project_id: projectId,
         })
         .select('id')
         .single();
@@ -61,7 +76,7 @@ export function useSprints(currentUid: string) {
       await refetch(); // hiện sprint mới NGAY, không đợi realtime dội về
       return data.id as string;
     },
-    [currentUid, refetch],
+    [currentUid, projectId, refetch],
   );
 
   const updateSprint = useCallback(async (id: string, patch: Partial<Sprint>) => {

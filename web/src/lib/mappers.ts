@@ -53,6 +53,7 @@ export function rowToMember(r: Row): TeamMember {
 export function rowToSprint(r: Row): Sprint {
   return {
     id: r.id,
+    projectId: r.project_id ?? null,
     name: r.name,
     goal: r.goal ?? '',
     status: r.status,

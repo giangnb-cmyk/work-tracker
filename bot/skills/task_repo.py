@@ -53,6 +53,8 @@ def _map_sprint(r: dict) -> dict:
         "goal": r.get("goal", ""),
         "startDate": r.get("start_date"),
         "endDate": r.get("end_date"),
+        # 0068: sprint thuoc TUNG du an, khong con dung chung.
+        "projectId": r.get("project_id"),
     }
 
 
@@ -214,57 +216,86 @@ def _first_where(client, table: str, column: str, value):
 
 # --- Sprints -------------------------------------------------------------
 
-def resolve_sprint(client, token: str):
-    """Phan giai sprint tu 'active' hoac ten sprint. Nem ResolveError neu khong tim thay."""
+def resolve_sprint(client, token: str, project_id=None):
+    """Phan giai sprint tu 'active' hoac ten sprint. Nem ResolveError neu khong tim thay.
+
+    `project_id` (0068 — sprint thuoc tung du an): co thi CHI xet sprint cua du an do —
+    'active' la sprint dang chay CUA DU AN, ten sprint cung chi khop trong du an. Bo trong
+    thi tim toan cuc (cho lenh khong co ngu canh du an, vd sprint_report khong --project);
+    ten trung giua hai du an se ra cai tao truoc — ai can chinh xac thi dua project vao.
+    """
     token = (token or "active").strip()
     if token.lower() == "active":
-        sprint = active_sprint(client)
+        sprint = active_sprint(client, project_id)
         if not sprint:
-            raise ResolveError("không có sprint nào đang chạy (không tuần nào phủ hôm nay)")
+            raise ResolveError(
+                "không có sprint nào đang chạy"
+                + (" trong dự án này" if project_id else "")
+                + " (không tuần nào phủ hôm nay)"
+            )
         return sprint
 
-    sprint = _match_sprint_name(client, token)
+    sprint = _match_sprint_name(client, token, project_id)
     if not sprint:
-        raise ResolveError(f"không tìm thấy sprint '{token}'")
+        raise ResolveError(
+            f"không tìm thấy sprint '{token}'" + (" trong dự án này" if project_id else "")
+        )
     return sprint
 
 
-def _match_sprint_name(client, name: str):
+def _match_sprint_name(client, name: str, project_id=None):
     """Khop ten sprint: chinh xac truoc, roi mot phan (khong phan biet hoa/thuong/dau)."""
     from constants import _fold
 
-    exact = _first_where(client, SPRINTS, "name", name)
+    exact_q = client.table(SPRINTS).select("*").eq("name", name)
+    if project_id:
+        exact_q = exact_q.eq("project_id", project_id)
+    exact = exact_q.limit(1).execute().data
     if exact:
-        return exact
+        return _map_sprint(exact[0])
+
+    partial_q = client.table(SPRINTS).select("*")
+    if project_id:
+        partial_q = partial_q.eq("project_id", project_id)
     target = _fold(name)
-    for r in client.table(SPRINTS).select("*").execute().data:
+    for r in partial_q.execute().data:
         if target and target in _fold(r.get("name", "")):
             return _map_sprint(r)
     return None
 
 
-def list_sprints(client) -> list:
-    """Moi sprint, cu -> moi."""
-    rows = client.table(SPRINTS).select("*").order("created_at").execute().data
+def list_sprints(client, project_id=None) -> list:
+    """Moi sprint, cu -> moi. `project_id` (0068): chi sprint cua du an do."""
+    q = client.table(SPRINTS).select("*")
+    if project_id:
+        q = q.eq("project_id", project_id)
+    rows = q.order("created_at").execute().data
     return [_map_sprint(r) for r in rows]
 
 
-def active_sprint(client):
+def active_sprint(client, project_id=None):
     """Sprint DANG CHAY = tuan chua hom nay (start_date <= now <= end_date), hoac None.
 
     Xet theo THOI GIAN chu khong theo cot status (giong web activeSprintAt) — sprint tuan
     tu tao bang pg_cron (0041) khong ai bam 'active' tay, moc ngay moi la su that. Nhieu
     sprint cung phu now (lo tao chong) -> lay cai bat dau muon nhat (tuan moi de tuan cu).
+    `project_id` (0068): cron tao MOI du an mot sprint/tuan nen thieu scope la hen xui
+    trung du an nao — co ngu canh du an thi luon truyen vao.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
-    rows = (client.table(SPRINTS).select("*")
-            .lte("start_date", now_iso).gte("end_date", now_iso)
+    q = client.table(SPRINTS).select("*")
+    if project_id:
+        q = q.eq("project_id", project_id)
+    rows = (q.lte("start_date", now_iso).gte("end_date", now_iso)
             .order("start_date", desc=True).limit(1).execute().data)
     return _map_sprint(rows[0]) if rows else None
 
 
 # camelCase (skill) -> snake_case (column) cho ghi sprint.
-_SPRINT_COL = {"name": "name", "goal": "goal", "status": "status", "createdBy": "created_by"}
+_SPRINT_COL = {
+    "name": "name", "goal": "goal", "status": "status", "createdBy": "created_by",
+    "projectId": "project_id",  # 0068 — NOT NULL: tao sprint ma thieu la DB tu choi ngay
+}
 
 
 def _sprint_row(fields: dict) -> dict:

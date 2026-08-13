@@ -76,13 +76,16 @@ def _start_date(sprint) -> date | None:
     return repo._as_datetime(raw).date() if raw else None
 
 
-def sprint_pair(client):
-    """(sprint truoc, sprint hien tai) theo THU TU NGAY BAT DAU.
+def sprint_pair(client, project_id):
+    """(sprint truoc, sprint hien tai) CUA MOT DU AN theo THU TU NGAY BAT DAU.
 
     Sap theo startDate chu khong theo created_at nhu list_sprints: sprint tao sau van co
     the la sprint cua tuan truoc. Sprint thieu ngay bi day xuong cuoi (khong doan).
+    Scope theo du an (0068) la BAT BUOC o day: cron tao moi du an mot sprint/tuan voi
+    CUNG start_date — khong loc thi 'sprint truoc' co the la sprint cua du an khac
+    ngay trong cung mot tuan.
     """
-    sprints = repo.list_sprints(client)
+    sprints = repo.list_sprints(client, project_id)
     dated = [s for s in sprints if _start_date(s)]
     dated.sort(key=_start_date)
     if not dated:
@@ -288,7 +291,7 @@ def run(project_token: str | None, tab: str, dry_run: bool, force: bool,
             f"Vào web > Dự án > sửa project > dán link Google Sheet."
         )
 
-    previous, current = sprint_pair(client)
+    previous, current = sprint_pair(client, project["_id"])
     if not current:
         raise sg.SheetsError("chưa có sprint nào có ngày bắt đầu — không biết ghi vào tuần nào.")
 

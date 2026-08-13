@@ -543,6 +543,8 @@ export interface Bug {
 
 export interface Sprint {
   id: string;
+  /** Dự án sở hữu sprint (0068) — sprint ĐỘC LẬP theo từng dự án, không dùng chung nữa. */
+  projectId: string | null;
   name: string;
   goal: string;
   status: SprintStatus;

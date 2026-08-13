@@ -99,6 +99,7 @@ A time-boxed sprint. Doc id is auto-generated.
 | Field       | Type      | Notes                                            |
 |-------------|-----------|--------------------------------------------------|
 | `id`        | string    | mirror of doc id (convenience)                   |
+| `projectId` | string    | **dự án sở hữu** (0068, NOT NULL, `on delete cascade`) — sprint ĐỘC LẬP theo từng dự án, hết dùng chung |
 | `name`      | string    | e.g. `Sprint 12`                                 |
 | `goal`      | string    | short sprint goal (may be empty)                 |
 | `status`    | string    | `planning` \| `active` \| `completed`            |
@@ -107,7 +108,22 @@ A time-boxed sprint. Doc id is auto-generated.
 | `createdAt` | Timestamp | creation time                                    |
 | `createdBy` | string    | uid of creator                                   |
 
-> Only **one** sprint should be `active` at a time (app convention, not enforced by rules).
+> Only **one** sprint per project should be `active` at a time (app convention, not enforced
+> by rules).
+>
+> **Sprint theo TỪNG dự án (0068)** — trước đây toàn cục, dự án mới mở ra là thấy nguyên
+> list sprint của dự án cũ:
+> - Cron `ensure_week_sprint()` (0041, viết lại ở 0068) tạo sprint tuần cho **mỗi** dự án —
+>   nghĩa là các sprint tuần **trùng tên** giữa các dự án; mọi phép resolve theo tên/`active`
+>   phải khoanh vùng dự án.
+> - Trigger `projects_seed_week_sprint` (AFTER INSERT on `projects`): dự án lập giữa tuần có
+>   ngay sprint tuần hiện tại, không đợi cron thứ 2.
+> - Web: `useSprints(uid, projectId)` lọc + realtime theo `project_id`; đổi dự án là
+>   `SprintContext` xoá lựa chọn sprint và tự chọn lại sprint đang chạy của dự án mới.
+> - Bot: `resolve_sprint`/`active_sprint`/`list_sprints` nhận `project_id`; `sprint_ops
+>   create` cần `--project` (bỏ trống nếu chỉ có 1 dự án); `weekly_report.sprint_pair` BẮT
+>   BUỘC scope dự án (sprint tuần các dự án cùng `start_date`, không lọc là lấy nhầm).
+> - Edge Function `daily-report`: sprint đang chạy tính riêng cho từng project.
 
 ---
 

@@ -70,14 +70,16 @@ def _resolve_reporter(client):
     return user["_id"] if user else None
 
 
-def _resolve_sprint(client, token: str):
+def _resolve_sprint(client, token: str, project_id=None):
     """'backlog' -> None; nguoc lai tra ve dict sprint (nem ResolveError neu sai).
 
     Tra ve ca dict chu khong chi _id vi cmd_create con can endDate de dat han mac dinh.
+    `project_id` (0068): sprint thuoc tung du an — 'active' phai la sprint cua DU AN task
+    sap vao, khong thi cron tao moi du an mot sprint/tuan va 'active' thanh hen xui.
     """
     if not token or token.strip().lower() == "backlog":
         return None
-    return repo.resolve_sprint(client, token)
+    return repo.resolve_sprint(client, token, project_id)
 
 
 def _due_window(sprint, due_arg: str):
@@ -218,7 +220,7 @@ def cmd_create(args):
     # Features) deu loc theo project dang chon, task se khong hien o dau ca.
     project = projects.resolve_project(client, args.project)
     feature = projects.resolve_feature(client, project["_id"], args.feature) if args.feature else None
-    sprint = _resolve_sprint(client, args.sprint)
+    sprint = _resolve_sprint(client, args.sprint, project["_id"])
     sprint_id = sprint["_id"] if sprint else None
     # default_self: khong noi giao cho ai -> giao cho CHINH nguoi tag bot.
     assignee_id, assignee_name = _assignee_fields(client, args.assignee, default_self=True)
@@ -565,19 +567,28 @@ def _list_assignee_id(client, token):
     return user["_id"]
 
 
-def _list_sprint_id(client, token):
+def _list_sprint_id(client, token, project_id=None):
     """Tra ve sentinel '__ANY__' khi khong loc; None cho backlog; id cho sprint."""
     if not token:
         return "__ANY__"
     if token.strip().lower() == "backlog":
         return None
-    return repo.resolve_sprint(client, token)["_id"]
+    return repo.resolve_sprint(client, token, project_id)["_id"]
 
 
 def cmd_list(args):
     client = repo.db()
+    # 0068: sprint thuoc tung du an — loc theo sprint ('active'/ten) can biet du an nao.
+    # --project bo trong: he thong 1 du an thi resolve tu lay; nhieu du an van cho chay
+    # (project=None -> tim sprint toan cuc nhu cu) de cau lenh cu khong gay.
+    project = None
+    if args.project or args.sprint:
+        try:
+            project = projects.resolve_project(client, args.project)
+        except ResolveError:
+            project = None  # nhieu du an ma khong noi ro -> giu hanh vi cu (toan cuc)
+    sprint_filter = _list_sprint_id(client, args.sprint, project["_id"] if project else None)
     assignee_id = _list_assignee_id(client, args.assignee)
-    sprint_filter = _list_sprint_id(client, args.sprint)
     status = _normalize_or_die(normalize_status, args.status, "status") if args.status else None
 
     tasks = repo.query_tasks(
@@ -686,6 +697,7 @@ def build_parser() -> argparse.ArgumentParser:
     l = sub.add_parser("list", help="Liet ke task")
     l.add_argument("--assignee", help="Ten nguoi | 'me'")
     l.add_argument("--sprint", help="Ten sprint | 'active' | 'backlog'")
+    l.add_argument("--project", help="Du an cua sprint (0068) — bo trong neu chi co 1 du an")
     l.add_argument("--status", help="Loc theo trang thai")
     l.set_defaults(func=cmd_list)
     return parser
