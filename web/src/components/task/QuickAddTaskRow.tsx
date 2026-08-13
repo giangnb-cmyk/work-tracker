@@ -55,6 +55,7 @@ export default function QuickAddTaskRow({ featureId, sprintId, projectId }: Prop
           assigneeName: me?.displayName ?? '',
           assigneeNotionUserId: me?.notionUserId ?? null,
           notionProjectId: projects.find((p) => p.id === projectId)?.notionProjectId ?? null,
+          notionSyncEnabled: projects.find((p) => p.id === projectId)?.notionSyncEnabled ?? true,
           watcherNames: [],
         },
       );

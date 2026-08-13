@@ -278,7 +278,12 @@ def cmd_create(args):
     # Noi ra khi da tu sua tieu de, de nguoi dung biet ma kiem lai — dung im lang.
     if extra:
         print(f"Lưu ý: đầu vào là một dòng bảng; đã lấy ô đầu làm tiêu đề, phần còn lại ({extra}) đưa vào mô tả.")
-    print(_sync_create(client, task_id, task_doc, assignee_id, project.get("notionProjectId")))
+    # Du an tat sync Notion (migration 0070, bat/tat o web > Du an) -> khong de trang Notion.
+    # Guong voi web (createTask/opts.notionSyncEnabled) de hai ben cung mot luat.
+    if project.get("notionSyncEnabled", True):
+        print(_sync_create(client, task_id, task_doc, assignee_id, project.get("notionProjectId")))
+    else:
+        print("Notion: bỏ qua (dự án đã tắt đồng bộ Notion)")
     # Bao webhook Discord co task moi (best-effort, khong in ra reply de khoi nhieu).
     try:
         _notify_created(client, task_id, short_code, task_doc, project, feature, sprint)
@@ -293,7 +298,13 @@ def _notify_created(client, task_id, short_code, task_doc, project, feature, spr
     embed khong tao thong bao. Best-effort: thieu DISCORD_WEBHOOK_URL thi bo qua. Cung khuon
     voi web (_discord.buildCreatedMessage) de bot va web bao giong nhau.
     """
-    if not webhook_notify.is_configured():
+    # Webhook RIENG cua du an (migration 0069/web > Du an). KHONG lui ve DISCORD_WEBHOOK_URL
+    # chung: bien env do tro vao kenh cua MOT du an, nen du an moi dung no la thong bao rot
+    # vao kenh du an cu — da bi bao loi that (task SM7 rot vao #merge-task cua M1).
+    hook = (project.get("discordWebhook") or "").strip()
+    if not hook:
+        print(f"(Dự án '{project['name']}' chưa cấu hình webhook Discord — bỏ qua thông báo task mới.)",
+              file=sys.stderr)
         return
     creator = permissions.current_user(client)
     creator_name = creator.get("displayName") if creator else None
@@ -326,7 +337,7 @@ def _notify_created(client, task_id, short_code, task_doc, project, feature, spr
         embed["url"] = url  # ten task bam duoc -> mo link rut gon
 
     content = f"<@{assignee_did}>" if assignee_did else ""
-    webhook_notify.post(content, [assignee_did] if assignee_did else [], embeds=[embed])
+    webhook_notify.post(content, [assignee_did] if assignee_did else [], embeds=[embed], url=hook)
 
 
 def _sync_create(client, task_id, task_doc, assignee_id, notion_project_id) -> str:

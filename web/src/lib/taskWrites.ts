@@ -11,11 +11,16 @@ import { endOfWorkWeek, sundayOfWeek } from './format';
 import { Timestamp } from './time';
 import type { NewTaskInput, Sprint, Task, TaskStatus } from '../types';
 
-interface CreateOpts {
+export interface CreateOpts {
   reporterId: string;
   assigneeName: string;
   assigneeNotionUserId?: string | null;
   notionProjectId?: string | null;
+  /**
+   * Dự án này có đẩy task sang Notion không (`projects.notion_sync_enabled`, 0070).
+   * Bỏ trống = BẬT: chỗ gọi cũ chưa truyền thì giữ nguyên hành vi trước đây.
+   */
+  notionSyncEnabled?: boolean;
   watcherNames: string[];
 }
 
@@ -97,7 +102,11 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     attachments: input.attachments ?? [],
     watcherIds: input.watcherIds ?? [],
   } as Task;
-  void syncNewToNotion(id, created, opts.assigneeNotionUserId, opts.notionProjectId);
+  // Dự án tắt sync Notion (0070) thì KHÔNG đẻ trang — database Notion là kho dùng chung
+  // của cả công ty, dự án không dùng Notion mà vẫn rải trang vào đó là rác của người khác.
+  if (opts.notionSyncEnabled !== false) {
+    void syncNewToNotion(id, created, opts.assigneeNotionUserId, opts.notionProjectId);
+  }
   // Báo Discord có task mới (webhook) — fire-and-forget, không chặn việc tạo nếu lỗi.
   void notifyTaskCreated({
     taskId: id,

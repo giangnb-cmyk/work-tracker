@@ -10,6 +10,7 @@ import { listNotionProjects, type NotionProjectOption } from '../lib/notionSync'
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import SearchableSelect from './SearchableSelect';
+import Switch from './Switch';
 import type { Project } from '../types';
 
 interface ProjectModalProps {
@@ -34,6 +35,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
   const [costSheetInput, setCostSheetInput] = useState(project?.costSheetId ?? '');
   const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
+  const [notionSyncEnabled, setNotionSyncEnabled] = useState(project?.notionSyncEnabled ?? true);
   const [bugForumInput, setBugForumInput] = useState(project?.bugForumChannelId ?? '');
   const [bugNotifyRole, setBugNotifyRole] = useState(project?.bugNotifyRole ?? '');
 
@@ -136,6 +138,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       color: project?.color ?? '#6366f1',
       description,
       notionProjectId: notionProjectId || null,
+      notionSyncEnabled,
       weeklySheetId: sheetId,
       dailyReportWebhook: dailyWebhook.trim() || null,
       costSheetId,
@@ -205,6 +208,25 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           💡 Liên kết để khi tạo task trong project này, Notion tự set đúng quan hệ Project.
         </p>
 
+        {/* Công tắc sync Notion (0070). Database Notion là kho DÙNG CHUNG của cả công ty,
+            nên dự án không dùng Notion phải tắt được hẳn, chứ không chỉ "không liên kết". */}
+        <div className="field" style={{ marginBottom: '0.35rem' }}>
+          <Switch
+            checked={notionSyncEnabled}
+            onChange={setNotionSyncEnabled}
+            label="Tạo task kèm trang Notion"
+            ariaLabel="Bật/tắt đồng bộ Notion cho dự án này"
+          />
+        </div>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {notionSyncEnabled ? (
+            <>✅ Mỗi task tạo trong dự án này (cả từ web lẫn từ bot) sẽ đẻ một trang Notion tương ứng.</>
+          ) : (
+            <>⛔ Tắt — task chỉ nằm trong app, không tạo trang Notion và nút “Tạo task trên Notion”
+              ở task chi tiết cũng ẩn đi. Task ĐÃ liên kết trước đó vẫn giữ link, không bị gỡ.</>
+          )}
+        </p>
+
         <label className="field">
           <span>Google Sheet weekly report</span>
           <input
@@ -247,7 +269,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
         </p>
 
         <label className="field">
-          <span>Webhook Discord — báo cáo task hằng ngày</span>
+          <span>Webhook Discord — kênh task của dự án</span>
           <input
             className="input"
             value={dailyWebhook}
@@ -259,9 +281,11 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           {webhookInvalid ? (
             <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
           ) : dailyWebhook.trim() ? (
-            <>✅ 10:30 mỗi ngày làm việc, bot gửi task của project này vào kênh webhook, tag người theo Discord ID.</>
+            <>✅ MỌI thông báo của dự án này đi vào kênh đó: task mới, task xong, xong subtask,
+              tài liệu mới, và báo cáo task 10:30 hằng ngày.</>
           ) : (
-            <>💡 Dán webhook của kênh Discord để nhận báo cáo task hằng ngày (10:30). Rỗng = project này không gửi.</>
+            <span className="error-text">⚠ Chưa có webhook — dự án này sẽ KHÔNG nhận được thông báo nào
+              trên Discord. Kênh Discord → ⚙ Chỉnh sửa kênh → Tích hợp → Webhook → Sao chép URL.</span>
           )}
         </p>
 

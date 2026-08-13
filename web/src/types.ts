@@ -317,6 +317,12 @@ export interface Project {
   description: string;
   /** Notion Projects DB page id — lets task syncs set the Notion "Project" relation. */
   notionProjectId: string | null;
+  /**
+   * false = tạo task trong dự án này KHÔNG đẻ trang Notion (migration `0070`), và nút
+   * "Sync Notion" ở task chi tiết cũng ẩn. Độc lập với {@link notionProjectId}: tắt sync
+   * vẫn giữ được liên kết để bật lại sau.
+   */
+  notionSyncEnabled: boolean;
   /** Google Spreadsheet **id** (không phải URL) bot điền weekly report vào. Rỗng = chưa bật. */
   weeklySheetId: string | null;
   /**

@@ -10,6 +10,8 @@ export interface ProjectInput {
   color: string;
   description: string;
   notionProjectId: string | null;
+  /** Tạo task có đẩy sang Notion không (0070). Bỏ trống = bật, giữ hành vi cũ. */
+  notionSyncEnabled?: boolean;
   weeklySheetId: string | null;
   dailyReportWebhook?: string | null;
   /** Sheet nhận bảng CHI PHÍ (file riêng, có lương — 0060). */
@@ -60,6 +62,7 @@ export async function createProject(input: ProjectInput, createdBy: string): Pro
       color: input.color || '#6366f1',
       description: input.description.trim(),
       notion_project_id: input.notionProjectId,
+      notion_sync_enabled: input.notionSyncEnabled ?? true,
       weekly_sheet_id: input.weeklySheetId,
       daily_report_webhook: input.dailyReportWebhook ?? null,
       cost_sheet_id: input.costSheetId ?? null,
@@ -80,6 +83,7 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
   if (patch.color !== undefined) row.color = patch.color;
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.notionProjectId !== undefined) row.notion_project_id = patch.notionProjectId;
+  if (patch.notionSyncEnabled !== undefined) row.notion_sync_enabled = patch.notionSyncEnabled;
   if (patch.weeklySheetId !== undefined) row.weekly_sheet_id = patch.weeklySheetId;
   if (patch.dailyReportWebhook !== undefined) row.daily_report_webhook = patch.dailyReportWebhook;
   if (patch.costSheetId !== undefined) row.cost_sheet_id = patch.costSheetId;

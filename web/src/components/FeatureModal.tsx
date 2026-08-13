@@ -13,6 +13,7 @@ import WatchersField from './task/WatchersField';
 import LabelSelect from './LabelSelect';
 import EmojiPicker from './EmojiPicker';
 import ConfirmDialog from './ConfirmDialog';
+import DuplicateFeatureModal from './DuplicateFeatureModal';
 import Switch from './Switch';
 import { labelGroup } from '../lib/bugLabelGroups';
 import {
@@ -48,6 +49,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
   const { user, isAdmin } = useAuth();
   const { members, refetchFeatures } = useSprintContext();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const isEdit = Boolean(feature);
   const [name, setName] = useState(feature?.name ?? '');
   const [icon, setIcon] = useState(feature?.icon ?? '🧩');
@@ -376,6 +378,20 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
                   🗑 Xoá feature
                 </button>
               )}
+              {/* Chỉ admin: tạo feature vốn là admin-only (RLS features_insert), nhân bản
+                  cũng là tạo. Huỷ timer tự-lưu trước khi mở — cùng lý do như handleDelete. */}
+              {isAdmin && feature && (
+                <button
+                  className="btn-sm"
+                  title="Tạo feature mới y hệt feature này, kèm toàn bộ task bên trong"
+                  onClick={() => {
+                    if (timerRef.current) clearTimeout(timerRef.current);
+                    setDuplicating(true);
+                  }}
+                >
+                  ⧉ Nhân bản
+                </button>
+              )}
               <span className={`tm-savehint tm-save-${saveState}`}>{saveHint}</span>
               <button className="btn-sm" onClick={() => void handleClose()}>Đóng</button>
             </>
@@ -389,6 +405,19 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
           )}
         </div>
       </div>
+
+      {duplicating && feature && (
+        <DuplicateFeatureModal
+          feature={feature}
+          onCancel={() => setDuplicating(false)}
+          onDone={async () => {
+            // Nạp lại danh sách feature rồi đóng: không refetch thì feature mới chỉ hiện ra
+            // ở lần vào lại trang, người dùng tưởng bấm hụt.
+            await refetchFeatures();
+            onClose();
+          }}
+        />
+      )}
 
       {confirmDelete && feature && (
         <ConfirmDialog

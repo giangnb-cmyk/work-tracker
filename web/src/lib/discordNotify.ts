@@ -41,6 +41,9 @@ export async function notifyTaskDone(task: Task, sprintName?: string): Promise<v
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
+        // Quyết định KÊNH đích (webhook riêng của dự án) — thiếu là tin rơi về webhook
+        // dùng chung, tức là vào kênh của dự án khác. Xem api/notify-discord.ts.
+        projectId: task.projectId,
         title: task.title,
         sprintName,
         assigneeName: task.assigneeName,
@@ -92,6 +95,7 @@ export async function notifySubtaskDone(task: Task, subtaskTitles: string[]): Pr
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         event: 'subtask_done',
+        projectId: task.projectId,
         title: task.title,
         subtaskTitles,
         doneCount: subs.filter((s) => s.done).length,
@@ -141,6 +145,7 @@ export async function notifyDocCreated(info: DocCreatedInfo): Promise<void> {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         event: 'doc_created',
+        projectId: info.projectId,
         title: info.name,
         url: info.url,
         providerLabel: providerMeta(info.provider).label,
@@ -219,6 +224,7 @@ export async function notifyTaskCreated(info: CreatedInfo): Promise<void> {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         event: 'created',
+        projectId: info.projectId,
         title: info.title,
         creatorName,
         assigneeName: info.assigneeName,

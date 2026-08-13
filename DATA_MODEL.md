@@ -140,13 +140,31 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `color`           | string         | accent token/hex for the card                             |
 | `description`     | string         | optional short description                                |
 | `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
+| `notionSyncEnabled` | boolean      | `false` = tạo task trong dự án này **không** đẻ trang Notion, và nút "Tạo task trên Notion" ở task chi tiết cũng ẩn (migration `0070`). Áp dụng cho CẢ web (`createTask`) lẫn bot (`task_ops._sync_create`). Mặc định `true`. Độc lập với `notionProjectId`: tắt sync vẫn giữ liên kết để bật lại |
 | `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
 | `releaseSheetId`  | string \| null | Google Spreadsheet **id** chứa lịch phát hành, tab `Timeline` (migration `0033`). KHÁC `weeklySheetId` — hai sheet khác nhau, xem `release_sync_requests` |
-| `dailyReportWebhook` | string \| null | Discord webhook URL cho báo cáo task hằng ngày 10:30 (migration `0047`). Job ngoài `daily-report-notion` (đọc bằng service_role) gửi report của project này vào đây. Rỗng = không gửi |
+| `dailyReportWebhook` | string \| null | **Webhook Discord của dự án** — MỌI thông báo của project này đi vào đúng kênh đó: task mới, task xong, xong subtask, tài liệu mới (web, qua `/api/notify-discord`), task mới do bot tạo (`task_ops`), và báo cáo task 10:30 (Edge Function `daily-report`, đọc bằng service_role). Migration `0047`. Rỗng = **không gửi thông báo nào** |
 | `bugForumChannelId` | string \| null | ID kênh **Forum Discord** đồng bộ bug hai chiều (migration `0069`). **Chuỗi**, không phải number — snowflake 19 chữ số vượt `Number.MAX_SAFE_INTEGER`. Rỗng = dự án không sync bug |
 | `bugNotifyRole`   | string \| null | Tên hoặc id role Discord được ping khi bug báo từ web thành bài forum mới (migration `0069`). Rỗng = không ping |
 | `createdAt`       | Timestamp      | creation time                                             |
 | `createdBy`       | string         | uid of creator                                            |
+
+### Thông báo Discord: MỘT KÊNH MỖI DỰ ÁN (`dailyReportWebhook`)
+
+Webhook nằm ở **hàng project**, không phải biến môi trường. Trước 08/2026 cả app dùng chung
+đúng một `DISCORD_WEBHOOK_URL` trên Vercel/bot, nên tạo task ở dự án MỚI vẫn bắn thông báo
+vào kênh của dự án CŨ (lỗi thật: task của *SM7 - Farm Route* rơi vào `#merge-task` của
+*M1 - Tasty Merge*).
+
+- **Web** → `web/api/notify-discord.ts`: mọi payload mang `projectId`; server tra
+  `projects.daily_report_webhook` bằng **anon key + token của chính người gọi** (RLS vẫn có
+  hiệu lực — tuyệt đối không đưa service-role key lên Vercel), rồi post vào đó.
+- **Bot** → `task_ops._notify_created` lấy `project['discordWebhook']` (map trong
+  `project_repo`) và truyền vào `webhook_notify.post(url=…)`.
+- Dự án **chưa cấu hình webhook = im lặng**, cố ý: `DISCORD_WEBHOOK_URL` chỉ còn là dự
+  phòng cho payload không kèm `projectId`. Lùi về nó khi biết dự án chính là tái lập lỗi cũ.
+- Client **không bao giờ** gửi URL webhook lên server: ai đăng nhập cũng sai được server
+  bắn tin vào một webhook Discord bất kỳ.
 
 ### Weekly report (`weeklySheetId`)
 

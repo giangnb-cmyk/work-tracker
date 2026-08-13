@@ -27,13 +27,17 @@ def is_configured() -> bool:
     return bool((os.getenv(_URL_ENV) or "").strip())
 
 
-def post(content: str = "", user_ids=None, embeds=None) -> bool:
+def post(content: str = "", user_ids=None, embeds=None, url: str | None = None) -> bool:
     """Post 1 tin vào webhook, CHỈ ping các id trong user_ids. True nếu Discord trả 2xx.
 
     embeds: list embed Discord (thẻ đẹp có màu, tiêu đề bấm được…). Ping phải nằm ở
     content NGOÀI embed — mention trong embed không tạo thông báo.
+
+    url: webhook đích. Truyền vào = webhook RIÊNG của dự án (projects.daily_report_webhook);
+    bỏ trống mới lùi về DISCORD_WEBHOOK_URL dùng chung. Chỗ gọi nào biết dự án thì PHẢI
+    truyền — env dùng chung trỏ vào kênh của MỘT dự án, mọi dự án khác dùng nó là báo nhầm chỗ.
     """
-    url = (os.getenv(_URL_ENV) or "").strip()
+    url = (url or os.getenv(_URL_ENV) or "").strip()
     if not url:
         return False
     # allowed_mentions.parse=[] để '@everyone'/role trong text không vô tình ping cả kênh.

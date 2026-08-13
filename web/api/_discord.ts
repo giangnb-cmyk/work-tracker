@@ -2,11 +2,26 @@
 // server-side. A webhook needs no bot token but can still ping users if the
 // message contains <@id> and allowed_mentions lists those ids.
 
-const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
+/**
+ * Webhook DỰ PHÒNG (env). Chỉ dùng khi payload KHÔNG kèm `projectId` — client cũ còn nằm
+ * trong tab của ai đó chẳng hạn.
+ *
+ * Từ 2026-08: mỗi dự án có webhook RIÊNG (`projects.daily_report_webhook`). Trước đây cả
+ * app dùng đúng biến env này, nên tạo task ở dự án MỚI vẫn bắn thông báo vào kênh của dự
+ * án CŨ — đã bị báo lỗi thật (task của SM7 - Farm Route rơi vào #merge-task của M1).
+ * Đừng biến nó lại thành đường mặc định cho mọi dự án.
+ */
+export const FALLBACK_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
 
-export const DISCORD_ENABLED = Boolean(WEBHOOK_URL);
+/**
+ * Dự án nào gửi tin này — quyết định webhook đích (`projects.daily_report_webhook`).
+ * Thiếu = lùi về webhook env dùng chung; xem FALLBACK_WEBHOOK_URL.
+ */
+interface ProjectScoped {
+  projectId?: string | null;
+}
 
-export interface DonePayload {
+export interface DonePayload extends ProjectScoped {
   title: string;
   sprintName?: string;
   assigneeName?: string;
@@ -15,7 +30,7 @@ export interface DonePayload {
 }
 
 /** Thông báo task VỪA ĐƯỢC TẠO. Các dòng ngữ cảnh là tuỳ chọn — thiếu thì bỏ dòng đó. */
-export interface CreatedPayload {
+export interface CreatedPayload extends ProjectScoped {
   event: 'created';
   title: string;
   creatorName?: string;
@@ -36,7 +51,7 @@ export interface CreatedPayload {
  * Nhận MỘT MẢNG chứ không một tên: ô sửa subtask trong TaskModal lưu theo kiểu debounce,
  * tick liền 3 cái là gộp vào một lượt ghi — bắn 3 tin rời thì ngập kênh.
  */
-export interface SubtaskDonePayload {
+export interface SubtaskDonePayload extends ProjectScoped {
   event: 'subtask_done';
   title: string;
   subtaskTitles: string[];
@@ -52,7 +67,7 @@ export interface SubtaskDonePayload {
 
 /** Thông báo TÀI LIỆU MỚI vừa vào thư viện dự án (`project_docs`). Không ping ai —
  *  thêm tài liệu không nhắm vào một người cụ thể như giao task. */
-export interface DocCreatedPayload {
+export interface DocCreatedPayload extends ProjectScoped {
   event: 'doc_created';
   /** Tên tài liệu (giữ tên field `title` để handler validate chung một chỗ). */
   title: string;
@@ -113,15 +128,15 @@ function buildCreatedMessage(p: CreatedPayload): { content: string; embeds: Embe
 }
 
 /** Gửi 1 tin qua webhook, ping đúng các id trong `users`. Không bao giờ throw ra caller. */
-async function postWebhook(content: string, users: string[], embeds?: Embed[]): Promise<boolean> {
-  if (!DISCORD_ENABLED) return false;
+async function postWebhook(url: string, content: string, users: string[], embeds?: Embed[]): Promise<boolean> {
+  if (!url) return false;
   try {
     const body: Record<string, unknown> = {
       content,
       allowed_mentions: { parse: [], users }, // ping only the listed users
     };
     if (embeds && embeds.length > 0) body.embeds = embeds;
-    const res = await fetch(WEBHOOK_URL, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -183,21 +198,21 @@ function buildSubtaskDoneMessage(p: SubtaskDonePayload): { content: string; embe
 }
 
 /** Send a completion message. Returns true on 2xx. Never throws to the caller. */
-export async function postDone(p: DonePayload): Promise<boolean> {
+export async function postDone(url: string, p: DonePayload): Promise<boolean> {
   const { content, embeds, users } = buildDoneMessage(p);
-  return postWebhook(content, users, embeds);
+  return postWebhook(url, content, users, embeds);
 }
 
 /** Send a "subtask ticked done" message. Returns true on 2xx. Never throws to the caller. */
-export async function postSubtaskDone(p: SubtaskDonePayload): Promise<boolean> {
+export async function postSubtaskDone(url: string, p: SubtaskDonePayload): Promise<boolean> {
   const { content, embeds, users } = buildSubtaskDoneMessage(p);
-  return postWebhook(content, users, embeds);
+  return postWebhook(url, content, users, embeds);
 }
 
 /** Send a "task created" message. Returns true on 2xx. Never throws to the caller. */
-export async function postCreated(p: CreatedPayload): Promise<boolean> {
+export async function postCreated(url: string, p: CreatedPayload): Promise<boolean> {
   const { content, embeds, users } = buildCreatedMessage(p);
-  return postWebhook(content, users, embeds);
+  return postWebhook(url, content, users, embeds);
 }
 
 /**
@@ -223,7 +238,7 @@ function buildDocCreatedMessage(p: DocCreatedPayload): Embed {
 }
 
 /** Send a "doc added to library" message. Returns true on 2xx. Never throws to the caller. */
-export async function postDocCreated(p: DocCreatedPayload): Promise<boolean> {
+export async function postDocCreated(url: string, p: DocCreatedPayload): Promise<boolean> {
   // content rỗng + embeds là hợp lệ với Discord (chỉ cần một trong hai có nội dung).
-  return postWebhook('', [], [buildDocCreatedMessage(p)]);
+  return postWebhook(url, '', [], [buildDocCreatedMessage(p)]);
 }
