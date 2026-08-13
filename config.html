@@ -235,7 +235,10 @@
         <div class="card-body">
           <div class="field wide forums" style="margin-bottom:6px">
             <label>Cặp Project ↔ Forum <span class="tgt">bug_forums[]</span></label>
-            <span class="hint">Mỗi dòng: <b>project_id</b> (UUID lấy từ web) ↔ <b>forum_channel_id</b> (ID kênh Forum Discord).</span>
+            <span class="hint"><b>DỰ PHÒNG</b> — chỗ chính giờ là web: <i>Dự án → sửa → “Kênh Forum Discord — báo bug”</i>
+              (cột <code>projects.bug_forum_channel_id</code>, migration 0069), sửa xong bot ăn sau ~30s không cần restart.
+              Mục dưới đây chỉ dùng cho dự án CHƯA điền ở web; điền cả hai nơi thì <b>web thắng</b>.<br />
+              Mỗi dòng: <b>project_id</b> (UUID lấy từ web) ↔ <b>forum_channel_id</b> (ID kênh Forum Discord).</span>
             <div id="forumRows" style="margin-top:8px"></div>
             <button type="button" class="btn ghost small" id="btnAddForum" style="align-self:flex-start">+ Thêm forum</button>
           </div>
@@ -560,7 +563,7 @@ const NOTES = {
   standup: `Optional custom standup prompt; leave empty to use the default 3-question prompt.`,
   moods: `Bo tam trang cua bot. Moi ngay bot tu chon 1 tam trang (co dinh trong ngay, doi qua ngay). Them/bot/sua thoai mai.`,
   moodOverride: `Ep tam trang co dinh. De TRONG '' = random doi theo ngay. Dien SO thu tu (1..so luong moods) de chon 1 tam trang. Hoac go THANG mot cau mo ta tam trang tuy y.`,
-  bugForums: `Dong bo HAI CHIEU bug voi forum Discord. Moi muc: project_id (uuid tu web) + forum_channel_id (ID kenh Forum). Discord->app: moi bai post -> 1 bug, forum tags -> nhan. app->Discord: doi nhan tren app se set lai tag cua thread. Bot can quyen 'Manage Threads' (sua tag thread) + 'Manage Channels' (tao tag moi). Chay tu dong luc bug_sync_hour, khi bam 'Sync' tren web, hoac '@bot sync bug'.`,
+  bugForums: `DU PHONG - tu migration 0069 cap project <-> forum dat NGAY TREN WEB (Du an -> sua -> 'Kenh Forum Discord - bao bug', cot projects.bug_forum_channel_id + bug_notify_role), sua xong bot an sau ~30s KHONG can restart. Muc nay chi dung cho project CHUA dien o web; dien ca hai noi thi WEB THANG. Dong bo HAI CHIEU bug voi forum Discord. Moi muc: project_id (uuid tu web) + forum_channel_id (ID kenh Forum). Discord->app: moi bai post -> 1 bug, forum tags -> nhan. app->Discord: doi nhan tren app se set lai tag cua thread. Bot can quyen 'Manage Threads' (sua tag thread) + 'Manage Channels' (tao tag moi). Chay tu dong luc bug_sync_hour, khi bam 'Sync' tren web, hoac '@bot sync bug'.`,
   bugMirror: `false = chi tai ANH len Storage (video xem qua nut 'Mo Discord') de do ton dung luong (video forum ~1GB > goi free 1GB). Dat true neu da nang Supabase Pro.`,
   ragSync: `true = moi ngay luc bug_sync_hour (9h) tu dong nap lai kho RAG, 3 phan: (1) sync_docs.py = tai lieu trong docs/ + links.txt; (2) drive_catalog.py = DANH MUC Google Drive (ten + link, tra loi 'file nam o dau'); (3) drive_ingest.py = RUOT tai lieu Drive (noi dung that ben trong Google Docs/Sheets/Slides/PDF/Word/Excel, tra loi 'trong file viet gi'). Phan (2)(3) chi chay khi co keys/service-account-gsheets.json. drive_ingest BO QUA cac file khai trong 'rag_drive_skip' (mac dinh: thu muc csv_config + file localization) va nap TANG DAN - chi file co sua tren Drive moi embedding lai (can migration 0027) nen ngay thuong chi vai giay. Yeu cau Ollama chay + da ap migration 0014. Ket qua ghi log; gui Discord neu bug_sync_channel_id != 0.`,
   ragTimeout: `Gioi han thoi gian (giay) moi skill RAG trong lan chay tu dong. rag_drive_timeout_seconds danh RIENG cho drive_ingest.py vi no phai embedding noi dung that (~3s/chunk tren may nay): ngay thuong nap tang dan nen chi vai giay, NHUNG lan dau (kho rong) phai nap ~2000 chunk = ~2 tieng -> de 10800 (3h) cho lan dau chay tron, khong thi bot giet giua chung. Bi giet cung KHONG mat du lieu: file da xong da co source_version nen hom sau chay tiep tu do.`,

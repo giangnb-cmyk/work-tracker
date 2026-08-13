@@ -25,6 +25,7 @@ import logging
 import os
 import re
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -52,6 +53,10 @@ BUGS = "bugs"
 BUG_LABELS = "bug_labels"
 BUG_NOTICES = "bug_status_notices"
 PROFILES = "profiles"
+PROJECTS = "projects"
+# Cache cau hinh forum doc tu DB (xem load_forum_configs).
+_FORUM_TTL = 30.0
+_forum_cache: tuple[float, list[dict]] | None = None
 # Bao doi trang thai: doc toi da ngan nay dong moi nhip (chan tran bo nho), va GUI toi da
 # ngan nay tin. Sua status hang loat tren web (keo 50 the) ma ban het mot luot la an rate
 # limit Discord; phan con lai van pending, nhip sau gui tiep.
@@ -138,14 +143,71 @@ _STATUS_DISPLAY = {
 }
 
 
-def load_forum_configs() -> list[dict]:
-    """Danh sach {project_id, forum_channel_id} tu settings.json['bug_forums']."""
+def _forums_from_settings() -> list[dict]:
+    """Cau hinh forum trong settings.json['bug_forums'] (nguon DU PHONG)."""
     out = []
     for c in _SETTINGS.get("bug_forums") or []:
         pid, fid = c.get("project_id"), c.get("forum_channel_id")
         if pid and fid:
             out.append({"project_id": str(pid), "forum_channel_id": int(fid),
                         "notify_role": c.get("notify_role")})
+    return out
+
+
+def _forums_from_db() -> list[dict]:
+    """Cau hinh forum trong bang `projects` (admin dat o web — migration 0069).
+
+    Cot la TEXT nen phai tu kiem tra dang so: gia tri rac (nguoi dung dan nham) bi bo qua
+    im lang o day, con hon de int() no giua vong dong bo va chet ca luot.
+    """
+    sb = get_client()
+    rows = (
+        sb.table(PROJECTS)
+        .select("id,bug_forum_channel_id,bug_notify_role")
+        .not_.is_("bug_forum_channel_id", "null")
+        .execute()
+        .data
+    ) or []
+    out = []
+    for r in rows:
+        fid = str(r.get("bug_forum_channel_id") or "").strip()
+        if not fid.isdigit():
+            if fid:
+                log.warning("Project %s có bug_forum_channel_id không hợp lệ: %r", r.get("id"), fid)
+            continue
+        out.append({"project_id": str(r["id"]), "forum_channel_id": int(fid),
+                    "notify_role": (r.get("bug_notify_role") or None)})
+    return out
+
+
+def load_forum_configs() -> list[dict]:
+    """Danh sach {project_id, forum_channel_id, notify_role} — DB TRUOC, settings.json SAU.
+
+    Nguon su that la cot `projects.bug_forum_channel_id` (admin sua ngay tren web, khong
+    phai dung vao may chay bot). settings.json['bug_forums'] van doc de cau hinh cu khong
+    vo: project nao CHUA dien o web thi lay theo file. Project co ca hai -> DB thang.
+
+    Ket qua cache _FORUM_TTL giay: ham nay bi goi nhieu lan trong MOT luot dong bo va co
+    ca trong vong poll 60s; khong cache thi moi lan la mot cu goi mang CHAN event loop
+    (ham sync, dang duoc goi thang tu code async). Doi forum tren web an sau toi da 30s.
+    """
+    global _forum_cache
+    now = time.monotonic()
+    if _forum_cache and now - _forum_cache[0] < _FORUM_TTL:
+        return _forum_cache[1]
+
+    from_settings = _forums_from_settings()
+    try:
+        merged = {c["project_id"]: c for c in from_settings}
+        merged.update({c["project_id"]: c for c in _forums_from_db()})
+        out = list(merged.values())
+    except Exception as e:
+        # Supabase chet thi VAN chay duoc bang cau hinh file — khong cache ket qua nay de
+        # nhip sau thu lai DB ngay.
+        log.warning("Đọc cấu hình forum từ DB lỗi (%s) — tạm dùng settings.json", e)
+        return from_settings
+
+    _forum_cache = (now, out)
     return out
 
 

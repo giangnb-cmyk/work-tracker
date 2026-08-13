@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { createProject, extractSheetId, updateProject, type ProjectInput } from '../lib/projectWrites';
+import {
+  createProject,
+  extractChannelId,
+  extractSheetId,
+  updateProject,
+  type ProjectInput,
+} from '../lib/projectWrites';
 import { listNotionProjects, type NotionProjectOption } from '../lib/notionSync';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
@@ -28,11 +34,15 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
   const [costSheetInput, setCostSheetInput] = useState(project?.costSheetId ?? '');
   const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
+  const [bugForumInput, setBugForumInput] = useState(project?.bugForumChannelId ?? '');
+  const [bugNotifyRole, setBugNotifyRole] = useState(project?.bugNotifyRole ?? '');
 
   const sheetId = extractSheetId(sheetInput);
   const sheetInvalid = sheetInput.trim().length > 0 && !sheetId;
   const costSheetId = extractSheetId(costSheetInput);
   const costSheetInvalid = costSheetInput.trim().length > 0 && !costSheetId;
+  const bugForumId = extractChannelId(bugForumInput);
+  const bugForumInvalid = bugForumInput.trim().length > 0 && !bugForumId;
   /**
    * Webhook chỉ để GỬI THỬ — cố ý KHÔNG lưu vào project.
    *
@@ -114,6 +124,10 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       setError('Webhook Discord không hợp lệ. Dán link dạng https://discord.com/api/webhooks/…');
       return;
     }
+    if (bugForumInvalid) {
+      setError('Kênh forum bug không hợp lệ. Dán link kênh Discord, hoặc id kênh (17–20 chữ số).');
+      return;
+    }
     setSaving(true);
     setError(null);
     const input: ProjectInput = {
@@ -125,6 +139,10 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       weeklySheetId: sheetId,
       dailyReportWebhook: dailyWebhook.trim() || null,
       costSheetId,
+      bugForumChannelId: bugForumId,
+      // Xoá forum thì xoá luôn role: ô role bị khoá lúc đó, để lại giá trị cũ là dữ liệu mồ
+      // côi — lần sau gán forum khác sẽ ping nhầm một role không ai còn nhớ đã đặt.
+      bugNotifyRole: bugForumId ? bugNotifyRole.trim() || null : null,
     };
     try {
       if (isEdit && project) {
@@ -136,6 +154,8 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           weeklySheetId: sheetId,
           dailyReportWebhook: dailyWebhook.trim() || null,
           costSheetId,
+          bugForumChannelId: bugForumId,
+          bugNotifyRole: bugNotifyRole.trim() || null,
         });
       } else {
         await createProject(input, user?.uid ?? '');
@@ -288,6 +308,53 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
             )}
           </p>
         </div>
+
+        {/* Forum bug — trước 0069 cặp project ↔ forum nằm trong bot/settings.json, đổi một
+            dự án là phải vào máy chạy bot sửa JSON rồi restart. Giờ nằm cùng chỗ với các
+            cấu hình per-project khác. */}
+        <label className="field">
+          <span>Kênh Forum Discord — báo bug</span>
+          <input
+            className="input"
+            value={bugForumInput}
+            onChange={(e) => setBugForumInput(e.target.value)}
+            placeholder="Dán link kênh forum: https://discord.com/channels/…, hoặc id kênh"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {bugForumInvalid ? (
+            <span className="error-text">⚠ Không đọc được id kênh. Chuột phải kênh forum → “Sao chép đường liên kết”.</span>
+          ) : bugForumId ? (
+            <>✅ Kênh id: <span className="mono">{bugForumId}</span> — bot đồng bộ hai chiều:
+              bài forum ↔ bug, tag forum ↔ nhãn. Bot cần quyền <b>Manage Threads</b>,{' '}
+              <b>Manage Channels</b>, <b>Create Posts</b> trong kênh này.</>
+          ) : (
+            <>💡 Rỗng = dự án này không đồng bộ bug với Discord (nút “Sync Discord” ở tab Bug
+              sẽ không có gì để chạy). Mỗi dự án một forum riêng.</>
+          )}
+        </p>
+
+        <label className="field">
+          <span>Role Discord được ping khi có bug mới</span>
+          <input
+            className="input"
+            value={bugNotifyRole}
+            onChange={(e) => setBugNotifyRole(e.target.value)}
+            placeholder="Tên role, ví dụ: DEV M1 — hoặc id role"
+            disabled={!bugForumId}
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {!bugForumId ? (
+            <>💡 Điền kênh forum ở trên trước đã.</>
+          ) : bugNotifyRole.trim() ? (
+            <>✅ Bug báo từ web mà <strong>chưa giao cho ai</strong> sẽ ping role này ở đầu bài.
+              Bug đã có người nhận thì chỉ ping đúng người đó. Role phải bật “Allow anyone to
+              @mention this role”, không thì tiếng ping câm.</>
+          ) : (
+            <>💡 Rỗng = không ping ai. Khớp theo tên, không phân biệt hoa/thường và dấu.</>
+          )}
+        </p>
 
         {error && <p className="error-text">{error}</p>}
 

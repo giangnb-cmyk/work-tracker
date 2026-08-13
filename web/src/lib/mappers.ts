@@ -76,6 +76,8 @@ export function rowToProject(r: Row): Project {
     releaseSheetId: r.release_sheet_id ?? null,
     costSheetId: r.cost_sheet_id ?? null,
     dailyReportWebhook: r.daily_report_webhook ?? null,
+    bugForumChannelId: r.bug_forum_channel_id ?? null,
+    bugNotifyRole: r.bug_notify_role ?? null,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };

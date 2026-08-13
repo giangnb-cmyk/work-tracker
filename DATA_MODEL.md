@@ -143,6 +143,8 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
 | `releaseSheetId`  | string \| null | Google Spreadsheet **id** chứa lịch phát hành, tab `Timeline` (migration `0033`). KHÁC `weeklySheetId` — hai sheet khác nhau, xem `release_sync_requests` |
 | `dailyReportWebhook` | string \| null | Discord webhook URL cho báo cáo task hằng ngày 10:30 (migration `0047`). Job ngoài `daily-report-notion` (đọc bằng service_role) gửi report của project này vào đây. Rỗng = không gửi |
+| `bugForumChannelId` | string \| null | ID kênh **Forum Discord** đồng bộ bug hai chiều (migration `0069`). **Chuỗi**, không phải number — snowflake 19 chữ số vượt `Number.MAX_SAFE_INTEGER`. Rỗng = dự án không sync bug |
+| `bugNotifyRole`   | string \| null | Tên hoặc id role Discord được ping khi bug báo từ web thành bài forum mới (migration `0069`). Rỗng = không ping |
 | `createdAt`       | Timestamp      | creation time                                             |
 | `createdBy`       | string         | uid of creator                                            |
 
@@ -686,6 +688,13 @@ Triggers: daily (default 09:00 `Asia/Ho_Chi_Minh`), `@bot sync bug`, or the web
 "Sync Discord" button (queues `bug_sync_requests`, admin-only insert; the service-role
 bot drains it and also pushes pending label edits every `bug_sync_poll_seconds`).
 The bot needs **Manage Threads** (edit thread tags) and **Manage Channels** (create tags).
+
+**Cặp project ↔ forum ở đâu** (migration `0069`): cột `projects.bug_forum_channel_id` +
+`projects.bug_notify_role`, admin đặt trong popup **Dự án** trên web — cùng chỗ với sheet
+weekly và webhook báo cáo. `bot/skills/bug_sync.py:load_forum_configs()` đọc DB trước,
+`bot/settings.json['bug_forums']` chỉ còn là **dự phòng** cho cấu hình cũ (project có ở cả
+hai nơi → DB thắng). Kết quả cache 30 s, nên đổi forum trên web ăn sau **tối đa 30 giây,
+không cần restart bot**.
 
 ### `bug_status_notices` (báo lên thread ai đổi trạng thái)
 

@@ -134,7 +134,19 @@ ALLOWED_USER_IDS = {int(x) for x in _settings.get("allowed_user_ids", [])}
 log.info("Bypass permissions: %s", BYPASS_PERMISSIONS)
 
 # --- Dong bo bug tu forum Discord --------------------------------------------
-BUG_FORUMS = _settings.get("bug_forums") or []
+def bug_forums() -> list[dict]:
+    """Cau hinh forum bug HIEN TAI: cot projects.bug_forum_channel_id (admin dat o web,
+    migration 0069), settings.json['bug_forums'] la du phong.
+
+    Co y la HAM chu khong phai bien module doc mot lan luc khoi dong: admin gan forum cho
+    mot du an tren web thi bot an ngay nhip sau, khong phai restart. bug_sync cache 30s nen
+    goi thoai mai.
+    """
+    try:
+        return bug_sync.load_forum_configs()
+    except Exception as e:
+        log.warning("Không đọc được cấu hình forum bug: %s", e)
+        return []
 BUG_SYNC_HOUR = int(_settings.get("bug_sync_hour", 9))          # gio chay tu dong (mac dinh 9h)
 BUG_SYNC_TZ = _settings.get("bug_sync_tz", "Asia/Ho_Chi_Minh")
 BUG_SYNC_CHANNEL_ID = int(_settings.get("bug_sync_channel_id", 0) or 0)  # kenh bao ket qua (0 = tat)
@@ -404,7 +416,7 @@ async def _do_sync_all() -> str:
 
 @tasks.loop(time=_SYNC_TIME)
 async def daily_bug_sync():
-    if not BUG_FORUMS:
+    if not bug_forums():
         return
     try:
         summary = await _do_sync_all()
@@ -692,7 +704,7 @@ async def _process_dm_request(sb, req):
 @tasks.loop(seconds=BUG_SYNC_POLL_SECONDS)
 async def poll_bug_sync_requests():
     """Moi nhip: (1) day thay doi nhan tu app -> Discord, (2) xu ly yeu cau 'Sync' tu web."""
-    if not BUG_FORUMS:
+    if not bug_forums():
         return
     try:
         sb = get_client()
@@ -750,7 +762,8 @@ async def _finish_sync_request(sb, req_id, status: str, result: str) -> None:
 
 async def _process_sync_request(sb, req) -> tuple[str, str]:
     pid = req.get("project_id")
-    cfg = bug_sync.forum_for_project(pid) if pid else (BUG_FORUMS[0] if len(BUG_FORUMS) == 1 else None)
+    _cfgs = bug_forums()
+    cfg = bug_sync.forum_for_project(pid) if pid else (_cfgs[0] if len(_cfgs) == 1 else None)
     status, result = "done", ""
     try:
         if not cfg:
@@ -910,12 +923,14 @@ async def on_ready():
     if not poll_release_sync_requests.is_running():
         poll_release_sync_requests.start()
         log.info("Quét yêu cầu sync lịch phát hành từ web mỗi %ds", BUG_SYNC_POLL_SECONDS)
-    if BUG_FORUMS:
-        if not daily_bug_sync.is_running():
-            daily_bug_sync.start()
-        if not poll_bug_sync_requests.is_running():
-            poll_bug_sync_requests.start()
-        log.info("Bug sync bật: %d forum, chạy lúc %sh (%s)", len(BUG_FORUMS), BUG_SYNC_HOUR, BUG_SYNC_TZ)
+    # Chay CA HAI vong bat ke hien co forum nao chua: cau hinh gio nam trong DB, admin gan
+    # forum cho mot du an tren web luc 10h thi bot phai an ngay, khong doi restart. Ban than
+    # hai vong da tu thoat som khi bug_forums() rong.
+    if not daily_bug_sync.is_running():
+        daily_bug_sync.start()
+    if not poll_bug_sync_requests.is_running():
+        poll_bug_sync_requests.start()
+    log.info("Bug sync bật: %d forum, chạy lúc %sh (%s)", len(bug_forums()), BUG_SYNC_HOUR, BUG_SYNC_TZ)
     if RAG_SYNC_ENABLED and not daily_rag_sync.is_running():
         daily_rag_sync.start()
         log.info("RAG sync bật: chạy lúc %sh (%s)", BUG_SYNC_HOUR, BUG_SYNC_TZ)
@@ -1003,7 +1018,7 @@ async def on_message(message: discord.Message):
         question = "Kiểm tra giúp mình các ảnh này có bị copy/đạo nhái/vi phạm bản quyền trên mạng không."
 
     # Lenh nhanh: "@bot sync bug" -> dong bo bug tu forum ngay (khong qua Claude).
-    if BUG_FORUMS and SYNC_BUG_RE.search(question) and "bug" in question.lower():
+    if SYNC_BUG_RE.search(question) and "bug" in question.lower() and bug_forums():
         log.info("[#%s] %s yêu cầu sync bug", message.channel, message.author)
         await ack(message)
         try:

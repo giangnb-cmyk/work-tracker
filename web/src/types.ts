@@ -335,6 +335,14 @@ export interface Project {
    * riêng chỉ admin xem (có LƯƠNG) + share Editor cho service account. Rỗng = chưa bật.
    */
   costSheetId: string | null;
+  /**
+   * ID kênh Forum Discord đồng bộ bug hai chiều (migration `0069`). Để **chuỗi** chứ không
+   * phải number: snowflake 19 chữ số vượt `Number.MAX_SAFE_INTEGER`, ép sang number là mất
+   * chữ số cuối và bot đi tìm một kênh không tồn tại. Rỗng = project không sync bug.
+   */
+  bugForumChannelId: string | null;
+  /** Tên hoặc id role Discord được ping khi bug từ web thành bài forum mới. Rỗng = không ping. */
+  bugNotifyRole: string | null;
   createdAt?: Timestamp;
   createdBy: string;
 }
