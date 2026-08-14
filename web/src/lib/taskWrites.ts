@@ -305,6 +305,48 @@ async function syncNewToNotion(
   }
 }
 
+/**
+ * Trang Notion đã bị XOÁ/ARCHIVE bên Notion -> `notionPageId` thành link chết.
+ *
+ * Không nhận ra nó thì mỗi lần lưu task lại ném đúng một lỗi vào Nhật ký lỗi, mãi mãi
+ * (đã bị báo: một task đẻ 4 lỗi trong 3 phút). Khớp theo NỘI DUNG lỗi vì gateway Notion
+ * chỉ trả về `detail` là câu tiếng Anh của API — không có mã máy đọc.
+ */
+function isDeadNotionPage(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  // HẸP có chủ đích: chỉ ba câu Notion dùng cho "trang không còn nữa". KHÔNG bắt chuỗi
+  // "not found" trống trơn — lỗi cấu hình sai cột trả về "property ... not found", gỡ link
+  // vì lý do đó là mất liên kết của một trang vẫn còn sống.
+  return /is archived|unarchive|could not find (block|page|database)/i.test(msg);
+}
+
+/** Gỡ link Notion chết khỏi task để thôi thử lại. Nút "Tạo task trên Notion" hiện lại. */
+async function clearNotionLink(taskId: string): Promise<void> {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ notion_page_id: null, notion_url: null })
+    .eq('id', taskId);
+  if (error) console.error('Gỡ liên kết Notion hỏng thất bại', error);
+}
+
+/**
+ * Dự án có bật đẩy sang Notion không (`projects.notion_sync_enabled`, 0070).
+ *
+ * Hỏi ở TẦNG GHI chứ không nhận từ UI như `createTask`: đường cập nhật có nhiều lối vào
+ * (lưu ở màn chi tiết, kéo thả Kanban, gắn feature…) và chỉ cần MỘT lối quên truyền cờ là
+ * dự án đã tắt vẫn bắn sang Notion. Một select nhỏ, và chỉ chạy khi task THẬT SỰ có link.
+ */
+async function notionSyncOn(projectId: string | null | undefined): Promise<boolean> {
+  if (!projectId) return true; // task không thuộc dự án nào -> giữ hành vi cũ
+  const { data, error } = await supabase
+    .from('projects')
+    .select('notion_sync_enabled')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (error) return true; // đọc hỏng thì đừng im lặng nuốt mất đồng bộ
+  return data?.notion_sync_enabled !== false;
+}
+
 async function safeNotionUpdate(
   notionPageId: string,
   task: Task,
@@ -313,8 +355,20 @@ async function safeNotionUpdate(
   subtasksChanged = false,
 ) {
   try {
+    if (!(await notionSyncOn(task.projectId))) return;
     await updateNotionPage(notionPageId, task, assigneeNotionUserId, notionProjectId, subtasksChanged);
   } catch (err) {
+    if (isDeadNotionPage(err)) {
+      await clearNotionLink(task.id);
+      // Báo MỘT lần rồi thôi (link đã gỡ nên không có lần sau) — người dùng cần biết task
+      // này từ giờ không còn dính Notion, chứ im lặng thì lần sau họ tưởng vẫn đang đồng bộ.
+      reportError(
+        'Notion · gỡ liên kết',
+        new Error(`Trang Notion của task “${task.title}” đã bị xoá/lưu trữ bên Notion.`),
+        'Đã gỡ liên kết để thôi báo lỗi mỗi lần lưu. Cần lại thì mở task rồi bấm “Tạo task trên Notion”.',
+      );
+      return;
+    }
     reportError('Notion · cập nhật', err, 'Thay đổi vẫn đã lưu trong app; chỉ trang Notion là chưa theo kịp.');
   }
 }

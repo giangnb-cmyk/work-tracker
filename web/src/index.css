@@ -445,7 +445,9 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 }
 .st-row + .st-row { border-top: 1px solid var(--border-soft); }
 .st-row:hover { background: rgba(255, 255, 255, 0.04); }
-.st-check { position: relative; display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0; cursor: pointer; }
+/* Chỉ bọc ô tick, KHÔNG bọc tên: tên subtask là vùng bấm riêng để sửa tại chỗ (xem
+   SubtasksField), nên label phải co lại đúng bằng ô tick thay vì chiếm cả hàng. */
+.st-check { position: relative; display: flex; align-items: center; flex: 0 0 auto; cursor: pointer; }
 .st-check input { position: absolute; opacity: 0; pointer-events: none; }
 .st-box {
   width: 18px; height: 18px; flex-shrink: 0; border-radius: 6px; display: grid; place-items: center;
@@ -460,6 +462,16 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .st-row.done .st-box svg { stroke-dashoffset: 0; }
 .st-title { flex: 1; min-width: 0; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.18s ease, opacity 0.18s ease; }
 .st-row.done .st-title { color: var(--muted); text-decoration: line-through; opacity: 0.75; }
+/* Sửa tên tại chỗ: nền nhạt khi rê chuột để thấy chữ này bấm được, chứ không thêm nút. */
+.st-title.editable { cursor: text; padding: 0.12rem 0.3rem; margin-left: -0.3rem; border-radius: 6px; }
+.st-title.editable:hover { background: rgba(255, 255, 255, 0.07); }
+.st-title.editable:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+/* Ô sửa phải CHỒNG KHÍT lên chỗ chữ vừa đứng — lệch một nhịp là cả hàng nảy khi bấm vào. */
+.st-edit {
+  flex: 1; min-width: 0; font: inherit; font-size: 0.88rem; color: var(--text);
+  padding: 0.12rem 0.3rem; margin-left: -0.3rem; border-radius: 6px;
+  background: rgba(15, 23, 42, 0.6); border: 1px solid var(--primary); outline: none;
+}
 .st-del {
   opacity: 0; width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center;
   background: none; border: none; border-radius: 7px; color: var(--muted); cursor: pointer;

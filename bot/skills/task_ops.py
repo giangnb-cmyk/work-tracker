@@ -14,6 +14,7 @@ Vi du:
 """
 
 import argparse
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -423,6 +424,20 @@ def _notify_done_if_needed(task, updates):
     return "Discord: đã báo hoàn thành" if ok else "Discord: bỏ qua (chưa cấu hình kênh)"
 
 
+def _project_of(client, project_id):
+    """Row project cua task (None neu task khong thuoc du an nao / doc hong).
+
+    Doc hong KHONG duoc chan dong bo -> tra None, chO goi coi nhu 'khong biet' va giu
+    hanh vi cu (van day sang Notion).
+    """
+    if not project_id:
+        return None
+    try:
+        return projects.resolve_project(client, str(project_id))
+    except Exception:
+        return None
+
+
 def _sync_update(client, task, updates) -> str:
     """Day cap nhat sang Notion neu task da lien ket va co truong lam Notion thay doi.
 
@@ -433,13 +448,25 @@ def _sync_update(client, task, updates) -> str:
         return "Notion: bỏ qua (task chưa liên kết Notion)"
     if not any(field in updates for field in _NOTION_TRIGGER_FIELDS):
         return "Notion: bỏ qua (không đổi status/assignee/priority/due)"
+    # Du an tat sync Notion (0070) -> khong day gi ca, ke ca task cu DA co link. Guong voi
+    # web (safeNotionUpdate/notionSyncOn): tat la tat, khong phai "tat cho task moi thoi".
+    project = _project_of(client, task.get("projectId"))
+    if project and not project.get("notionSyncEnabled", True):
+        return "Notion: bỏ qua (dự án đã tắt đồng bộ Notion)"
 
     merged = {**task, **updates}  # gop truong moi len task cu de gui du du lieu
     notion_uid = repo.notion_user_id(client, merged.get("assigneeId"))
     result = notion_gateway.update_page(page_id, merged, notion_uid)
     if result.get("synced"):
         return "Notion: đã đồng bộ"
-    return f"Notion: KHÔNG cập nhật được — {result.get('reason', 'gọi gateway thất bại')}"
+    # Trang bi xoa/archive ben Notion -> link chet, giu lai chi de bao loi mai. Go luon.
+    reason = str(result.get("reason", "gọi gateway thất bại"))
+    # HEP co chu dich — xem isDeadNotionPage ben web: "property ... not found" la loi cau
+    # hinh cot, go link vi no la mat lien ket cua mot trang van con song.
+    if re.search(r"is archived|unarchive|could not find (block|page|database)", reason, re.I):
+        repo.set_notion_link(client, task["_id"], None, None)
+        return "Notion: trang đã bị xoá bên Notion — đã gỡ liên kết khỏi task"
+    return f"Notion: KHÔNG cập nhật được — {reason}"
 
 
 def _build_updates(client, args) -> dict:
