@@ -161,6 +161,8 @@ export async function duplicateFeature(
       attachments: copyAttachments(source.attachments),
       memberIds: [...(source.memberIds ?? [])],
       done: false,
+      // CỐ Ý không chép `targetDate` (0071): "Map 2" làm sau "Map 1" nên hẹn của bản gốc
+      // gần như chắc chắn sai — để trống còn hơn để một mốc đã trễ sẵn từ lúc sinh ra.
     },
     createdBy,
   );

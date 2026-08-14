@@ -4,7 +4,11 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import DateRangePicker from './DateRangePicker';
+import DateInput from './DateInput';
 import TaskModal from './TaskModal';
+import { updateFeatureLabel } from '../lib/featureLabelWrites';
+import { toInputDate } from '../lib/format';
+import { Timestamp } from '../lib/time';
 import { TIMELINE_PRESETS, startOfDay, type DateRange } from '../lib/dateRange';
 import { buildVersionRows, type FeatureRow, type TaskBar, type VersionRow } from '../lib/timelineRows';
 import { requestReleaseSync } from '../lib/releaseSyncWrites';
@@ -39,6 +43,27 @@ export default function Timeline() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  /** Nhãn version đang sửa mốc phát hành tại chỗ (id); null = không sửa cái nào. */
+  const [editingRelease, setEditingRelease] = useState<string | null>(null);
+
+  /**
+   * Chốt mốc phát hành cho một version. Không đóng ô sửa ngay: người ta hay gõ lại vài lần
+   * cho đúng, đóng phắt sau cú đầu là bắt bấm mở lại. Bấm "Xong" mới đóng.
+   *
+   * Ngày về từ DateInput là ISO 'YYYY-MM-DD'; updateFeatureLabel tự cắt lại đúng dạng đó
+   * cho cột `date`. '' = xoá mốc.
+   */
+  async function saveRelease(labelId: string, iso: string) {
+    try {
+      await updateFeatureLabel(labelId, { releaseDate: iso ? Timestamp.fromDate(new Date(iso)) : null });
+      setSyncMsg(iso ? `Đã đặt mốc phát hành ${label(new Date(iso).getTime())}.` : 'Đã xoá mốc phát hành.');
+    } catch (err) {
+      console.error('Lưu mốc phát hành thất bại', err);
+      setSyncMsg('Lưu mốc phát hành thất bại — cần quyền admin.');
+    } finally {
+      setTimeout(() => setSyncMsg(null), 6000);
+    }
+  }
 
   /**
    * Xếp yêu cầu cho bot đọc lại lịch từ sheet. Web không đọc được Google Sheets (service
@@ -97,6 +122,12 @@ export default function Timeline() {
     const marks = [
       ...taskBars.filter((b) => b.hasDates).flatMap((b) => [b.start, b.end]),
       ...labels.map((l) => l.releaseDate?.toMillis()).filter((ms): ms is number => Boolean(ms)),
+      // Mốc mong muốn của feature (0071) — cùng lý do với ngày phát hành: nó thường nằm xa
+      // hơn hạn task cuối, bỏ ra ngoài khung là cờ 🎯 bị cắt mất đúng lúc cần nhìn nhất.
+      ...features
+        .filter((f) => f.projectId === selectedProjectId)
+        .map((f) => f.targetDate?.toMillis())
+        .filter((ms): ms is number => Boolean(ms)),
       ...(projectStartMs !== null ? [projectStartMs] : []),
     ];
     if (marks.length === 0) return { start: now - DAY, end: now + 30 * DAY };
@@ -104,7 +135,7 @@ export default function Timeline() {
       start: Math.min(...marks, now) - DAY,
       end: Math.max(...marks, now) + DAY,
     };
-  }, [taskBars, labels, projectStartMs]);
+  }, [taskBars, labels, projectStartMs, features, selectedProjectId]);
 
   const domain = useMemo(
     () => (range ? { start: startOfDay(range.fromMs), end: startOfDay(range.toMs) } : projectDomain),
@@ -252,10 +283,36 @@ export default function Timeline() {
                         {v.label ? `🏷️ ${v.label.name}` : '📦 Chưa gắn version'}
                       </span>
                       <span className="muted tl-who mono">
-                        {/* Ngày phát hành chốt ở sheet — hiện thẳng ra, đây là con số
-                            người ta mở Timeline lên để tìm. */}
-                        {v.releaseMs !== null && `🚩 ${label(v.releaseMs)} · `}
-                        {v.rows.length} feature · {v.done}/{v.total}
+                        {/* Ngày phát hành — con số người ta mở Timeline lên để tìm. Admin
+                            bấm vào là sửa TẠI CHỖ: sheet release không phải nguồn duy nhất,
+                            và bắt mở Google Sheet chỉ để dời một mốc là quá xa. Bấm phải
+                            chặn nổi bọt, không thì hàng version xổ/đóng ngay dưới tay. */}
+                        {v.label && editingRelease === v.label.id ? (
+                          <span className="tl-release-edit" onClick={(e) => e.stopPropagation()}>
+                            <DateInput
+                              value={toInputDate(v.label.releaseDate)}
+                              onChange={(iso) => void saveRelease(v.label!.id, iso)}
+                              ariaLabel={`Ngày phát hành ${v.label.name}`}
+                            />
+                            <button className="btn-sm" onClick={() => setEditingRelease(null)}>Xong</button>
+                          </span>
+                        ) : (
+                          <>
+                            {isAdmin && v.label ? (
+                              <button
+                                type="button"
+                                className={`tl-release-btn${v.releaseMs === null ? ' empty' : ''}`}
+                                title="Sửa mốc phát hành của bản này"
+                                onClick={(e) => { e.stopPropagation(); setEditingRelease(v.label!.id); }}
+                              >
+                                🚩 {v.releaseMs !== null ? label(v.releaseMs) : 'đặt mốc'}
+                              </button>
+                            ) : (
+                              v.releaseMs !== null && `🚩 ${label(v.releaseMs)} · `
+                            )}
+                            {v.rows.length} feature · {v.done}/{v.total}
+                          </>
+                        )}
                       </span>
                     </div>
                     <div className="tl-track">

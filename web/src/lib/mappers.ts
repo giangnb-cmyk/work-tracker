@@ -99,6 +99,7 @@ export function rowToFeature(r: Row): Feature {
     attachments: (r.attachments ?? []) as Attachment[],
     memberIds: r.member_ids ?? [],
     doneAt: Timestamp.fromISO(r.done_at),
+    targetDate: Timestamp.fromISO(r.target_date),
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };

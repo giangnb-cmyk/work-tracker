@@ -304,6 +304,12 @@ export interface Feature {
    * tracker nên không có task để suy ra. null = suy từ task như thường.
    */
   doneAt: Timestamp | null;
+  /**
+   * Mốc MONG MUỐN hoàn thành (migration `0071`) — hẹn riêng cho feature này, vẽ thành cờ
+   * 🎯 trên Timeline. Khác `doneAt` (đã xong lúc nào, quá khứ) và khác
+   * `FeatureLabel.releaseDate` (lịch phát hành của cả version). null = chưa hẹn.
+   */
+  targetDate: Timestamp | null;
   createdAt?: Timestamp;
   createdBy: string;
 }

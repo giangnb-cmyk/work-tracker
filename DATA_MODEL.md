@@ -396,12 +396,26 @@ liên tục không bao giờ xong (Polish…) vẫn là feature nhưng mang `kin
 | `attachments` | jsonb     | link tài liệu + ảnh ref dùng chung mọi task của feature (0019) |
 | `memberIds`   | uuid[]    | **người tham gia thêm tay** (→ `profiles.id`), migration 0046. UI gộp với người suy từ task; task mới thuộc feature auto-gắn cả hai nhóm vào `tasks.watcherIds`. Denormalize, không FK từng phần tử |
 | `doneAt`      | Timestamp \| null | mốc đánh dấu TAY là đã xong (0031) — CHỈ có nghĩa khi feature 0 task. Feature CÓ task thì task quyết định (`isFeatureDone`): thêm task mới vào feature đã xong là nó tự mở lại — 2/3 task mà hiện 100% là bug đã sửa |
+| `targetDate`  | Timestamp \| null | **mốc MONG MUỐN hoàn thành** (migration `0071`, cột `date`) — điền tay ở popup Feature, vẽ thành cờ 🎯 trên Timeline (đỏ khi quá hạn mà chưa xong hết task). Là HẸN cho riêng feature này nên có thể sớm hơn `feature_labels.releaseDate` của version chứa nó. Nhân bản feature **không** chép mốc này. NULL = chưa hẹn |
 | `createdAt`   | Timestamp | creation time                                    |
 | `createdBy`   | string    | uid of creator                                   |
 
 **feature_labels** — per-project tag palette cho feature (cùng pattern `bug_labels`;
 RLS: read all signed-in, write admin). Fields: `id`, `projectId`, `name` (1–40),
-`color`, `icon`. Không có `discordTagId` — palette này không sync Discord.
+`color`, `icon`, `releaseDate`. Không có `discordTagId` — palette này không sync Discord.
+
+`releaseDate` (cột `date`, migration `0032`) chỉ có nghĩa với nhãn **version**: đó là ngày
+phát hành của cả bản, và Timeline lấy nó làm mốc CHỐT — bar version chạy
+`[ngày phát hành bản trước → ngày phát hành của nó]` chứ không suy từ hạn task
+(`applyReleaseWindows` trong `lib/timelineRows.ts`). Hai đường ghi, **cùng một cột**:
+- **Tay**: admin bấm thẳng vào 🚩 trên hàng version ở Timeline (`updateFeatureLabel`).
+- **Sheet**: nút "🔄 Sync lịch" xếp `release_sync_requests`, bot đọc tab `Timeline` của
+  `projects.release_sheet_id` rồi ghi đè (migration `0033`).
+
+> Sync sheet GHI ĐÈ bản sửa tay — nhưng CHỈ với version có mặt trong sheet: `sync_project`
+> duyệt theo từng dòng sheet và khớp nhãn **theo tên**, version không có trong sheet thì
+> không ai đụng tới. Chốt lịch bằng tay cho một bản đang nằm trong sheet thì lần
+> "🔄 Sync lịch" kế tiếp sẽ dập mất.
 
 ---
 
