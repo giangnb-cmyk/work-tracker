@@ -609,16 +609,19 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .trow-pct { font-size: 0.76rem; color: var(--muted); width: 34px; text-align: right; }
 .trow-status { flex-shrink: 0; width: 96px; font-size: 0.82rem; color: var(--muted); }
 
-/* Hẹp dần thì bỏ cột phụ trước, giữ tiêu đề + tick + menu tới cùng. */
+/* Hẹp dần thì bỏ cột phụ trước, giữ tiêu đề + tick + menu tới cùng.
+   Selector phải 2 lớp (.trow .trow-prio): pill mang cả class .prio-pill mà rule
+   `.prio-pill { display:inline-flex }` nằm SAU các khối media này trong file —
+   cùng specificity thì nó đè mất display:none, pill không bao giờ ẩn thật. */
 @media (max-width: 1180px) {
-  .trow-status { display: none; }
+  .trow .trow-status { display: none; }
 }
 @media (max-width: 980px) {
-  .trow-prog { display: none; }
+  .trow .trow-prog { display: none; }
 }
 @media (max-width: 820px) {
-  .trow-who { display: none; }
-  .trow-prio { display: none; }
+  .trow .trow-who { display: none; }
+  .trow .trow-prio { display: none; }
 }
 
 /* Task cards (compact — denser grid, smaller type/tiles) */
@@ -3145,6 +3148,10 @@ body.kb-open .mnav { display: none; }
     row-gap: 0.15rem; column-gap: 0.6rem;
     padding: 0.6rem 0.7rem; min-height: 56px; align-items: center;
   }
+  /* MỌI con không được gán grid-area phải ẨN TƯỜNG MINH: grid auto-place con thừa
+     xuống hàng phụ — pill ưu tiên từng rơi xuống cột 1, nong rộng cột checkbox
+     ~90px làm icon + title bị đẩy vào giữa. */
+  .trow .trow-prio, .trow .trow-who, .trow .trow-prog, .trow .trow-status { display: none; }
   .trow-check { grid-area: check; }
   .trow-icon { grid-area: icon; width: 20px; }
   .trow-title {
