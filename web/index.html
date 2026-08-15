@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/IconGame.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: cần cho env(safe-area-inset-*) trên máy tai thỏ + Capacitor
+         edge-to-edge. KHÔNG thêm maximum-scale/user-scalable (vi phạm WCAG). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
     <title>Work Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

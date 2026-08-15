@@ -14,6 +14,15 @@
     "node": "22.x"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "@capgo/capacitor-social-login": "^8.4.2",
     "@notionhq/client": "^2.2.15",
     "@supabase/supabase-js": "2.110.4",
     "chart.js": "^4.4.3",
@@ -24,6 +33,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@types/node": "^22.20.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { lazyView } from '../lib/lazyView';
 import { isGlobalAdminView, navigate, pathFor, useRoute } from '../lib/router';
 import MemberPreviewBar from './MemberPreviewBar';
+import MobileNav from './MobileNav';
 import Sidebar, { ADMIN_ONLY_VIEWS } from './Sidebar';
 import TopBar from './TopBar';
 
@@ -82,6 +83,8 @@ export default function Layout() {
           </Suspense>
         </main>
       </div>
+      {/* Bottom tab bar — chỉ hiện ≤768px (CSS .mnav); Sidebar ẩn ở cùng breakpoint. */}
+      <MobileNav active={activeView} onSelect={(v) => navigate(pathFor(v))} />
     </div>
   );
 }

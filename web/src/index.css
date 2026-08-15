@@ -2231,11 +2231,10 @@ table.data-table { width: 100%; border-collapse: collapse; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
 
-/* Responsive */
+/* Responsive — tablet hẹp. Shell mobile thật (sidebar → bottom nav) nằm ở khối
+   "MOBILE" cuối file; ở đây chỉ nới mật độ. Sidebar GIỮ NGUYÊN dạng cột tới 769px:
+   hack cũ bẻ nó thành hàng ngang wrap chiếm ~300px chrome, đã bỏ. */
 @media (max-width: 860px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; }
-  .sidebar-footer { margin: 0; border: none; padding: 0; }
   .board { grid-template-columns: 1fr; }
   .tab-scroller { padding: 1rem; }
   .topbar { padding: 0 1rem; }
@@ -2913,3 +2912,272 @@ table.data-table { width: 100%; border-collapse: collapse; }
   font-size: 0.9rem;
 }
 .mm-note-row p { font-size: 0.84rem; margin: 0.15rem 0; line-height: 1.45; }
+
+/* ============================================================================
+   MOBILE — điện thoại 360–430px (trình duyệt + webview Capacitor)
+   Nguyên tắc: shell đổi ở 768px (sidebar → bottom tab bar), modal đổi ở 640px
+   (→ bottom sheet), còn ergonomics chạm thì theo (pointer: coarse) chứ không
+   theo bề rộng — tablet to vẫn là máy chạm.
+   Số liệu chuẩn: đích chạm ≥44px (Apple HIG) / 48dp (Material 3); input ≥16px
+   để iOS không tự zoom khi focus; dvh thay vh (URL bar iOS co giãn).
+   ========================================================================== */
+
+:root {
+  --tap-min: 44px;
+  --mnav-h: 60px; /* bottom tab bar, CHƯA gồm safe-area */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Select chọn sprint trên TopBar — trước là inline style (không override được bằng
+   media query) nên chuyển thành class: desktop giữ min 180px, mobile co theo màn. */
+.sprint-select { width: auto; min-width: 180px; }
+
+/* --- Nền tảng chạm (mọi bề rộng) --- */
+button, a, .nav-item, .trow, .tcard, .bug-card, .bug-row, .feat-row {
+  -webkit-tap-highlight-color: transparent;
+}
+/* touch-action: manipulation bỏ delay double-tap-zoom trên nút bấm. */
+button, .trow, .tcard, .bug-card, .bug-row { touch-action: manipulation; }
+
+/* Vùng cuộn con không được kéo lây sang trang/modal phía sau (scroll chaining). */
+.bugm-scroll, .tmodal-scroll, .tm-activity, .ss-list, .lsel-pop, .watcher-optlist,
+.tokflt-pop, .tokflt-vals, .feat-attach-panel, .picker-list, .ftm-list,
+.perf-drawer-scroll, .errlog-list, .notif-panel, .modal, .drp-panel, .sheet {
+  overscroll-behavior: contain;
+}
+
+/* Khoá cuộn nền khi có lớp phủ mở — :has() thay cho JS lock từng modal một.
+   (Modal ở đây là hand-rolled, không <dialog>, nên không có cơ chế sẵn.) */
+body:has(.modal-overlay), body:has(.sheet-overlay), body:has(.lightbox) { overflow: hidden; }
+
+@media (pointer: coarse) {
+  /* iOS Safari/WKWebView tự phóng to trang khi focus vào input <16px — chặn bằng
+     cỡ chữ, KHÔNG bằng maximum-scale (cấm zoom là vi phạm WCAG). */
+  input, select, textarea { font-size: 16px; }
+  /* Chrome Android: chặn pull-to-refresh vô tình khi cuộn lên đầu trang. */
+  html { overscroll-behavior-y: none; }
+  /* Nút vốn chỉ hiện khi :hover thì trên máy chạm phải hiện luôn. */
+  .ref-remove, .st-del { opacity: 1; }
+  .date-input-btn { opacity: 1; }
+  /* Đích chạm tối thiểu cho các nút icon nhỏ (28–34px trên desktop). */
+  .tcard-menu, .doc-kebab, .bugm-iconbtn, .tmodal-x, .watcher-add,
+  .project-edit-btn, .drp-nav button {
+    min-width: 40px; min-height: 40px;
+  }
+  .btn-sm { min-height: 38px; }
+  .seg { min-height: 38px; }
+  .drp-day { height: 40px; }
+  /* Ô tick hoàn thành task: giữ cỡ nhìn 18px nhưng nới vùng bấm ra ~44px. */
+  .trow-check { position: relative; }
+  .trow-check::before { content: ''; position: absolute; inset: -13px; }
+  .st-box { position: relative; }
+  .st-box::before { content: ''; position: absolute; inset: -13px; }
+}
+
+/* --- Bottom tab bar (component MobileNav) --- */
+.mnav { display: none; }
+/* Bàn phím native đang mở (Capacitor gắn class qua lib/native.ts): giấu bar để nó
+   không nổi lên trên bàn phím che ô nhập. */
+body.kb-open .mnav { display: none; }
+.sheet-overlay {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(2, 6, 23, 0.6);
+  display: grid; align-items: end;
+  animation: fadeIn 0.18s ease;
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sheet {
+  background: var(--glass-solid);
+  border: 1px solid var(--border); border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  padding: 0.4rem 0.9rem calc(0.9rem + var(--safe-bottom));
+  max-height: 85dvh; overflow-y: auto;
+  animation: sheetUp 0.25s ease;
+}
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 0.35rem auto 0.7rem;
+}
+.sheet .nav-item { min-height: 48px; }
+.sheet-sep { border: none; border-top: 1px solid var(--border-soft); margin: 0.5rem 0; }
+.sheet-user { display: flex; align-items: center; gap: 0.6rem; width: 100%; }
+
+@media (max-width: 768px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+
+  .mnav {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+    padding: 0 0 var(--safe-bottom);
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+  }
+  .mnav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; min-height: var(--mnav-h); padding: 6px 0 8px;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--muted); font-size: 0.68rem; font-weight: 600;
+  }
+  /* Active = pill indigo đặc + glow quanh ICON (kiểu Material 3), label sáng lên —
+     giữ đúng luật design system "active nav là fill đặc, không phải tint". */
+  .mnav-ic {
+    display: grid; place-items: center;
+    padding: 3px 14px; border-radius: 999px;
+    font-size: 1.2rem; line-height: 1.3;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .mnav-item.active { color: #fff; }
+  .mnav-item.active .mnav-ic {
+    background: var(--primary);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+  }
+
+  /* Nội dung chừa chỗ cho bar dưới; head dính trên chừa safe-area (Capacitor). */
+  .tab-scroller { padding: 1rem 0.85rem calc(var(--mnav-h) + var(--safe-bottom) + 1.25rem); }
+  .main-head { padding-top: var(--safe-top); background: var(--bg); }
+  .topbar { height: 56px; padding: 0 0.85rem; gap: 0.5rem; }
+  .topbar .row { gap: 0.5rem !important; min-width: 0; }
+  .sprint-select { min-width: 0 !important; max-width: 58vw; }
+  .preview-bar { padding: 0.5rem 0.85rem; }
+
+  /* Toast lỗi không được nấp sau bottom bar. */
+  .errlog-toasts { bottom: calc(var(--mnav-h) + var(--safe-bottom) + 0.75rem); }
+
+  /* View header: cho wrap + hạ cỡ tiêu đề (desktop 1.8rem chiếm nửa màn hình). */
+  .view-header h1 { font-size: 1.3rem; }
+  .view-header.row.between, .view-header .row, .mt-subhead.row.between {
+    flex-wrap: wrap; row-gap: 0.5rem;
+  }
+  .view-header p { font-size: 0.84rem; }
+
+  /* Bảng dữ liệu: CUỘN NGANG thay vì bóp cột (width:100% làm chúng nát vụn).
+     .table-container đã overflow-x:auto sẵn, chỉ cần cho bảng một sàn bề rộng. */
+  .data-table { min-width: 560px; }
+
+  /* Kanban Bugs: mỗi cột ~86% màn hình, snap từng cột, hé cột kế bên làm mồi vuốt.
+     Kéo-thả HTML5 không chạy trên chạm — đổi trạng thái bằng pill trong BugModal. */
+  .bug-board {
+    grid-auto-columns: 86%;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scroll-padding: 0 7%;
+  }
+  .bug-col { scroll-snap-align: center; }
+
+  /* Timeline: cột nhãn hẹp lại và DÍNH TRÁI khi kéo ngang — kéo tới đâu vẫn biết
+     hàng nào là feature nào. Nền đặc để bar không lộ xuyên qua. */
+  .tl-scroll { min-width: 640px; }
+  .tl-axis, .tl-row { grid-template-columns: 132px 1fr; }
+  .tl-row-label, .tl-axis-label {
+    position: sticky; left: 0; z-index: 2;
+    background: var(--bg);
+  }
+  .tl-feat .tl-row-label { padding-left: 1rem; }
+  .tl-sub .tl-row-label { padding-left: 1.9rem; }
+  .tl-who { display: none; }
+
+  /* GlobalAdmin (.ga-shell KHÔNG có media query nào trước giờ): sidebar dọc →
+     thanh tab ngang cuộn được, dính trên. */
+  .ga-shell { display: block; }
+  .ga-sidebar {
+    position: sticky; top: 0; height: auto; z-index: 60;
+    flex-direction: row; align-items: center; gap: 0.25rem;
+    overflow-x: auto; padding: calc(0.45rem + var(--safe-top)) 0.6rem 0.45rem;
+    border-right: none; border-bottom: 1px solid var(--border);
+  }
+  .ga-sidebar .nav-item { width: auto; white-space: nowrap; padding: 0.5rem 0.7rem; flex-shrink: 0; }
+  .ga-back { margin-bottom: 0; }
+  .ga-nav { flex-direction: row; gap: 0.25rem; }
+  .ga-footer { margin: 0 0 0 auto; border: none; padding: 0; flex-direction: row; flex-shrink: 0; }
+  .ga-user { display: none; }
+  .ga-signout-btn { width: auto; margin-top: 0; white-space: nowrap; }
+  .ga-main-inner { padding: 1rem 0.85rem 3rem; }
+
+  /* Biểu đồ chi phí cao 400px cố định → quá nửa màn hình điện thoại. */
+  .cost-chart-wrap { height: 280px; }
+  .perf-range-field { width: 100%; }
+}
+
+/* --- Modal → bottom sheet (≤640px) --- */
+@media (max-width: 640px) {
+  .modal-overlay { place-items: end stretch; padding: 0; }
+  .modal {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0; border-bottom: none;
+    padding-bottom: calc(1.5rem + var(--safe-bottom));
+    animation: sheetUp 0.25s ease;
+  }
+  /* Hai modal lớn (task/bug) gần như full màn hình; padding-bottom dồn vào footer
+     vì phần thân của chúng tự cuộn bên trong. */
+  .tmodal {
+    width: 100%; max-height: 96dvh;
+    border-radius: 20px 20px 0 0;
+    animation: sheetUp 0.25s ease;
+  }
+  .modal.bug-modal { max-height: 96dvh; padding-bottom: 0; }
+  .bugm-footer { padding-bottom: calc(0.8rem + var(--safe-bottom)); flex-wrap: wrap; }
+  .bugm-head { flex-wrap: wrap; row-gap: 0.35rem; padding: 0.75rem 0.85rem; }
+  .bugm-scroll { padding: 1rem 0.85rem; }
+  .tmodal-header { padding: 1rem 0.85rem 0.75rem; }
+  .tmodal-scroll { padding: 1rem 0.85rem; }
+  .tmodal-title { font-size: 1.15rem; }
+  .tmodal-icon { width: 38px; height: 38px; font-size: 1.1rem; }
+  .modal h2 { font-size: 1.1rem; }
+
+  /* Video/ảnh media trong bug modal co theo màn hình thay vì tràn. */
+  .bug-media-video { width: 100%; max-width: 320px; height: auto; aspect-ratio: 11 / 7; }
+
+  /* Task row: 18 cột 1 dòng → lưới 2 dòng (tiêu đề được 2 dòng chữ, meta xuống dưới). */
+  .trow {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas:
+      'check icon title menu'
+      'check icon meta  menu';
+    row-gap: 0.15rem; column-gap: 0.6rem;
+    padding: 0.6rem 0.7rem; min-height: 56px; align-items: center;
+  }
+  .trow-check { grid-area: check; }
+  .trow-icon { grid-area: icon; width: 20px; }
+  .trow-title {
+    grid-area: title;
+    white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 0.92rem; line-height: 1.3;
+  }
+  .trow-due { grid-area: meta; justify-self: start; text-align: left; width: auto; }
+  .task-flags { grid-area: meta; justify-self: end; }
+  .tcard-menu-wrap { grid-area: menu; }
+
+  /* Bug list (kiểu GitLab): khối phải (avatar + "cập nhật…") xuống dòng dưới. */
+  .bug-row { flex-direction: column; align-items: stretch; gap: 0.4rem; padding: 0.7rem 0.85rem; }
+  .bug-row-side { justify-content: flex-start; gap: 0.6rem; }
+
+  /* Form 2 cột → 1 cột (SprintManager, MemberModal, Settings…). */
+  .grid-2 { grid-template-columns: 1fr; }
+  .review-grid { grid-template-columns: 1fr; }
+  .ss-panel-overlay { width: 100%; max-width: 100%; }
+
+  /* DateRangePicker: panel absolute → bottom sheet thật; lịch giãn hết bề ngang. */
+  .drp-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    width: auto; max-width: none;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: calc(0.75rem + var(--safe-bottom));
+    z-index: 110;
+    animation: sheetUp 0.25s ease;
+  }
+  .drp-grid { grid-template-columns: repeat(7, 1fr); width: 100%; }
+
+  /* Thẻ task: lưới thông tin 2 cột chật ở ~330px — hạ cỡ icon ô cho thoáng. */
+  .tcard-grid { column-gap: 0.5rem; }
+}

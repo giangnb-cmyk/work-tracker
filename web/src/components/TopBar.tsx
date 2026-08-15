@@ -41,8 +41,7 @@ export default function TopBar() {
     <header className="topbar">
       <div className="row" style={{ gap: '0.75rem' }}>
         <select
-          className="select"
-          style={{ width: 'auto', minWidth: 180 }}
+          className="select sprint-select"
           value={selectedSprintId ?? 'backlog'}
           onChange={(e) => selectSprint(e.target.value === 'backlog' ? null : e.target.value)}
         >

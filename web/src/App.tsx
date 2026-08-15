@@ -1,6 +1,8 @@
 // App shell: providers + auth gate + project gate. All routing/UI lives in Layout.
 
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { nativeHideSplash } from './lib/native';
 import { SprintProvider, useSprintContext } from './contexts/SprintContext';
 import { NotifyProvider } from './contexts/NotifyContext';
 import Login from './components/Login';
@@ -34,6 +36,12 @@ function ProjectGate() {
 
 function Gate() {
   const { user, profile, loading } = useAuth();
+
+  // App native: giữ splash tới khi check phiên xong — user thấy thẳng màn hình đúng
+  // (login hoặc app), không chớp qua màn login trong lúc phiên đang khôi phục.
+  useEffect(() => {
+    if (!loading) nativeHideSplash();
+  }, [loading]);
 
   if (loading) {
     return (

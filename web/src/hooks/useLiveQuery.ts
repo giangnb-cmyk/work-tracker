@@ -107,10 +107,17 @@ export function useLiveQuery<T>({ table, fetcher, filter, deps, enabled = true }
       )
       .subscribe();
 
+    // App native (Capacitor) quay lại foreground: socket realtime đã chết lúc treo nền,
+    // event trong lúc đó mất hẳn → lib/native.ts bắn 'app-resume', mình refetch bù.
+    // Trên web event này không bao giờ bắn — listener vô hại.
+    const onResume = () => void run();
+    window.addEventListener('app-resume', onResume);
+
     return () => {
       alive = false;
       clearTimeout(timer);
       runRef.current = async () => {};
+      window.removeEventListener('app-resume', onResume);
       void supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -13,6 +13,7 @@ import {
 } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { ALLOWED_EMAIL_DOMAIN, supabase } from '../supabase';
+import { isNative, nativeGoogleSignIn } from '../lib/native';
 import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
 import { logVisit } from '../lib/visitWrites';
 import { navigate } from '../lib/router';
@@ -217,6 +218,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn() {
     setError(null);
+
+    // APP NATIVE (Capacitor): Google chặn OAuth trong webview → đăng nhập bằng sheet
+    // Google native rồi signInWithIdToken. Không có redirect nên không cần stash path
+    // (trang không reload, onAuthStateChange tự bắn ngay tại chỗ).
+    if (isNative) {
+      try {
+        await nativeGoogleSignIn();
+      } catch (err) {
+        console.error('Đăng nhập native thất bại', err);
+        setError(err instanceof Error ? err.message : 'Đăng nhập thất bại. Thử lại nhé.');
+      }
+      return;
+    }
+
     // Giữ deep link qua vòng OAuth. Không nhét path vào redirectTo: URL redirect phải
     // nằm trong allowlist của Supabase, origin thì chắc chắn có còn path thì không.
     const deepPath = window.location.pathname + window.location.search;
