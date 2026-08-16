@@ -609,6 +609,42 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .trow-pct { font-size: 0.76rem; color: var(--muted); width: 34px; text-align: right; }
 .trow-status { flex-shrink: 0; width: 96px; font-size: 0.82rem; color: var(--muted); }
 
+/* Subtask ngay trên dòng task: pill đếm cạnh tiêu đề, bấm xổ checklist ra dưới dòng —
+   xem không cần mở chi tiết. Wrapper .trow-group giữ dòng + checklist là MỘT flex item
+   của .trow-list, để gap của list không chen vào giữa hai phần. */
+.trow-group { display: flex; flex-direction: column; min-width: 0; }
+.trow-title { display: flex; align-items: center; gap: 0.5rem; }
+.trow-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow.done .trow-title-text { text-decoration: line-through; }
+.trow-st {
+  display: inline-flex; align-items: center; gap: 0.3rem; flex-shrink: 0;
+  padding: 0.1rem 0.55rem 0.1rem 0.4rem; border-radius: 999px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-soft);
+  color: var(--muted); font-size: 0.74rem; font-weight: 600; line-height: 1.5;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.trow-st svg { width: 10px; height: 10px; transition: transform 0.15s ease; }
+.trow-st:hover { border-color: rgba(99, 102, 241, 0.55); color: var(--text); }
+.trow-st.open { border-color: rgba(99, 102, 241, 0.45); background: rgba(99, 102, 241, 0.12); color: var(--text); }
+.trow-st.open svg { transform: rotate(90deg); }
+.trow-subs {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  margin: 0.35rem 0 0.1rem 2.55rem; padding-left: 0.85rem;
+  border-left: 2px solid rgba(99, 102, 241, 0.25);
+  cursor: pointer;
+}
+.trow-sub { display: flex; align-items: center; gap: 0.55rem; padding: 0.3rem 0.55rem; border-radius: 8px; font-size: 0.88rem; }
+.trow-sub:hover { background: rgba(99, 102, 241, 0.08); }
+.trow-sub-box {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 15px; height: 15px; border-radius: 4px;
+  border: 1.5px solid var(--border); color: transparent;
+}
+.trow-sub-box svg { width: 9px; height: 9px; }
+.trow-sub.done .trow-sub-box { background: var(--green); border-color: var(--green); color: #fff; }
+.trow-sub-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow-sub.done .trow-sub-title { color: var(--muted); text-decoration: line-through; }
+
 /* Hẹp dần thì bỏ cột phụ trước, giữ tiêu đề + tick + menu tới cùng.
    Selector phải 2 lớp (.trow .trow-prio): pill mang cả class .prio-pill mà rule
    `.prio-pill { display:inline-flex }` nằm SAU các khối media này trong file —
@@ -2974,6 +3010,9 @@ body:has(.modal-overlay), body:has(.sheet-overlay), body:has(.lightbox) { overfl
   /* Ô tick hoàn thành task: giữ cỡ nhìn 18px nhưng nới vùng bấm ra ~44px. */
   .trow-check { position: relative; }
   .trow-check::before { content: ''; position: absolute; inset: -13px; }
+  /* Pill subtask: nới vừa phải — nới quá thì đè lên vùng bấm mở chi tiết của dòng. */
+  .trow-st { position: relative; }
+  .trow-st::before { content: ''; position: absolute; inset: -9px -6px; }
   .st-box { position: relative; }
   .st-box::before { content: ''; position: absolute; inset: -13px; }
 }
@@ -3154,13 +3193,14 @@ body.kb-open .mnav { display: none; }
   .trow .trow-prio, .trow .trow-who, .trow .trow-prog, .trow .trow-status { display: none; }
   .trow-check { grid-area: check; }
   .trow-icon { grid-area: icon; width: 20px; }
-  .trow-title {
-    grid-area: title;
+  .trow-title { grid-area: title; font-size: 0.92rem; line-height: 1.3; }
+  /* Clamp 2 dòng nằm ở span chữ (title giờ là flex chứa cả pill subtask). */
+  .trow-title-text {
     white-space: normal;
     display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
     -webkit-box-orient: vertical;
-    font-size: 0.92rem; line-height: 1.3;
   }
+  .trow-subs { margin-left: 1.3rem; padding-left: 0.7rem; }
   .trow-due { grid-area: meta; justify-self: start; text-align: left; width: auto; }
   .task-flags { grid-area: meta; justify-self: end; }
   .tcard-menu-wrap { grid-area: menu; }
