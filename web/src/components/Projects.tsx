@@ -131,6 +131,8 @@ function ProjectDetail({ project, onBack, onEdit, editingProject, onCloseEdit }:
               canChangeStatus={canChangeStatus(t)}
               onOpen={setEditingTask}
               onQuickStatus={quickStatus}
+              // Màn này xem project bất kỳ (không phải project đang chọn) -> truyền tường minh.
+              notionEnabled={!!project.notionProjectId}
             />
           ))}
         </div>

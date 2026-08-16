@@ -1,0 +1,4 @@
+# Script shell phai giu LF ke ca khi checkout tren Windows (khong thi macOS chay loi
+# "bad interpreter"); .bat thi nguoc lai giu CRLF.
+*.sh text eol=lf
+*.bat text eol=crlf

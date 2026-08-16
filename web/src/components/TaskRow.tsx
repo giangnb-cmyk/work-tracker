@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import Avatar from './Avatar';
 import TaskFlags from './task/TaskFlags';
+import { useSprintContext } from '../contexts/SprintContext';
 import { daysUntil } from '../lib/format';
 import { taskProgress } from '../lib/sprint';
 import { providerMeta } from '../lib/attachments';
@@ -33,6 +34,8 @@ interface TaskRowProps {
   onQuickStatus: (task: Task, status: TaskStatus) => void;
   /** Optional: chỉ màn có sprint mới cần mục "Chuyển sang sprint…". */
   onMoveSprint?: (task: Task) => void;
+  /** Project có liên kết Notion không — không truyền thì suy từ project đang chọn. */
+  notionEnabled?: boolean;
 }
 
 const UNDONE_STATUS: TaskStatus = 'in_progress';
@@ -97,7 +100,11 @@ export default function TaskRow({
   onOpen,
   onQuickStatus,
   onMoveSprint,
+  notionEnabled,
 }: TaskRowProps) {
+  const { selectedProject } = useSprintContext();
+  // Project tắt liên kết Notion -> ẩn cả chip mở trang lẫn cờ Notion (xem TaskFlags).
+  const showNotion = notionEnabled ?? !!selectedProject?.notionProjectId;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
@@ -110,7 +117,7 @@ export default function TaskRow({
 
   const atts = task.attachments ?? [];
   const docs: Doc[] = [
-    ...(task.notionUrl ? [{ url: task.notionUrl, name: 'Notion', provider: 'notion', isImage: false }] : []),
+    ...(showNotion && task.notionUrl ? [{ url: task.notionUrl, name: 'Notion', provider: 'notion', isImage: false }] : []),
     ...atts.map((a: Attachment) => ({ url: a.url, name: a.name, provider: a.provider, isImage: a.kind === 'image' })),
   ];
 
@@ -138,7 +145,7 @@ export default function TaskRow({
         </span>
         <h3 className="tcard-title">{task.title}</h3>
         {/* Cờ đã gắn feature + đã tạo Notion — cùng TaskFlags với dòng list. */}
-        <TaskFlags task={task} />
+        <TaskFlags task={task} notionEnabled={showNotion} />
         <span className="prio-pill" style={{ color: PRIO_COLOR[task.priority] }}>
           <span className="prio-dot" style={{ background: PRIO_COLOR[task.priority] }} />
           {PRIORITY_LABEL[task.priority]}

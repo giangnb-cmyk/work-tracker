@@ -275,6 +275,10 @@ export default function TaskModal({
     saveState === 'error' ? '⚠ Lưu lỗi' :
     saveState === 'saved' ? '✓ Đã lưu' : 'Tự động lưu';
 
+  // Project tắt liên kết Notion (Cấu hình project -> bỏ "Liên kết Notion project")
+  // -> ẩn cả link "Mở task trên Notion" lẫn nút "Tạo task trên Notion".
+  const notionEnabled = !!projects.find((p) => p.id === projectId)?.notionProjectId;
+
   return (
     <div className="modal-overlay" onClick={() => void handleClose()}>
       <div className="tmodal" onClick={(e) => e.stopPropagation()}>
@@ -414,7 +418,7 @@ export default function TaskModal({
             <section className="tm-section">
               <h4 className="tm-h"><PaperclipIcon size={16} /> Tài liệu</h4>
               <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={!canEditOwn} />
-              {isEdit && task?.notionUrl && (
+              {isEdit && notionEnabled && task?.notionUrl && (
                 <a className="notion-row" href={task.notionUrl} target="_blank" rel="noreferrer">📝 Mở task trên Notion →</a>
               )}
               {/* Chưa có trang Notion -> cho tạo lại bằng tay. Sync lúc tạo task là
@@ -423,7 +427,7 @@ export default function TaskModal({
                   member được giao task mà sync tự động lỗi thì phải tự tạo lại được —
                   RLS tasks_update (0002) vốn cho cả reporter lẫn assignee ghi
                   notion_page_id, nên nới tới đây là khớp đúng quyền ghi thật. */}
-              {isEdit && task && !task.notionPageId && canChangeStatus && (
+              {isEdit && notionEnabled && task && !task.notionPageId && canChangeStatus && (
                 <div className="notion-sync-row">
                   <button className="btn-sm" onClick={handleSyncNotion} disabled={notionSyncing}>
                     {notionSyncing ? '⏳ Đang tạo trên Notion…' : '📝 Tạo task trên Notion'}

@@ -96,7 +96,11 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     attachments: input.attachments ?? [],
     watcherIds: input.watcherIds ?? [],
   } as Task;
-  void syncNewToNotion(id, created, opts.assigneeNotionUserId, opts.notionProjectId);
+  // Project không liên kết Notion (notionProjectId rỗng) -> KHÔNG tự tạo page: UI đã ẩn
+  // hết icon/nút Notion, tạo page mồ côi ở đây thì không ai thấy mà quản.
+  if (opts.notionProjectId) {
+    void syncNewToNotion(id, created, opts.assigneeNotionUserId, opts.notionProjectId);
+  }
   // Báo Discord có task mới (webhook) — fire-and-forget, không chặn việc tạo nếu lỗi.
   void notifyTaskCreated({
     taskId: id,

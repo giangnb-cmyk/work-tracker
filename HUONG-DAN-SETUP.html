@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn setup — Work Tracker</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: rgba(30, 41, 59, 0.7);
+    --card-solid: #1e293b;
+    --border: rgba(148, 163, 184, 0.15);
+    --indigo: #6366f1;
+    --sky: #38bdf8;
+    --gold: #fbbf24;
+    --green: #34d399;
+    --red: #f87171;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 1rem; }
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99,102,241,.15), transparent),
+                      radial-gradient(ellipse 60% 40% at 90% 10%, rgba(56,189,248,.08), transparent);
+    color: var(--text);
+    font-family: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.65;
+    min-height: 100vh;
+  }
+  .wrap { display: flex; max-width: 1200px; margin: 0 auto; gap: 2rem; padding: 2rem 1.25rem 6rem; }
+
+  /* ---- TOC sidebar ---- */
+  nav.toc {
+    position: sticky; top: 1.5rem; align-self: flex-start;
+    width: 240px; flex-shrink: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1rem; backdrop-filter: blur(10px);
+    max-height: calc(100vh - 3rem); overflow-y: auto;
+  }
+  nav.toc .toc-title { font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: .6rem; }
+  nav.toc a {
+    display: block; color: var(--muted); text-decoration: none;
+    font-size: .85rem; padding: .32rem .5rem; border-radius: 7px; border-left: 2px solid transparent;
+  }
+  nav.toc a:hover { color: var(--text); background: rgba(99,102,241,.12); border-left-color: var(--indigo); }
+  nav.toc a .n { color: var(--indigo); font-weight: 600; margin-right: .4rem; font-variant-numeric: tabular-nums; }
+
+  main { flex: 1; min-width: 0; }
+
+  /* ---- Header ---- */
+  header { margin-bottom: 2rem; }
+  header h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; }
+  header h1 .accent { color: var(--indigo); }
+  header p.sub { color: var(--muted); margin-top: .4rem; max-width: 60ch; }
+
+  /* ---- Architecture diagram ---- */
+  .arch {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.25rem; margin: 1.25rem 0 0; backdrop-filter: blur(10px); overflow-x: auto;
+  }
+  .arch svg { display: block; margin: 0 auto; min-width: 560px; }
+  .arch .cap { text-align: center; color: var(--muted); font-size: .8rem; margin-top: .5rem; }
+
+  /* ---- Sections ---- */
+  section { margin-top: 2.6rem; }
+  h2 {
+    font-size: 1.35rem; font-weight: 700; letter-spacing: -.01em;
+    padding-bottom: .5rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;
+    display: flex; align-items: center; gap: .6rem;
+  }
+  h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.7em; height: 1.7em; border-radius: 8px; flex-shrink: 0;
+    background: var(--indigo); color: #fff; font-size: .8em; font-weight: 700;
+    box-shadow: 0 0 14px rgba(99,102,241,.45);
+  }
+  h3 { font-size: 1.02rem; font-weight: 600; margin: 1.4rem 0 .6rem; color: var(--sky); }
+  p { margin: .6rem 0; }
+  p.muted, span.muted { color: var(--muted); }
+  ol, ul { margin: .6rem 0 .6rem 1.4rem; }
+  li { margin: .3rem 0; }
+  a { color: var(--sky); }
+  strong { font-weight: 650; }
+
+  /* ---- Tables ---- */
+  .tblwrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; margin: .8rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .875rem; }
+  th {
+    text-align: left; padding: .6rem .8rem; white-space: nowrap;
+    background: rgba(99,102,241,.14); color: var(--text); font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: .55rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(odd) { background: rgba(148,163,184,.04); }
+  td:first-child code, .var { font-family: var(--mono); font-size: .82em; color: var(--gold); white-space: nowrap; }
+
+  /* ---- Badges ---- */
+  .b { display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .05em;
+       padding: .12rem .5rem; border-radius: 99px; white-space: nowrap; }
+  .b.req { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.35); }
+  .b.opt { background: rgba(148,163,184,.12); color: var(--muted); border: 1px solid rgba(148,163,184,.25); }
+  .b.cond { background: rgba(251,191,36,.13); color: var(--gold); border: 1px solid rgba(251,191,36,.3); }
+
+  /* ---- Code ---- */
+  code { font-family: var(--mono); font-size: .85em; background: rgba(148,163,184,.12);
+         padding: .1em .4em; border-radius: 5px; }
+  pre {
+    background: #0b1120; border: 1px solid var(--border); border-radius: 12px;
+    padding: .9rem 1.1rem; overflow-x: auto; margin: .8rem 0; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; font-size: .84rem; color: #c7d2fe; }
+  pre .c { color: #64748b; }   /* comment */
+  pre .cmd { color: #7dd3fc; } /* command */
+
+  /* ---- Callouts ---- */
+  .warn, .info, .ok {
+    border-radius: 12px; padding: .8rem 1rem; margin: .9rem 0;
+    border: 1px solid; font-size: .9rem;
+  }
+  .warn { background: rgba(251,191,36,.08); border-color: rgba(251,191,36,.3); }
+  .warn::before { content: "⚠️ "; }
+  .info { background: rgba(56,189,248,.07); border-color: rgba(56,189,248,.25); }
+  .info::before { content: "💡 "; }
+  .ok { background: rgba(52,211,153,.07); border-color: rgba(52,211,153,.25); }
+
+  /* ---- Cards / steps ---- */
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1rem 1.2rem; margin: .9rem 0; backdrop-filter: blur(10px);
+  }
+
+  /* ---- Checklist ---- */
+  ul.check { list-style: none; margin-left: 0; }
+  ul.check li { padding-left: 1.7em; position: relative; }
+  ul.check li::before {
+    content: "✓"; position: absolute; left: 0; top: .1em;
+    width: 1.15em; height: 1.15em; border-radius: 5px; text-align: center; line-height: 1.15em;
+    background: rgba(52,211,153,.15); color: var(--green); font-size: .85em; font-weight: 700;
+    border: 1px solid rgba(52,211,153,.35);
+  }
+
+  footer { margin-top: 3rem; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+
+  @media (max-width: 900px) {
+    .wrap { flex-direction: column; gap: 0; padding-top: 1rem; }
+    nav.toc { position: static; width: 100%; max-height: none; margin-bottom: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc">
+  <div class="toc-title">Mục lục</div>
+  <a href="#soft"><span class="n">0</span>Cài phần mềm</a>
+  <a href="#supabase"><span class="n">1</span>Supabase</a>
+  <a href="#web"><span class="n">2</span>Web chạy local</a>
+  <a href="#vercel"><span class="n">3</span>Vercel</a>
+  <a href="#bot"><span class="n">4</span>Bot Discord</a>
+  <a href="#keys"><span class="n">5</span>Google service account</a>
+  <a href="#notion"><span class="n">6</span>Đồng bộ Notion</a>
+  <a href="#mobile"><span class="n">7</span>App mobile</a>
+  <a href="#checklist"><span class="n">8</span>Checklist chạy được</a>
+  <a href="#errors"><span class="n">9</span>Lỗi hay gặp</a>
+</nav>
+
+<main>
+
+<header>
+  <h1>Hướng dẫn setup <span class="accent">Work Tracker</span></h1>
+  <p class="sub">Runbook dựng hệ thống trên máy mới, làm theo thứ tự từ trên xuống.
+  Hệ thống có 3 phần: <strong>Supabase</strong> (data + auth, cloud, dùng chung),
+  <strong>Web</strong> (Vercel), <strong>Bot Discord</strong> (self-host trên MỘT máy).</p>
+
+  <div class="arch">
+    <svg viewBox="0 0 640 230" width="100%" height="230" role="img" aria-label="Sơ đồ liên kết env giữa Web, Vercel, Supabase, Bot, Notion">
+      <defs>
+        <marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8"/>
+        </marker>
+      </defs>
+      <!-- Supabase center -->
+      <rect x="250" y="88" width="140" height="54" rx="12" fill="rgba(52,211,153,.12)" stroke="#34d399"/>
+      <text x="320" y="110" text-anchor="middle" fill="#34d399" font-size="14" font-weight="700">SUPABASE</text>
+      <text x="320" y="128" text-anchor="middle" fill="#94a3b8" font-size="10">Postgres · Auth · RLS</text>
+      <!-- Web local -->
+      <rect x="20" y="20" width="150" height="46" rx="12" fill="rgba(56,189,248,.1)" stroke="#38bdf8"/>
+      <text x="95" y="39" text-anchor="middle" fill="#38bdf8" font-size="12" font-weight="700">web/.env.local</text>
+      <text x="95" y="55" text-anchor="middle" fill="#94a3b8" font-size="10">npm run dev</text>
+      <!-- Vercel -->
+      <rect x="20" y="150" width="150" height="46" rx="12" fill="rgba(99,102,241,.12)" stroke="#6366f1"/>
+      <text x="95" y="169" text-anchor="middle" fill="#a5b4fc" font-size="12" font-weight="700">Vercel env</text>
+      <text x="95" y="185" text-anchor="middle" fill="#94a3b8" font-size="10">web + api/*</text>
+      <!-- Bot -->
+      <rect x="470" y="20" width="150" height="46" rx="12" fill="rgba(251,191,36,.1)" stroke="#fbbf24"/>
+      <text x="545" y="39" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="700">bot/.env</text>
+      <text x="545" y="55" text-anchor="middle" fill="#94a3b8" font-size="10">self-host 1 máy</text>
+      <!-- Notion -->
+      <rect x="470" y="150" width="150" height="46" rx="12" fill="rgba(248,113,113,.09)" stroke="#f87171"/>
+      <text x="545" y="169" text-anchor="middle" fill="#f87171" font-size="12" font-weight="700">Notion</text>
+      <text x="545" y="185" text-anchor="middle" fill="#94a3b8" font-size="10">qua /api/notion</text>
+      <!-- arrows -->
+      <line x1="170" y1="52" x2="252" y2="95" stroke="#94a3b8" marker-end="url(#ar)"/>
+      <text x="190" y="62" fill="#94a3b8" font-size="10">anon key</text>
+      <line x1="170" y1="164" x2="252" y2="128" stroke="#94a3b8" marker-end="url(#ar)"/>
+      <text x="186" y="158" fill="#94a3b8" font-size="10">anon key</text>
+      <line x1="470" y1="52" x2="388" y2="95" stroke="#94a3b8" marker-end="url(#ar)"/>
+      <text x="386" y="62" fill="#f87171" font-size="10">service_role key</text>
+      <line x1="170" y1="180" x2="468" y2="180" stroke="#94a3b8" marker-end="url(#ar)"/>
+      <text x="270" y="173" fill="#94a3b8" font-size="10">NOTION_TOKEN</text>
+      <path d="M 545 66 C 545 110, 545 110, 545 148" stroke="#94a3b8" stroke-dasharray="4 3" fill="none" marker-end="url(#ar)"/>
+      <text x="553" y="112" fill="#94a3b8" font-size="10">NOTION_SYNC_SECRET</text>
+      <text x="553" y="125" fill="#64748b" font-size="9">(trùng với Vercel)</text>
+    </svg>
+    <div class="cap">Các key nối 3 phần với nhau — bảng chi tiết từng biến ở mục 2, 3, 4.</div>
+  </div>
+</header>
+
+<!-- ============ 0 ============ -->
+<section id="soft">
+  <h2><span class="num">0</span>Cài phần mềm</h2>
+  <p class="muted">Chạy được trên cả <strong>Windows</strong> lẫn <strong>macOS</strong> — code web + bot
+  đều cross-platform; script chạy bot có 2 bản: <code>.bat</code> (Windows) và <code>.sh</code> (macOS/Linux).</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Phần mềm</th><th>Windows</th><th>macOS</th><th>Cần cho</th><th>Kiểm tra</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Node.js 22.x</strong></td><td><code>winget install OpenJS.NodeJS.LTS</code></td><td><code>brew install node@22</code></td><td>web</td><td><code>node -v</code> → v22.x</td></tr>
+      <tr><td><strong>Git</strong></td><td><code>winget install Git.Git</code></td><td>có sẵn (Xcode CLT)</td><td>tất cả</td><td><code>git --version</code></td></tr>
+      <tr><td><strong>Python 3.11+</strong></td><td><code>winget install Python.Python.3.11</code></td><td><code>brew install python@3.11</code></td><td>bot</td><td><code>python --version</code> / <code>python3</code></td></tr>
+      <tr><td><strong>Claude CLI</strong></td><td colspan="2"><a href="https://claude.com/claude-code">claude.com/claude-code</a> — cài xong chạy <code>claude</code> đăng nhập 1 lần</td><td>bot</td><td><code>claude --version</code></td></tr>
+      <tr><td><strong>Ollama + bge-m3</strong> <span class="b opt">TUỲ CHỌN</span></td><td><code>winget install Ollama.Ollama</code></td><td><code>brew install ollama</code></td><td>bot (RAG) — xong <code>ollama pull bge-m3</code></td><td><code>ollama list</code></td></tr>
+      <tr><td><strong>JDK 21 + Android SDK</strong> <span class="b opt">TUỲ CHỌN</span></td><td>mục 7</td><td><code>brew install openjdk@21</code> + Android Studio</td><td>mobile</td><td><code>./gradlew -v</code></td></tr>
+      <tr><td><strong>Xcode</strong> <span class="b opt">TUỲ CHỌN</span></td><td>—</td><td>App Store — chỉ khi build app <strong>iOS</strong></td><td>mobile iOS</td><td><code>xcodebuild -version</code></td></tr>
+    </tbody>
+  </table></div>
+  <pre><code><span class="cmd">git clone https://github.com/janreng/work-tracker.git d:\AppProject\work-tracker</span></code></pre>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="supabase">
+  <h2><span class="num">1</span>Supabase — nền của cả web lẫn bot</h2>
+  <p>Project đang chạy: ref <code>vlsskdwcfcmyubyrtwhn</code> → URL
+  <code>https://vlsskdwcfcmyubyrtwhn.supabase.co</code>.</p>
+  <div class="info"><strong>Máy mới nối vào project có sẵn thì chỉ cần làm bước 1.5 (lấy key).</strong>
+  Các bước 1.1–1.4 chỉ dành cho lúc dựng project Supabase MỚI từ đầu.</div>
+
+  <h3>1.1. Tạo project + bật đăng nhập Google</h3>
+  <ol>
+    <li><a href="https://supabase.com/dashboard">supabase.com/dashboard</a> → <strong>New project</strong> (chọn region gần VN).</li>
+    <li>Tạo OAuth client: <strong>Google Cloud Console → APIs &amp; Credentials → Create Credentials →
+      OAuth client ID → type <em>Web application</em></strong>:
+      <ul>
+        <li><em>Authorized JavaScript origins</em>: <code>https://m-plan.easygoing.vn</code>, <code>http://localhost:5173</code>, domain vercel.</li>
+        <li><em>Authorized redirect URIs</em>: <code>https://&lt;ref&gt;.supabase.co/auth/v1/callback</code></li>
+      </ul>
+      Copy <strong>Client ID</strong> + <strong>Client Secret</strong>.</li>
+    <li>Supabase → <strong>Authentication → Providers → Google</strong>: bật, dán Client ID + Secret.</li>
+  </ol>
+
+  <h3>1.2. Áp schema (migrations)</h3>
+  <p>Nguồn sự thật schema + RLS là <code>supabase/migrations/</code> (đánh số tăng dần). Chọn 1 cách:</p>
+  <pre><code><span class="c"># Cách 1 — Supabase CLI (khuyên dùng)</span>
+<span class="cmd">supabase link --project-ref &lt;ref&gt;</span>
+<span class="cmd">supabase db push</span>
+
+<span class="c"># Cách 2 — dán từng file vào Dashboard → SQL Editor, theo thứ tự 0001, 0002…</span></code></pre>
+  <p class="muted">Migrations tạo đủ bảng + RLS + realtime + bucket Storage <code>attachments</code>.</p>
+
+  <h3>1.3. Redirect URLs</h3>
+  <p><strong>Authentication → URL Configuration</strong>:</p>
+  <ul>
+    <li><em>Site URL</em> = domain production, vd <code>https://m-plan.easygoing.vn</code></li>
+    <li><em>Redirect URLs</em>: thêm <code>https://&lt;domain&gt;/**</code> và <code>http://localhost:5173/**</code> (khi dev)</li>
+  </ul>
+  <div class="warn">Thiếu bước này = đăng nhập xong bị đá về trang trắng.</div>
+
+  <h3>1.4. Admin đầu tiên + allowlist</h3>
+  <ol>
+    <li>Mở web, đăng nhập Google 1 lần (tự tạo row trong <code>profiles</code>).</li>
+    <li>Dashboard → <strong>Table Editor → profiles</strong> → sửa <code>role</code> = <code>'admin'</code> (hoặc <code>'owner'</code>).</li>
+    <li>Web → tab <strong>Cấu hình</strong> → thêm email/domain được phép đăng nhập.
+      <span class="muted">Danh sách trống = ai cũng vào được (chỉ để trống lúc khởi tạo).</span></li>
+  </ol>
+
+  <h3>1.5. Lấy 2 key (Dashboard → Project Settings → API)</h3>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Key</th><th>Dùng ở</th><th>Tính chất</th></tr></thead>
+    <tbody>
+      <tr><td><code>anon</code> key</td><td><code>web/.env.local</code>, Vercel env</td>
+        <td><strong>Công khai theo thiết kế</strong> — bảo vệ bằng RLS + Auth, không phải bằng giấu key</td></tr>
+      <tr><td><code>service_role</code> key</td><td><strong>CHỈ</strong> <code>bot/.env</code></td>
+        <td><strong style="color:var(--red)">BYPASS toàn bộ RLS.</strong> Không bao giờ đưa vào web/, Vercel, hay commit</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="web">
+  <h2><span class="num">2</span>Web chạy local — <code>web/.env.local</code></h2>
+  <pre><code><span class="cmd">cd web</span>
+<span class="cmd">npm install</span>
+<span class="cmd">copy .env.example .env.local</span>     <span class="c"># macOS: cp .env.example .env.local</span>
+<span class="cmd">npm run dev</span>                      <span class="c"># http://localhost:5173</span></code></pre>
+
+  <p>Từng biến trong <code>.env.local</code> — chỉ 2 biến đầu là bắt buộc để chạy:</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Biến</th><th></th><th>Giá trị / lấy ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td><code>VITE_SUPABASE_URL</code></td><td><span class="b req">BẮT BUỘC</span></td>
+        <td><code>https://vlsskdwcfcmyubyrtwhn.supabase.co</code> — có sẵn trong .env.example</td></tr>
+      <tr><td><code>VITE_SUPABASE_ANON_KEY</code></td><td><span class="b req">BẮT BUỘC</span></td>
+        <td>Supabase → Project Settings → API → <code>anon</code> key (mục 1.5)</td></tr>
+      <tr><td><code>VITE_ALLOWED_EMAIL_DOMAIN</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>Chặn domain email dự phòng — CHỈ có tác dụng khi allowlist (tab Cấu hình) còn trống. Trống = không chặn</td></tr>
+      <tr><td><code>VITE_APP_URL</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>Domain dựng link chia sẻ tuyệt đối (link task <code>/t/&lt;mã&gt;</code> dán Discord). Trống = dùng mặc định trong code (<code>https://m-plan.easygoing.vn</code>)</td></tr>
+      <tr><td><code>VITE_GOOGLE_CLIENT_ID</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>OAuth <strong>Web</strong> client ID (mục 1.1) — cho nút "Xuất Google Sheet" tab Chi phí. Trống = nút báo thiếu cấu hình</td></tr>
+      <tr><td><code>VITE_GOOGLE_WEB_CLIENT_ID</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>Đăng nhập Google <strong>native trong app mobile</strong>. Trống = fallback sang <code>VITE_GOOGLE_CLIENT_ID</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="warn">Biến <code>VITE_*</code> <strong>nhúng vào bundle lúc build</strong> — trên Vercel
+  đổi giá trị xong phải <strong>Redeploy</strong> mới ăn. Local thì restart <code>npm run dev</code>.</div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="vercel">
+  <h2><span class="num">3</span>Vercel — deploy web + cổng API</h2>
+
+  <h3>3.1. Nối repo</h3>
+  <ol>
+    <li><a href="https://vercel.com">vercel.com</a> → <strong>Add New → Project</strong> → import repo GitHub <code>janreng/work-tracker</code>.</li>
+    <li><strong>Root Directory = <code>web</code></strong> ← quan trọng nhất, sai là build fail.</li>
+    <li>Framework preset: <strong>Vite</strong> (tự nhận), output <code>dist</code> — đã có <code>web/vercel.json</code>.</li>
+    <li>Domain: gắn <code>m-plan.easygoing.vn</code> (Project Settings → Domains).
+      <span class="muted">Domain này phải nằm trong Redirect URLs của Supabase (mục 1.3).</span></li>
+  </ol>
+
+  <h3>3.2. Environment Variables</h3>
+  <p><strong>Nhóm client (VITE_ — vào bundle browser):</strong> đặt giống hệt mục 2 —
+  <code>VITE_SUPABASE_URL</code>, <code>VITE_SUPABASE_ANON_KEY</code>
+  (+ tuỳ chọn <code>VITE_ALLOWED_EMAIL_DOMAIN</code>, <code>VITE_APP_URL</code>,
+  <code>VITE_GOOGLE_CLIENT_ID</code>, <code>VITE_GOOGLE_WEB_CLIENT_ID</code>).</p>
+
+  <p><strong>Nhóm server (cho serverless <code>web/api/*</code> — không lộ ra browser):</strong></p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Biến</th><th></th><th>Ý nghĩa / lấy ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td><code>SUPABASE_URL</code></td><td><span class="b cond">CẦN CHO /api</span></td>
+        <td>Giống <code>VITE_SUPABASE_URL</code> — để <code>/api</code> verify JWT của user gửi lên</td></tr>
+      <tr><td><code>SUPABASE_ANON_KEY</code></td><td><span class="b cond">CẦN CHO /api</span></td>
+        <td><strong>Anon key</strong> — KHÔNG phải service_role (service_role cấm lên Vercel)</td></tr>
+      <tr><td><code>NOTION_SYNC_SECRET</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>Chuỗi bí mật tự đặt — bot dùng để gọi cổng Notion. <strong>Phải trùng</strong> biến cùng tên trong <code>bot/.env</code></td></tr>
+      <tr><td><code>DISCORD_WEBHOOK_URL</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>Webhook kênh Discord nhận thông báo "task hoàn thành" từ web. Discord → Channel Settings → Integrations → Webhooks</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><strong>Nhóm Notion</strong> — chỉ khi bật đồng bộ Notion (quy trình đầy đủ ở mục 6):</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Biến</th><th>Mặc định</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>NOTION_TOKEN</code></td><td>—</td>
+        <td>Token integration: <a href="https://www.notion.so/my-integrations">notion.so/my-integrations</a> → New integration → copy <strong>Internal Integration Secret</strong></td></tr>
+      <tr><td><code>NOTION_DATABASE_ID</code></td><td>—</td>
+        <td>ID database <strong>Tasks</strong> trên Notion — chuỗi 32 ký tự trong URL của database</td></tr>
+      <tr><td><code>NOTION_PROP_TITLE</code></td><td><code>Name</code></td><td>Tên cột title trong Notion DB</td></tr>
+      <tr><td><code>NOTION_PROP_STATUS</code></td><td><code>Status</code></td>
+        <td>Cột trạng thái. <code>NOTION_STATUS_TYPE</code> = <code>status</code> hoặc <code>select</code> tuỳ kiểu cột</td></tr>
+      <tr><td><code>NOTION_PROP_ASSIGNEE</code></td><td><code>Assignee</code></td>
+        <td>Cột người nhận. <code>NOTION_ASSIGNEE_TYPE</code> = <code>rich_text</code> hoặc <code>people</code></td></tr>
+      <tr><td><code>NOTION_PROP_DUE</code></td><td><code>Due</code></td><td>Cột hạn (kiểu date)</td></tr>
+      <tr><td><code>NOTION_PROP_PRIORITY</code></td><td><code>Priority</code></td>
+        <td>Cột ưu tiên. Đặt <code>''</code> (rỗng) để TẮT nếu DB không có cột này</td></tr>
+      <tr><td><code>NOTION_PROP_DESCRIPTION</code></td><td><em>(tắt)</em></td>
+        <td>Cột mô tả (rich_text). <strong>Chỉ điền khi DB thật sự có cột</strong> — điền bừa là MỌI lần sync lỗi</td></tr>
+      <tr><td><code>NOTION_STATUS_MAP</code> / <code>NOTION_PRIORITY_MAP</code></td><td>trong <code>_notion.ts</code></td>
+        <td>JSON ánh xạ giá trị app → tên lựa chọn Notion, vd <code>{"todo":"Todo","in_progress":"In progress"}</code></td></tr>
+      <tr><td><code>NOTION_PROJECTS_DB_ID</code></td><td>—</td>
+        <td>ID database <strong>Projects</strong> — cho dropdown "Liên kết Notion project" trong Cấu hình project</td></tr>
+      <tr><td><code>NOTION_PROP_PROJECT</code></td><td><code>Project</code></td><td>Tên cột relation Project trên Tasks DB</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>3.3. Sau khi đặt env</h3>
+  <p>Bấm <strong>Redeploy</strong> (Deployments → ⋯ → Redeploy). Về sau push code lên GitHub là tự deploy.</p>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="bot">
+  <h2><span class="num">4</span>Bot Discord — chỉ trên MỘT máy</h2>
+
+  <h3>4.1. Tạo Discord app</h3>
+  <ol>
+    <li><a href="https://discord.com/developers/applications">discord.com/developers/applications</a> → <strong>New Application</strong> → tab <strong>Bot</strong>.</li>
+    <li><strong>Reset Token</strong> → copy (dán vào <code>.env</code> bước 4.2).</li>
+    <li>Bật <strong>MESSAGE CONTENT INTENT</strong> — bắt buộc, bot đọc nội dung khi được tag.</li>
+    <li>Tab <strong>OAuth2 → URL Generator</strong>: scope <code>bot</code>, quyền <code>Send Messages</code>,
+      <code>Read Message History</code>, <code>Manage Threads</code>, <code>Manage Channels</code>,
+      <code>Create Posts</code> <span class="muted">(3 quyền sau cho sync bug forum)</span> → mở URL, mời bot vào server.</li>
+  </ol>
+
+  <h3>4.2. Cài + điền <code>bot/.env</code></h3>
+  <pre><code><span class="cmd">cd bot</span>
+<span class="cmd">pip install -r requirements.txt</span>      <span class="c"># macOS: pip3 install -r requirements.txt</span>
+<span class="cmd">copy .env.example .env</span>               <span class="c"># macOS: cp .env.example .env</span></code></pre>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Biến</th><th></th><th>Ý nghĩa / lấy ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td><code>DISCORD_TOKEN</code></td><td><span class="b req">BẮT BUỘC</span></td><td>Token bot (bước 4.1)</td></tr>
+      <tr><td><code>SUPABASE_URL</code></td><td><span class="b req">BẮT BUỘC</span></td><td><code>https://vlsskdwcfcmyubyrtwhn.supabase.co</code></td></tr>
+      <tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td><span class="b req">BẮT BUỘC</span></td>
+        <td>Supabase → Project Settings → API → <code>service_role</code>. <strong style="color:var(--red)">Bí mật tuyệt đối</strong> — bypass RLS</td></tr>
+      <tr><td><code>CLAUDE_CMD</code></td><td><span class="b opt">TUỲ CHỌN</span></td><td>Lệnh gọi Claude CLI, mặc định <code>claude</code>. Đổi nếu binary ở path khác</td></tr>
+      <tr><td><code>WEB_BASE_URL</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>URL web production — bot gắn link mở task vào thông báo. Trống = không có link. KHÔNG dùng localhost (link gửi cho cả team)</td></tr>
+      <tr><td><code>DISCORD_WEBHOOK_URL</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>Webhook kênh báo "task mới" — trùng webhook với Vercel là cùng 1 kênh. Trống = không báo</td></tr>
+      <tr><td><code>OLLAMA_HOST</code></td><td><span class="b opt">TUỲ CHỌN</span></td><td>Mặc định <code>http://localhost:11434</code> — RAG tài liệu</td></tr>
+      <tr><td><code>RAG_EMBED_MODEL</code></td><td><span class="b opt">TUỲ CHỌN</span></td><td>Mặc định <code>bge-m3</code> — phải <code>ollama pull bge-m3</code> trước</td></tr>
+      <tr><td><code>GDRIVE_SERVICE_ACCOUNT</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td>Path service account JSON; trống = mặc định <code>keys/service-account-gsheets.json</code></td></tr>
+      <tr><td><code>NOTION_GATEWAY_URL</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td><code>https://&lt;domain-web&gt;/api/notion</code> — bot sync Notion qua cổng này</td></tr>
+      <tr><td><code>NOTION_SYNC_SECRET</code></td><td><span class="b opt">TUỲ CHỌN</span></td>
+        <td><strong>Phải trùng</strong> biến cùng tên trên Vercel. Trống cả 2 biến Notion = bot bỏ qua sync (không lỗi)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>4.3. <code>settings.json</code> — nút cấu hình chính</h3>
+  <p class="muted">File tự giải thích bằng các khoá <code>_note_*</code> ngay cạnh từng mục. Các mục phải đụng khi setup:</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Mục</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>model</code> / <code>effort</code></td><td>Model Claude + mức suy luận (mặc định <code>claude-opus-4-8</code> / <code>medium</code>)</td></tr>
+      <tr><td><code>reminder_channel_id</code>, <code>standup_channel_id</code>, <code>task_done_channel_id</code></td>
+        <td>ID kênh Discord cho nhắc hạn / standup / báo task xong (bật Developer Mode → chuột phải kênh → Copy ID). <code>0</code> = tắt</td></tr>
+      <tr><td><code>bug_forums[]</code></td><td>Sync forum bug hai chiều: <code>project_id</code> (uuid từ web) + <code>forum_channel_id</code> + <code>notify_role</code></td></tr>
+      <tr><td><code>bypass_permissions</code></td><td>Để <code>false</code> (run-bot-safe.bat ép false). Bật = Claude chạy lệnh không hỏi — nguy hiểm</td></tr>
+      <tr><td><code>sheets_mcp_enabled</code></td><td>Bot đọc Google Sheet — cần <code>uv</code> + service account, xem <code>bot/GOOGLE_SHEETS_MCP.md</code></td></tr>
+      <tr><td><code>rag_sync_enabled</code>, <code>rag_drive_skip</code>, <code>rag_member_*</code></td><td>Kho RAG tài liệu + giới hạn phạm vi member</td></tr>
+      <tr><td><code>weekly_report_enabled</code>, <code>weekly_mail</code>, <code>member_dm</code>, <code>member_review</code></td>
+        <td>Báo cáo tuần vào Sheet · mail draft Gmail · DM điểm tuần · đánh giá AI</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>4.4. Chạy</h3>
+  <p><strong>Windows:</strong></p>
+  <pre><code><span class="cmd">run-bot-safe.bat</span>     <span class="c"># chạy + tự restart khi crash. GIỮ CỬA SỔ MỞ.</span></code></pre>
+  <ul>
+    <li>Bật cùng Windows: <code>Win+R</code> → <code>shell:startup</code> → shortcut tới <code>run-bot-safe.bat</code>.</li>
+    <li>Lịch tự động (Windows Task Scheduler → Start a program): <code>run-reminder.bat</code> (nhắc hạn ~9h),
+      <code>run-standup.bat</code> (standup T2–T6 ~9h30).</li>
+  </ul>
+  <p><strong>macOS / Linux:</strong></p>
+  <pre><code><span class="cmd">chmod +x *.sh</span>        <span class="c"># một lần sau khi clone (nếu mất quyền thực thi)</span>
+<span class="cmd">./run-bot-safe.sh</span>    <span class="c"># chạy + tự restart khi crash. GIỮ CỬA SỔ TERMINAL MỞ.</span></code></pre>
+  <ul>
+    <li>Lịch tự động bằng <strong>cron</strong> — <code>crontab -e</code> rồi thêm (sửa path cho đúng máy):
+      <pre><code>0  9 * * *   /path/to/work-tracker/bot/run-reminder.sh
+30 9 * * 1-5 /path/to/work-tracker/bot/run-standup.sh</code></pre></li>
+    <li>Bật cùng máy: System Settings → General → <strong>Login Items</strong> → thêm Terminal chạy
+      <code>run-bot-safe.sh</code> (hoặc dựng LaunchAgent nếu cần chạy ẩn).</li>
+    <li>Script sync RAG cũng có bản <code>.sh</code>: <code>./sync-rag.sh</code>, <code>./sync-drive.sh</code>, <code>./sync-drive-content.sh</code>.</li>
+  </ul>
+  <div class="warn">Chỉ chạy bot ở <strong>một</strong> máy — 2 bot cùng token = xử lý trùng lệnh.</div>
+  <div class="ok">✅ Test: gõ <code>@bot báo cáo sprint</code> trong kênh cho phép → bot trả lời là xong.</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="keys">
+  <h2><span class="num">5</span>Google service account (<code>keys/</code>)</h2>
+  <p class="muted">Các file trong <code>keys/</code> bị gitignore — máy mới chép tay từ máy cũ, hoặc tạo lại:</p>
+  <div class="tblwrap"><table>
+    <thead><tr><th>File</th><th>Dùng cho</th><th>Tạo lại thế nào</th></tr></thead>
+    <tbody>
+      <tr><td><code>service-account-gsheets.json</code></td>
+        <td>Weekly report vào Sheet, xuất Chi phí, danh mục + ruột tài liệu Drive (RAG), GA4</td>
+        <td>Google Cloud Console → IAM → Service Accounts → Create key (JSON). Bật <strong>Sheets API + Drive API</strong>
+        (+ Analytics Data API nếu dùng GA4). <strong>Share</strong> folder Drive / Sheet đích cho email của SA
+        (quyền Editor với sheet cần ghi)</td></tr>
+      <tr><td><code>gmail-oauth-client.json</code></td><td>Soạn mail weekly report từ template Gmail</td>
+        <td>Google Cloud Console → Credentials → OAuth client <strong>type Desktop</strong></td></tr>
+      <tr><td><code>gmail-token.json</code></td><td>Token sau khi auth Gmail</td>
+        <td>Chạy <code>python skills/gmail_gateway.py --auth</code> một lần</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="notion">
+  <h2><span class="num">6</span>Đồng bộ Notion <span class="b opt" style="font-size:.6em">TUỲ CHỌN</span></h2>
+  <ol>
+    <li><a href="https://www.notion.so/my-integrations">notion.so/my-integrations</a> → <strong>New integration</strong> → copy secret = <code>NOTION_TOKEN</code>.</li>
+    <li>Mở database <strong>Tasks</strong> trên Notion → ⋯ → <strong>Connections</strong> → add integration vừa tạo.
+      <span class="muted">Làm tương tự với database Projects nếu dùng <code>NOTION_PROJECTS_DB_ID</code>.</span></li>
+    <li>Lấy Database ID: URL dạng <code>notion.so/&lt;ws&gt;/<strong>&lt;DB_ID&gt;</strong>?v=…</code> — chuỗi 32 ký tự.</li>
+    <li>Điền nhóm env Notion trên <strong>Vercel</strong> (bảng mục 3.2) → <strong>Redeploy</strong>.</li>
+    <li>Bot muốn sync: điền <code>NOTION_GATEWAY_URL</code> + <code>NOTION_SYNC_SECRET</code> trong <code>bot/.env</code>.</li>
+    <li>Trên web: <strong>Cấu hình project → "Liên kết Notion project"</strong> chọn project Notion tương ứng.</li>
+  </ol>
+  <div class="info"><strong>Bỏ liên kết Notion ở Cấu hình project</strong> = task của project đó ẩn toàn bộ
+  icon/nút Notion (task list + task detail) và không tự tạo page Notion nữa.
+  Không cấu hình gì = app vẫn chạy bình thường, chỉ không sync.</div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="mobile">
+  <h2><span class="num">7</span>App mobile <span class="b opt" style="font-size:.6em">TUỲ CHỌN</span></h2>
+  <pre><code><span class="cmd">cd web && npm run build && npx cap sync</span>
+<span class="cmd">cd android && ./gradlew assembleDebug</span>     <span class="c"># APK: app/build/outputs/apk/debug/</span></code></pre>
+  <ul>
+    <li><strong>JDK 21</strong> — trỏ qua <code>~/.gradle/gradle.properties</code>: <code>org.gradle.java.home=&lt;path&gt;</code> (JDK 17 lỗi <code>invalid source release: 21</code>).</li>
+    <li><strong>Android SDK 36</strong> — <code>web/android/local.properties</code>: <code>sdk.dir=&lt;path&gt;</code> (gitignore, mỗi máy tự tạo).</li>
+    <li>Đăng nhập Google native: OAuth client <strong>type Android</strong> (package <code>com.mio.app.manager</code> +
+      SHA-1 từ <code>./gradlew signingReport</code>) + đặt <code>VITE_GOOGLE_WEB_CLIENT_ID</code>.</li>
+    <li>iOS: cần macOS + Xcode. Chi tiết đầy đủ: README §4.</li>
+  </ul>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="checklist">
+  <h2><span class="num">8</span>Checklist "app chạy được"</h2>
+  <div class="card">
+    <ul class="check">
+      <li>Web local <code>npm run dev</code> → đăng nhập Google được, thấy danh sách project</li>
+      <li>Vercel deploy xong → domain production đăng nhập được</li>
+      <li><code>@bot báo cáo sprint</code> → bot trả lời</li>
+      <li>Tạo task trên web → kênh Discord nhận thông báo (nếu đặt webhook)</li>
+      <li>Tạo task ở project có liên kết Notion → page Notion xuất hiện (nếu bật Notion)</li>
+      <li>Task Scheduler chạy thử <code>run-reminder.bat</code> → tin nhắc đúng kênh</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="errors">
+  <h2><span class="num">9</span>Lỗi hay gặp</h2>
+  <div class="tblwrap"><table>
+    <thead><tr><th>Hiện tượng</th><th>Xử lý</th></tr></thead>
+    <tbody>
+      <tr><td>Web trắng trang / lỗi auth</td><td>Thiếu <code>VITE_SUPABASE_ANON_KEY</code>, hoặc domain chưa có trong Redirect URLs (mục 1.3)</td></tr>
+      <tr><td>Đăng nhập bị từ chối</td><td>Email chưa nằm trong allowlist (tab Cấu hình)</td></tr>
+      <tr><td>Đăng nhập xong quay về trang trắng</td><td>Site URL / Redirect URLs sai (mục 1.3)</td></tr>
+      <tr><td>Đổi env trên Vercel không ăn</td><td>Biến <code>VITE_*</code> nhúng lúc build — phải <strong>Redeploy</strong></td></tr>
+      <tr><td>Bot im lặng</td><td>Chưa bật MESSAGE CONTENT INTENT, sai <code>DISCORD_TOKEN</code>, hoặc kênh bị chặn trong <code>settings.json</code></td></tr>
+      <tr><td>Bot báo lỗi Supabase</td><td>Sai/thiếu <code>SUPABASE_SERVICE_ROLE_KEY</code></td></tr>
+      <tr><td><code>@bot</code> không trả lời câu hỏi</td><td>Máy chưa cài / chưa đăng nhập Claude CLI (<code>claude --version</code>)</td></tr>
+      <tr><td>Sync Notion lỗi mọi task</td><td><code>NOTION_PROP_*</code> trỏ cột không tồn tại — hay gặp nhất: điền <code>NOTION_PROP_DESCRIPTION</code> mà DB không có cột</td></tr>
+      <tr><td>Nút "Xuất Google Sheet" báo thiếu cấu hình</td><td>Chưa đặt <code>VITE_GOOGLE_CLIENT_ID</code>, hoặc domain chưa có trong Authorized JavaScript origins</td></tr>
+      <tr><td>Weekly report không ghi Sheet</td><td>Sheet chưa Share Editor cho email service account</td></tr>
+      <tr><td>Build mobile <code>invalid source release: 21</code></td><td>Đang dùng JDK 17 — trỏ JDK 21 qua <code>~/.gradle/gradle.properties</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  Work Tracker · bản MD cùng nội dung: <code>HUONG-DAN-SETUP.md</code> · chi tiết sâu hơn:
+  <code>README.md</code> · schema: <code>DATA_MODEL.md</code> · chuẩn code: <code>CLAUDE.md</code>
+</footer>
+
+</main>
+</div>
+</body>
+</html>
