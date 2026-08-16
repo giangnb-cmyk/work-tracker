@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
-import { createProject, extractSheetId, updateProject, type ProjectInput } from '../lib/projectWrites';
+import {
+  createProject,
+  extractChannelId,
+  extractSheetId,
+  updateProject,
+  type ProjectInput,
+} from '../lib/projectWrites';
 import { listNotionProjects, type NotionProjectOption } from '../lib/notionSync';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import SearchableSelect from './SearchableSelect';
+import Switch from './Switch';
 import type { Project } from '../types';
 
 interface ProjectModalProps {
@@ -28,36 +35,56 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
   const [costSheetInput, setCostSheetInput] = useState(project?.costSheetId ?? '');
   const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
+  const [notionSyncEnabled, setNotionSyncEnabled] = useState(project?.notionSyncEnabled ?? true);
+  const [bugForumInput, setBugForumInput] = useState(project?.bugForumChannelId ?? '');
+  const [bugNotifyRole, setBugNotifyRole] = useState(project?.bugNotifyRole ?? '');
 
   const sheetId = extractSheetId(sheetInput);
   const sheetInvalid = sheetInput.trim().length > 0 && !sheetId;
   const costSheetId = extractSheetId(costSheetInput);
   const costSheetInvalid = costSheetInput.trim().length > 0 && !costSheetId;
-  // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
-  const webhookInvalid = dailyWebhook.trim().length > 0 && !dailyWebhook.includes('/api/webhooks/');
+  const bugForumId = extractChannelId(bugForumInput);
+  const bugForumInvalid = bugForumInput.trim().length > 0 && !bugForumId;
+  /**
+   * Webhook chỉ để GỬI THỬ — cố ý KHÔNG lưu vào project.
+   *
+   * Muốn xem thử báo cáo mà phải gõ đè lên ô webhook thật rồi nhớ hoàn nguyên là kiểu rất
+   * dễ lỡ tay bấm Lưu, thế là kênh chính của cả đội chuyển sang kênh nháp. Tách hẳn một ô
+   * riêng: bỏ trống thì gửi vào webhook chính, điền thì gửi vào đúng cái vừa dán.
+   */
+  const [testWebhook, setTestWebhook] = useState('');
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
 
+  // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
+  const isWebhookUrl = (v: string) => v.includes('/api/webhooks/');
+  const webhookInvalid = dailyWebhook.trim().length > 0 && !isWebhookUrl(dailyWebhook);
+  const usingTestHook = testWebhook.trim().length > 0;
+  const testTarget = usingTestHook ? testWebhook.trim() : dailyWebhook.trim();
+  const testTargetInvalid = testTarget.length > 0 && !isWebhookUrl(testTarget);
+  const canTest = isEdit && testTarget.length > 0 && !testTargetInvalid;
+
   /** Gọi Edge Function daily-report ở chế độ TEST cho ĐÚNG project này -> gửi report thử
-   *  (nhãn 🧪) vào webhook đang nhập. Chỉ edit mode (cần project.id) + đã có admin JWT. */
+   *  (nhãn 🧪) vào webhook đích. Chỉ edit mode (cần project.id) + đã có admin JWT. */
   async function handleTest() {
     if (!project) return;
-    if (webhookInvalid || !dailyWebhook.trim()) {
+    if (!canTest) {
       setTestMsg('⚠ Nhập webhook hợp lệ trước khi gửi thử.');
       return;
     }
     setTesting(true);
     setTestMsg(null);
+    const where = usingTestHook ? 'webhook thử' : 'webhook chính';
     try {
       const { data, error } = await supabase.functions.invoke('daily-report', {
-        body: { projectId: project.id, webhook: dailyWebhook.trim() },
+        body: { projectId: project.id, webhook: testTarget },
       });
       if (error) throw error;
       if (data?.ok) {
         setTestMsg(
           data.sent > 0
-            ? `✅ Đã gửi thử (${data.sent} tin) — mở kênh Discord xem thử.`
-            : '⚠ Gửi xong nhưng webhook trả lỗi — kiểm tra lại URL webhook.',
+            ? `✅ Đã gửi ${data.sent} tin vào ${where} — mở kênh Discord xem thử.`
+            : `⚠ Gửi xong nhưng ${where} trả lỗi — kiểm tra lại URL.`,
         );
       } else {
         setTestMsg(`❌ ${data?.message ?? 'Gửi thử thất bại.'}`);
@@ -99,6 +126,10 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       setError('Webhook Discord không hợp lệ. Dán link dạng https://discord.com/api/webhooks/…');
       return;
     }
+    if (bugForumInvalid) {
+      setError('Kênh forum bug không hợp lệ. Dán link kênh Discord, hoặc id kênh (17–20 chữ số).');
+      return;
+    }
     setSaving(true);
     setError(null);
     const input: ProjectInput = {
@@ -107,9 +138,14 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       color: project?.color ?? '#6366f1',
       description,
       notionProjectId: notionProjectId || null,
+      notionSyncEnabled,
       weeklySheetId: sheetId,
       dailyReportWebhook: dailyWebhook.trim() || null,
       costSheetId,
+      bugForumChannelId: bugForumId,
+      // Xoá forum thì xoá luôn role: ô role bị khoá lúc đó, để lại giá trị cũ là dữ liệu mồ
+      // côi — lần sau gán forum khác sẽ ping nhầm một role không ai còn nhớ đã đặt.
+      bugNotifyRole: bugForumId ? bugNotifyRole.trim() || null : null,
     };
     try {
       if (isEdit && project) {
@@ -121,6 +157,8 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           weeklySheetId: sheetId,
           dailyReportWebhook: dailyWebhook.trim() || null,
           costSheetId,
+          bugForumChannelId: bugForumId,
+          bugNotifyRole: bugNotifyRole.trim() || null,
         });
       } else {
         await createProject(input, user?.uid ?? '');
@@ -170,6 +208,25 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           💡 Liên kết để khi tạo task trong project này, Notion tự set đúng quan hệ Project.
         </p>
 
+        {/* Công tắc sync Notion (0070). Database Notion là kho DÙNG CHUNG của cả công ty,
+            nên dự án không dùng Notion phải tắt được hẳn, chứ không chỉ "không liên kết". */}
+        <div className="field" style={{ marginBottom: '0.35rem' }}>
+          <Switch
+            checked={notionSyncEnabled}
+            onChange={setNotionSyncEnabled}
+            label="Tạo task kèm trang Notion"
+            ariaLabel="Bật/tắt đồng bộ Notion cho dự án này"
+          />
+        </div>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {notionSyncEnabled ? (
+            <>✅ Mỗi task tạo trong dự án này (cả từ web lẫn từ bot) sẽ đẻ một trang Notion tương ứng.</>
+          ) : (
+            <>⛔ Tắt — task chỉ nằm trong app, không tạo trang Notion và nút “Tạo task trên Notion”
+              ở task chi tiết cũng ẩn đi. Task ĐÃ liên kết trước đó vẫn giữ link, không bị gỡ.</>
+          )}
+        </p>
+
         <label className="field">
           <span>Google Sheet weekly report</span>
           <input
@@ -211,39 +268,115 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           )}
         </p>
 
-        <div className="field">
-          <span>Webhook Discord — báo cáo task hằng ngày</span>
+        <label className="field">
+          <span>Webhook Discord — kênh task của dự án</span>
+          <input
+            className="input"
+            value={dailyWebhook}
+            onChange={(e) => setDailyWebhook(e.target.value)}
+            placeholder="https://discord.com/api/webhooks/…"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {webhookInvalid ? (
+            <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
+          ) : dailyWebhook.trim() ? (
+            <>✅ MỌI thông báo của dự án này đi vào kênh đó: task mới, task xong, xong subtask,
+              tài liệu mới, và báo cáo task 10:30 hằng ngày.</>
+          ) : (
+            <span className="error-text">⚠ Chưa có webhook — dự án này sẽ KHÔNG nhận được thông báo nào
+              trên Discord. Kênh Discord → ⚙ Chỉnh sửa kênh → Tích hợp → Webhook → Sao chép URL.</span>
+          )}
+        </p>
+
+        {/* Gửi thử — ô riêng, KHÔNG lưu. Chỉ ở chế độ SỬA vì cần project.id để dựng báo cáo. */}
+        <div className="field dr-test">
+          <span>🧪 Gửi thử báo cáo</span>
           <div className="row" style={{ gap: '0.5rem', alignItems: 'stretch' }}>
             <input
               className="input"
               style={{ flex: 1 }}
-              value={dailyWebhook}
-              onChange={(e) => setDailyWebhook(e.target.value)}
-              placeholder="https://discord.com/api/webhooks/…"
+              value={testWebhook}
+              onChange={(e) => setTestWebhook(e.target.value)}
+              placeholder="Webhook để thử — bỏ trống thì gửi vào webhook chính ở trên"
+              disabled={!isEdit}
             />
-            {/* Gửi thử chỉ khi đang SỬA project (cần id để build report). Tạo mới thì lưu trước. */}
-            {isEdit && (
-              <button
-                type="button"
-                className="btn-sm"
-                onClick={handleTest}
-                disabled={testing || webhookInvalid || !dailyWebhook.trim()}
-                title="Gửi thử báo cáo của project này vào webhook trên"
-              >
-                {testing ? 'Đang gửi…' : '🧪 Gửi thử'}
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn-sm"
+              onClick={handleTest}
+              disabled={testing || !canTest}
+              title={
+                isEdit
+                  ? 'Gửi báo cáo của dự án này ngay bây giờ (mang nhãn 🧪 TEST)'
+                  : 'Tạo dự án xong rồi mở lại để gửi thử'
+              }
+            >
+              {testing ? 'Đang gửi…' : 'Gửi thử'}
+            </button>
           </div>
+          <p className="muted" style={{ fontSize: '0.78rem', marginTop: '0.4rem', marginBottom: 0 }}>
+            {testMsg ? (
+              <span>{testMsg}</span>
+            ) : !isEdit ? (
+              <>💡 Tạo dự án xong rồi mở lại để gửi thử (báo cáo cần id của dự án).</>
+            ) : testTargetInvalid ? (
+              <span className="error-text">⚠ Link webhook thử không đúng dạng (phải chứa /api/webhooks/).</span>
+            ) : (
+              <>
+                Ô này <strong>không được lưu</strong> — dán webhook kênh nháp để xem thử mà không
+                đụng webhook chính. Báo cáo gửi ngay lúc bấm, nội dung y hệt bản 10:30 nhưng mang
+                nhãn <strong>🧪 TEST</strong>.
+                {usingTestHook ? ' Đang nhắm: webhook thử.' : ' Đang nhắm: webhook chính ở trên.'}
+              </>
+            )}
+          </p>
         </div>
+
+        {/* Forum bug — trước 0069 cặp project ↔ forum nằm trong bot/settings.json, đổi một
+            dự án là phải vào máy chạy bot sửa JSON rồi restart. Giờ nằm cùng chỗ với các
+            cấu hình per-project khác. */}
+        <label className="field">
+          <span>Kênh Forum Discord — báo bug</span>
+          <input
+            className="input"
+            value={bugForumInput}
+            onChange={(e) => setBugForumInput(e.target.value)}
+            placeholder="Dán link kênh forum: https://discord.com/channels/…, hoặc id kênh"
+          />
+        </label>
         <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
-          {testMsg ? (
-            <span>{testMsg}</span>
-          ) : webhookInvalid ? (
-            <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
-          ) : dailyWebhook.trim() ? (
-            <>✅ 10:30 mỗi ngày làm việc, bot gửi task của project này vào kênh webhook, tag người theo Discord ID.{isEdit && ' Bấm “Gửi thử” để xem trước ngay.'}</>
+          {bugForumInvalid ? (
+            <span className="error-text">⚠ Không đọc được id kênh. Chuột phải kênh forum → “Sao chép đường liên kết”.</span>
+          ) : bugForumId ? (
+            <>✅ Kênh id: <span className="mono">{bugForumId}</span> — bot đồng bộ hai chiều:
+              bài forum ↔ bug, tag forum ↔ nhãn. Bot cần quyền <b>Manage Threads</b>,{' '}
+              <b>Manage Channels</b>, <b>Create Posts</b> trong kênh này.</>
           ) : (
-            <>💡 Dán webhook của kênh Discord để nhận báo cáo task hằng ngày (10:30). Rỗng = project này không gửi.</>
+            <>💡 Rỗng = dự án này không đồng bộ bug với Discord (nút “Sync Discord” ở tab Bug
+              sẽ không có gì để chạy). Mỗi dự án một forum riêng.</>
+          )}
+        </p>
+
+        <label className="field">
+          <span>Role Discord được ping khi có bug mới</span>
+          <input
+            className="input"
+            value={bugNotifyRole}
+            onChange={(e) => setBugNotifyRole(e.target.value)}
+            placeholder="Tên role, ví dụ: DEV M1 — hoặc id role"
+            disabled={!bugForumId}
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {!bugForumId ? (
+            <>💡 Điền kênh forum ở trên trước đã.</>
+          ) : bugNotifyRole.trim() ? (
+            <>✅ Bug báo từ web mà <strong>chưa giao cho ai</strong> sẽ ping role này ở đầu bài.
+              Bug đã có người nhận thì chỉ ping đúng người đó. Role phải bật “Allow anyone to
+              @mention this role”, không thì tiếng ping câm.</>
+          ) : (
+            <>💡 Rỗng = không ping ai. Khớp theo tên, không phân biệt hoa/thường và dấu.</>
           )}
         </p>
 

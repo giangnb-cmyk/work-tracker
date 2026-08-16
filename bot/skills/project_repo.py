@@ -37,8 +37,14 @@ def _map_project(r: dict) -> dict:
         "color": r.get("color", "#6366f1"),
         "description": r.get("description", ""),
         "notionProjectId": r.get("notion_project_id"),
+        # False = du an nay KHONG tao trang Notion khi tao task (migration 0070). Thieu cot
+        # (chua ap migration) -> True, giu hanh vi cu.
+        "notionSyncEnabled": r.get("notion_sync_enabled", True) is not False,
         # Google Sheet cho weekly report (migration 0022). Rong = project chua bat.
         "weeklySheetId": r.get("weekly_sheet_id"),
+        # Webhook Discord RIENG cua du an: moi thong bao cua du an nay di vao kenh do. Rong
+        # = khong bao gi (CO Y khong lui ve webhook chung — xem _notify_created).
+        "discordWebhook": r.get("daily_report_webhook"),
     }
 
 

@@ -164,10 +164,44 @@ export interface Attachment {
   storagePath?: string;
 }
 
+/**
+ * Một mục trong THƯ VIỆN TÀI LIỆU của dự án (`project_docs`, migration 0066): link tài
+ * liệu dùng chung, chọn ra để gắn vào feature/task.
+ *
+ * ĐỪNG lẫn với `Attachment`: attachment là bản đã ĐÍNH VÀO một task/feature (sống trong
+ * cột jsonb của nó), còn đây là danh mục để chọn. Gắn = copy sang Attachment, không trỏ
+ * FK — xoá một mục trong thư viện không được làm rỗng tài liệu của hàng loạt task cũ.
+ */
+export interface ProjectDoc {
+  id: string;
+  projectId: string;
+  name: string;
+  url: string;
+  /** Suy từ URL (`detectProvider`) rồi lưu lại — dùng cho icon và bộ lọc. */
+  provider: string;
+  description: string;
+  /** Nhóm tự do do người dùng gõ (GDD, Art, Kỹ thuật…). Rỗng = chưa phân nhóm. */
+  category: string;
+  sortOrder: number;
+  createdAt?: Timestamp;
+  createdBy: string | null;
+}
+
+/** Dữ liệu form thêm/sửa một mục thư viện (id/thời gian do DB lo). */
+export type ProjectDocInput = Pick<ProjectDoc, 'name' | 'url' | 'description' | 'category'>;
+
 export interface Subtask {
   id: string;
   title: string;
   done: boolean;
+  /**
+   * Người làm subtask này (→ `profiles.id`). Mặc định = người THÊM nó, đổi được sau.
+   * `null`/thiếu = chưa giao — subtask có trước khi thêm trường này đều rơi vào đây, nên
+   * mọi chỗ đọc phải chịu được `undefined` (jsonb, không có migration để backfill).
+   */
+  assigneeId?: string | null;
+  /** Tên hiển thị denormalize, y như `tasks.assigneeName` — render khỏi phải join profiles. */
+  assigneeName?: string;
 }
 
 export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'review', 'done'];
@@ -270,6 +304,12 @@ export interface Feature {
    * tracker nên không có task để suy ra. null = suy từ task như thường.
    */
   doneAt: Timestamp | null;
+  /**
+   * Mốc MONG MUỐN hoàn thành (migration `0071`) — hẹn riêng cho feature này, vẽ thành cờ
+   * 🎯 trên Timeline. Khác `doneAt` (đã xong lúc nào, quá khứ) và khác
+   * `FeatureLabel.releaseDate` (lịch phát hành của cả version). null = chưa hẹn.
+   */
+  targetDate: Timestamp | null;
   createdAt?: Timestamp;
   createdBy: string;
 }
@@ -283,6 +323,12 @@ export interface Project {
   description: string;
   /** Notion Projects DB page id — lets task syncs set the Notion "Project" relation. */
   notionProjectId: string | null;
+  /**
+   * false = tạo task trong dự án này KHÔNG đẻ trang Notion (migration `0070`), và nút
+   * "Sync Notion" ở task chi tiết cũng ẩn. Độc lập với {@link notionProjectId}: tắt sync
+   * vẫn giữ được liên kết để bật lại sau.
+   */
+  notionSyncEnabled: boolean;
   /** Google Spreadsheet **id** (không phải URL) bot điền weekly report vào. Rỗng = chưa bật. */
   weeklySheetId: string | null;
   /**
@@ -301,6 +347,14 @@ export interface Project {
    * riêng chỉ admin xem (có LƯƠNG) + share Editor cho service account. Rỗng = chưa bật.
    */
   costSheetId: string | null;
+  /**
+   * ID kênh Forum Discord đồng bộ bug hai chiều (migration `0069`). Để **chuỗi** chứ không
+   * phải number: snowflake 19 chữ số vượt `Number.MAX_SAFE_INTEGER`, ép sang number là mất
+   * chữ số cuối và bot đi tìm một kênh không tồn tại. Rỗng = project không sync bug.
+   */
+  bugForumChannelId: string | null;
+  /** Tên hoặc id role Discord được ping khi bug từ web thành bài forum mới. Rỗng = không ping. */
+  bugNotifyRole: string | null;
   createdAt?: Timestamp;
   createdBy: string;
 }
@@ -509,6 +563,8 @@ export interface Bug {
 
 export interface Sprint {
   id: string;
+  /** Dự án sở hữu sprint (0068) — sprint ĐỘC LẬP theo từng dự án, không dùng chung nữa. */
+  projectId: string | null;
   name: string;
   goal: string;
   status: SprintStatus;
@@ -549,6 +605,16 @@ export interface Task {
   /** Related people (uids) beyond the assignee — mentioned on completion. */
   watcherIds: string[];
   watcherNames: string[];
+}
+
+/**
+ * Một dòng lịch sử sprint của task (bảng `task_sprints`, migration 0015): task đã VÀO
+ * sprint nào, lúc nào. `tasks.sprintId` là sprint hiện tại; bảng này giữ mọi sprint đã qua
+ * (trigger DB ghi, client chỉ đọc) — để thấy task bị đẩy qua mấy sprint.
+ */
+export interface TaskSprintEntry {
+  sprintId: string;
+  addedAt: Timestamp | null;
 }
 
 /** Payload used when creating a task from the UI (server fills timestamps/id). */
@@ -615,3 +681,13 @@ export const NOTE_RATING_LABEL: Record<number, string> = NOTE_RATINGS.reduce(
   (acc, r) => ({ ...acc, [r.value]: r.label }),
   {} as Record<number, string>,
 );
+
+/**
+ * Ba mục nội dung của một ghi chú — icon để nhận diện & phân loại nhanh trong nhật ký.
+ * `key` trùng tên trường trong MemberSprintNote để render bằng vòng lặp, không lặp code.
+ */
+export const NOTE_SECTIONS: { key: 'overview' | 'highlights' | 'concerns'; label: string; icon: string }[] = [
+  { key: 'overview', label: 'Tổng quan', icon: '📋' },
+  { key: 'highlights', label: 'Nổi bật', icon: '⭐' },
+  { key: 'concerns', label: 'Lưu ý', icon: '⚠️' },
+];

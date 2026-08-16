@@ -28,6 +28,39 @@ function supabaseAuthClient(): SupabaseClient | null {
   return client;
 }
 
+/**
+ * Webhook Discord của MỘT dự án (`projects.daily_report_webhook`).
+ *
+ * Đọc bằng ANON KEY + CHÍNH token của người gọi, nên RLS vẫn có hiệu lực (policy SELECT của
+ * `projects` mở cho `authenticated`). Không dùng service-role: CLAUDE.md cấm đưa key đó lên
+ * Vercel, và ở đây không cần.
+ *
+ * CỐ Ý không để client tự gửi URL webhook lên: làm thế thì bất kỳ ai đăng nhập cũng sai
+ * được server bắn tin vào một webhook Discord tuỳ ý.
+ *
+ * Client tạo MỚI mỗi lần gọi (không cache như `supabaseAuthClient`): token nằm trong header
+ * của client, cache lại là request sau đi bằng danh tính của người trước.
+ */
+export async function projectWebhook(projectId: string, authHeader: string): Promise<string | null> {
+  const url = env.SUPABASE_URL;
+  const key = env.SUPABASE_ANON_KEY;
+  if (!url || !key || !authHeader) return null;
+  const scoped = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data, error } = await scoped
+    .from('projects')
+    .select('daily_report_webhook')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (error) {
+    console.warn('Không đọc được webhook của dự án %s: %s', projectId, error.message);
+    return null;
+  }
+  return (data?.daily_report_webhook as string | null) || null;
+}
+
 export interface Caller {
   ok: boolean;
   uid?: string;

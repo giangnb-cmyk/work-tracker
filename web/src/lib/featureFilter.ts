@@ -36,14 +36,18 @@ export interface FeatureStatsView {
 }
 
 /**
- * Feature coi là XONG khi: được đánh dấu tay, HOẶC mọi task của nó đã xong.
+ * Feature coi là XONG khi: mọi task của nó đã xong, HOẶC không có task nào nhưng được
+ * đánh dấu tay.
  *
- * `doneAt` (0031) là lối ghi đè thủ công, thắng cả số task — dự án chạy từ trước khi có
- * tracker thì feature đã ship chẳng có task nào để suy ra, cứ nằm đó 0% mãi.
+ * CÓ TASK thì TASK là nguồn sự thật — kể cả khi từng đánh dấu tay: feature "đã xong" mà
+ * nhận thêm task mới là nó ĐANG MỞ LẠI, giữ 100% với dấu tích trong khi card ghi 2/3 là
+ * tự mâu thuẫn (bug đã bị báo). `doneAt` (0031) chỉ còn là lối thoát cho feature 0 task —
+ * đúng mục đích ban đầu của nó: dự án chạy từ trước khi có tracker thì feature đã ship
+ * chẳng có task nào để suy ra, cứ nằm đó 0% mãi.
  *
  * Hai trường hợp cố tình KHÔNG tính là xong:
  * - `ongoing` (Polish, tuning…) theo định nghĩa không bao giờ có "done" — xem DATA_MODEL.
- *   Xét TRƯỚC doneAt: đánh dấu tay cũng không lật được luật này.
+ *   Xét TRƯỚC mọi thứ: đánh dấu tay cũng không lật được luật này.
  * - Chưa có task nào (0/0) mà cũng không đánh dấu tay: chưa làm gì chứ không phải đã xong.
  *
  * Loại trừ theo 'ongoing' chứ KHÔNG liệt kê loại nào được tính: thêm loại mới (0030 thêm
@@ -51,8 +55,8 @@ export interface FeatureStatsView {
  */
 export function isFeatureDone(f: Feature, stats: FeatureStatsView): boolean {
   if (f.kind === 'ongoing') return false;
-  if (f.doneAt) return true;
-  return stats.total > 0 && stats.done === stats.total;
+  if (stats.total > 0) return stats.done === stats.total;
+  return Boolean(f.doneAt);
 }
 
 /**

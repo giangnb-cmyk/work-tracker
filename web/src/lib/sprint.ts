@@ -35,6 +35,9 @@ export interface SprintStats {
   totalPoints: number;
   percentDone: number; // 0..100 by task count
   overdue: number;
+  /** Tổng subtask của mọi task trong phạm vi, và số đã tick. */
+  subtasksTotal: number;
+  subtasksDone: number;
 }
 
 export function computeStats(tasks: Task[]): SprintStats {
@@ -42,6 +45,8 @@ export function computeStats(tasks: Task[]): SprintStats {
   let donePoints = 0;
   let totalPoints = 0;
   let overdue = 0;
+  let subtasksTotal = 0;
+  let subtasksDone = 0;
   const now = Date.now();
 
   for (const t of tasks) {
@@ -49,22 +54,59 @@ export function computeStats(tasks: Task[]): SprintStats {
     totalPoints += t.points ?? 0;
     if (t.status === 'done') donePoints += t.points ?? 0;
     if (t.status !== 'done' && t.dueDate && t.dueDate.toDate().getTime() < now) overdue += 1;
+    for (const s of t.subtasks ?? []) {
+      subtasksTotal += 1;
+      if (s.done) subtasksDone += 1;
+    }
   }
 
   const total = tasks.length;
   const percentDone = total === 0 ? 0 : Math.round((byStatus.done / total) * 100);
-  return { total, byStatus, donePoints, totalPoints, percentDone, overdue };
+  return { total, byStatus, donePoints, totalPoints, percentDone, overdue, subtasksTotal, subtasksDone };
 }
 
-export function groupByAssignee(tasks: Task[]): Map<string, Task[]> {
-  const map = new Map<string, Task[]>();
+/** Một dòng của bảng "Khối lượng theo người" — task VÀ subtask của cùng một người. */
+export interface WorkloadRow {
+  name: string;
+  tasks: Task[];
+  taskDone: number;
+  points: number;
+  subtaskTotal: number;
+  subtaskDone: number;
+}
+
+/**
+ * Khối lượng theo người: gộp task được giao VÀ subtask được giao.
+ *
+ * Hai nguồn phải hợp nhất chứ không lấy một: subtask giao chéo (task của A, subtask giao
+ * cho B) là chuyện thường, nên chỉ đếm theo task là B biến mất khỏi bảng dù đang gánh việc.
+ * Khoá theo TÊN (đồng bộ với `assigneeName` denormalize ở cả task lẫn subtask); subtask
+ * chưa giao gom vào 'Chưa giao' y như task.
+ */
+export function workloadRows(tasks: Task[]): WorkloadRow[] {
+  const UNASSIGNED = 'Chưa giao';
+  const rows = new Map<string, WorkloadRow>();
+  const rowFor = (name: string): WorkloadRow => {
+    const found = rows.get(name);
+    if (found) return found;
+    const fresh: WorkloadRow = { name, tasks: [], taskDone: 0, points: 0, subtaskTotal: 0, subtaskDone: 0 };
+    rows.set(name, fresh);
+    return fresh;
+  };
+
   for (const t of tasks) {
-    const key = t.assigneeName || 'Chưa giao';
-    const arr = map.get(key) ?? [];
-    arr.push(t);
-    map.set(key, arr);
+    const row = rowFor(t.assigneeName || UNASSIGNED);
+    row.tasks.push(t);
+    if (t.status === 'done') row.taskDone += 1;
+    row.points += t.points ?? 0;
+    for (const s of t.subtasks ?? []) {
+      // Tên lưu trong subtask có thể rỗng (subtask cũ, có trước khi thêm người nhận).
+      const owner = rowFor(s.assigneeName || UNASSIGNED);
+      owner.subtaskTotal += 1;
+      if (s.done) owner.subtaskDone += 1;
+    }
   }
-  return map;
+  return [...rows.values()];
 }
 
 /** Thành tích của một thành viên trong phạm vi task được truyền vào (thường là 1 sprint). */

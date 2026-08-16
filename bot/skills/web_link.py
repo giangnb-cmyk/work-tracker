@@ -17,17 +17,19 @@ def base_url() -> str:
     return ((os.getenv(_BASE_ENV) or "").strip() or _DEFAULT_BASE).rstrip("/")
 
 
-def task_url(task_id: str) -> str:
+def task_url(task_id: str, project_id=None) -> str:
     """Link mo TaskModal theo id DAY DU. Rong neu thieu id.
 
     WHY id DAY DU chu khong phai short_id: TaskDeepLink query .eq('id', taskId), id rut
     gon 8 ky tu lam Postgres nem loi cast uuid -> nguoi dung thay 'Không tìm thấy task'.
-    Khong can '?p=<projectId>': TaskDeepLink tu chuyen sang du an cua task.
+    project_id (tuy chon) -> them '?p=<projectId>' de mo DUNG du an ngay khi bam tu Discord
+    (nguoi bam co the dang dung du an khac). Song song taskPath() ben web/src/lib/router.ts.
     """
     base = base_url()
     if not base or not task_id:
         return ""
-    return f"{base}/tasks/{task_id}"
+    suffix = f"?p={project_id}" if project_id else ""
+    return f"{base}/tasks/{task_id}{suffix}"
 
 
 def task_short_url(short_code, task_id: str) -> str:

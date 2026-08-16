@@ -99,6 +99,7 @@ A time-boxed sprint. Doc id is auto-generated.
 | Field       | Type      | Notes                                            |
 |-------------|-----------|--------------------------------------------------|
 | `id`        | string    | mirror of doc id (convenience)                   |
+| `projectId` | string    | **dự án sở hữu** (0068, NOT NULL, `on delete cascade`) — sprint ĐỘC LẬP theo từng dự án, hết dùng chung |
 | `name`      | string    | e.g. `Sprint 12`                                 |
 | `goal`      | string    | short sprint goal (may be empty)                 |
 | `status`    | string    | `planning` \| `active` \| `completed`            |
@@ -107,7 +108,22 @@ A time-boxed sprint. Doc id is auto-generated.
 | `createdAt` | Timestamp | creation time                                    |
 | `createdBy` | string    | uid of creator                                   |
 
-> Only **one** sprint should be `active` at a time (app convention, not enforced by rules).
+> Only **one** sprint per project should be `active` at a time (app convention, not enforced
+> by rules).
+>
+> **Sprint theo TỪNG dự án (0068)** — trước đây toàn cục, dự án mới mở ra là thấy nguyên
+> list sprint của dự án cũ:
+> - Cron `ensure_week_sprint()` (0041, viết lại ở 0068) tạo sprint tuần cho **mỗi** dự án —
+>   nghĩa là các sprint tuần **trùng tên** giữa các dự án; mọi phép resolve theo tên/`active`
+>   phải khoanh vùng dự án.
+> - Trigger `projects_seed_week_sprint` (AFTER INSERT on `projects`): dự án lập giữa tuần có
+>   ngay sprint tuần hiện tại, không đợi cron thứ 2.
+> - Web: `useSprints(uid, projectId)` lọc + realtime theo `project_id`; đổi dự án là
+>   `SprintContext` xoá lựa chọn sprint và tự chọn lại sprint đang chạy của dự án mới.
+> - Bot: `resolve_sprint`/`active_sprint`/`list_sprints` nhận `project_id`; `sprint_ops
+>   create` cần `--project` (bỏ trống nếu chỉ có 1 dự án); `weekly_report.sprint_pair` BẮT
+>   BUỘC scope dự án (sprint tuần các dự án cùng `start_date`, không lọc là lấy nhầm).
+> - Edge Function `daily-report`: sprint đang chạy tính riêng cho từng project.
 
 ---
 
@@ -124,11 +140,31 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `color`           | string         | accent token/hex for the card                             |
 | `description`     | string         | optional short description                                |
 | `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
+| `notionSyncEnabled` | boolean      | `false` = tạo task trong dự án này **không** đẻ trang Notion, và nút "Tạo task trên Notion" ở task chi tiết cũng ẩn (migration `0070`). Áp dụng cho CẢ web (`createTask`) lẫn bot (`task_ops._sync_create`). Mặc định `true`. Độc lập với `notionProjectId`: tắt sync vẫn giữ liên kết để bật lại |
 | `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
 | `releaseSheetId`  | string \| null | Google Spreadsheet **id** chứa lịch phát hành, tab `Timeline` (migration `0033`). KHÁC `weeklySheetId` — hai sheet khác nhau, xem `release_sync_requests` |
-| `dailyReportWebhook` | string \| null | Discord webhook URL cho báo cáo task hằng ngày 10:30 (migration `0047`). Job ngoài `daily-report-notion` (đọc bằng service_role) gửi report của project này vào đây. Rỗng = không gửi |
+| `dailyReportWebhook` | string \| null | **Webhook Discord của dự án** — MỌI thông báo của project này đi vào đúng kênh đó: task mới, task xong, xong subtask, tài liệu mới (web, qua `/api/notify-discord`), task mới do bot tạo (`task_ops`), và báo cáo task 10:30 (Edge Function `daily-report`, đọc bằng service_role). Migration `0047`. Rỗng = **không gửi thông báo nào** |
+| `bugForumChannelId` | string \| null | ID kênh **Forum Discord** đồng bộ bug hai chiều (migration `0069`). **Chuỗi**, không phải number — snowflake 19 chữ số vượt `Number.MAX_SAFE_INTEGER`. Rỗng = dự án không sync bug |
+| `bugNotifyRole`   | string \| null | Tên hoặc id role Discord được ping khi bug báo từ web thành bài forum mới (migration `0069`). Rỗng = không ping |
 | `createdAt`       | Timestamp      | creation time                                             |
 | `createdBy`       | string         | uid of creator                                            |
+
+### Thông báo Discord: MỘT KÊNH MỖI DỰ ÁN (`dailyReportWebhook`)
+
+Webhook nằm ở **hàng project**, không phải biến môi trường. Trước 08/2026 cả app dùng chung
+đúng một `DISCORD_WEBHOOK_URL` trên Vercel/bot, nên tạo task ở dự án MỚI vẫn bắn thông báo
+vào kênh của dự án CŨ (lỗi thật: task của *SM7 - Farm Route* rơi vào `#merge-task` của
+*M1 - Tasty Merge*).
+
+- **Web** → `web/api/notify-discord.ts`: mọi payload mang `projectId`; server tra
+  `projects.daily_report_webhook` bằng **anon key + token của chính người gọi** (RLS vẫn có
+  hiệu lực — tuyệt đối không đưa service-role key lên Vercel), rồi post vào đó.
+- **Bot** → `task_ops._notify_created` lấy `project['discordWebhook']` (map trong
+  `project_repo`) và truyền vào `webhook_notify.post(url=…)`.
+- Dự án **chưa cấu hình webhook = im lặng**, cố ý: `DISCORD_WEBHOOK_URL` chỉ còn là dự
+  phòng cho payload không kèm `projectId`. Lùi về nó khi biết dự án chính là tái lập lỗi cũ.
+- Client **không bao giờ** gửi URL webhook lên server: ai đăng nhập cũng sai được server
+  bắn tin vào một webhook Discord bất kỳ.
 
 ### Weekly report (`weeklySheetId`)
 
@@ -295,26 +331,27 @@ insert+select, chỉ bot (service role) update.
 
 ---
 
-## `member_sprint_notes` (đánh giá thành viên theo sprint)
+## `member_sprint_notes` (nhật ký đánh giá thành viên theo sprint)
 
-Ghi chú có cấu trúc cho MỘT người trong MỘT sprint (tuần) — migration `0059`. Hiện ở tab **Đánh
-giá** (`Reviews`, view id `reviews`) trong **khu quản trị chung NGOÀI dự án** (`GlobalAdmin`, cạnh
-Thành viên/Chi phí — dữ liệu toàn cục theo người) và tab **Ghi chú** trong `MemberModal`. Nhạy cảm
-(đánh giá của quản lý) → RLS **admin-only cho CẢ ĐỌC lẫn GHI** (`is_admin()` bao owner), y như
-`member_compensation`. Một dòng DÙNG CHUNG cho mỗi `(member_id, sprint_id)` (khoá upsert), sửa-đè;
-`updated_by` = người sửa cuối (KHÔNG lưu tác giả gốc — upsert ghi đè mọi cột truyền vào).
+Ghi chú có cấu trúc cho một người trong một sprint (tuần) — migration `0059`, chuyển thành **NHẬT
+KÝ APPEND-ONLY** ở `0062`: **mỗi lần lưu là MỘT DÒNG MỚI** mang ngày ghi (`created_at`), KHÔNG còn
+unique `(member_id, sprint_id)` / KHÔNG ghi đè — quản lý log hằng ngày trong sprint, form luôn mở
+trống. Hiện ở tab **Đánh giá** (`Reviews`, view id `reviews`) trong **khu quản trị chung NGOÀI dự
+án** (`GlobalAdmin`, cạnh Thành viên/Chi phí — dữ liệu toàn cục theo người) và tab **Ghi chú**
+trong `MemberModal` (nhật ký theo ngày). Nhạy cảm (đánh giá của quản lý) → RLS **admin-only cho CẢ
+ĐỌC lẫn GHI** (`is_admin()` bao owner), y như `member_compensation`.
 
 | Field | Type | Notes |
 |---|---|---|
 | `id` | uuid (PK) | `gen_random_uuid()` |
 | `member_id` | uuid | → `profiles.id`, `on delete cascade` (người được đánh giá) |
 | `sprint_id` | uuid | → `sprints.id`, `on delete cascade` |
-| `overview` | text | Tổng quan ("tuần này thế nào") |
+| `overview` | text | Tổng quan ("hôm nay/tuần này thế nào") |
 | `highlights` | text | Điểm nổi bật |
 | `concerns` | text | Điểm cần lưu ý |
 | `rating` | smallint \| null | 1..5 (CHECK); null = chưa chấm. Nhãn: `NOTE_RATINGS` trong `web/src/types.ts` |
-| `updated_at` / `updated_by` | timestamptz / uuid \| null | writer set inline (không trigger như `member_compensation`) |
-| `created_at` | timestamptz | `now()` |
+| `updated_at` / `updated_by` | timestamptz / uuid \| null | người ghi / lúc ghi DÒNG NÀY (append-only từ `0062`) |
+| `created_at` | timestamptz | `now()` — **ngày ghi của entry, hiện ở nhật ký** |
 
 - **RLS**: 4 policy admin-only (select/insert/update/delete). Realtime + `replica identity full`.
 - **Web**: hook `useSprintNotes(sprintId)` (live, `byMember` Map, `enabled=isAdmin`); ghi qua
@@ -358,13 +395,89 @@ liên tục không bao giờ xong (Polish…) vẫn là feature nhưng mang `kin
 | `labelIds`    | string[]  | ids into `feature_labels` — nhóm + version, dùng để lọc |
 | `attachments` | jsonb     | link tài liệu + ảnh ref dùng chung mọi task của feature (0019) |
 | `memberIds`   | uuid[]    | **người tham gia thêm tay** (→ `profiles.id`), migration 0046. UI gộp với người suy từ task; task mới thuộc feature auto-gắn cả hai nhóm vào `tasks.watcherIds`. Denormalize, không FK từng phần tử |
-| `doneAt`      | Timestamp \| null | mốc đánh dấu TAY là đã xong (0031); `null` = suy từ task |
+| `doneAt`      | Timestamp \| null | mốc đánh dấu TAY là đã xong (0031) — CHỈ có nghĩa khi feature 0 task. Feature CÓ task thì task quyết định (`isFeatureDone`): thêm task mới vào feature đã xong là nó tự mở lại — 2/3 task mà hiện 100% là bug đã sửa |
+| `targetDate`  | Timestamp \| null | **mốc MONG MUỐN hoàn thành** (migration `0071`, cột `date`) — điền tay ở popup Feature, vẽ thành cờ 🎯 trên Timeline (đỏ khi quá hạn mà chưa xong hết task). Là HẸN cho riêng feature này nên có thể sớm hơn `feature_labels.releaseDate` của version chứa nó. Nhân bản feature **không** chép mốc này. NULL = chưa hẹn |
 | `createdAt`   | Timestamp | creation time                                    |
 | `createdBy`   | string    | uid of creator                                   |
 
 **feature_labels** — per-project tag palette cho feature (cùng pattern `bug_labels`;
 RLS: read all signed-in, write admin). Fields: `id`, `projectId`, `name` (1–40),
-`color`, `icon`. Không có `discordTagId` — palette này không sync Discord.
+`color`, `icon`, `releaseDate`. Không có `discordTagId` — palette này không sync Discord.
+
+`releaseDate` (cột `date`, migration `0032`) chỉ có nghĩa với nhãn **version**: đó là ngày
+phát hành của cả bản, và Timeline lấy nó làm mốc CHỐT — bar version chạy
+`[ngày phát hành bản trước → ngày phát hành của nó]` chứ không suy từ hạn task
+(`applyReleaseWindows` trong `lib/timelineRows.ts`). Hai đường ghi, **cùng một cột**:
+- **Tay**: admin bấm thẳng vào 🚩 trên hàng version ở Timeline (`updateFeatureLabel`).
+- **Sheet**: nút "🔄 Sync lịch" xếp `release_sync_requests`, bot đọc tab `Timeline` của
+  `projects.release_sheet_id` rồi ghi đè (migration `0033`).
+
+> Sync sheet GHI ĐÈ bản sửa tay — nhưng CHỈ với version có mặt trong sheet: `sync_project`
+> duyệt theo từng dòng sheet và khớp nhãn **theo tên**, version không có trong sheet thì
+> không ai đụng tới. Chốt lịch bằng tay cho một bản đang nằm trong sheet thì lần
+> "🔄 Sync lịch" kế tiếp sẽ dập mất.
+
+---
+
+## `project_docs` (thư viện tài liệu của dự án)
+
+Danh mục link tài liệu dùng chung của MỘT dự án — migration `0066`. Tab **📚 Tài liệu**
+(`DocLibrary`, view id `docs`) để curate; gắn vào task/feature bằng nút **📚 Thư viện** trong
+ô Tài liệu của `TaskModal`/`FeatureModal` (`DocPickerModal`).
+
+> ⚠️ **KHÔNG phải bảng `documents`.** `documents` (0014…0050) là store RAG (chunk +
+> embedding bge-m3) cho doc search của bot — chỉ mục do máy sinh. `project_docs` là thư
+> viện do người curate. Hai thứ khác nhau, đừng nhồi vào nhau.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid (PK) | `gen_random_uuid()` |
+| `project_id` | uuid | → `projects.id`, `on delete cascade` |
+| `name` | text | tên hiển thị (1–160 ký tự); web để trống thì lấy hostname của URL |
+| `url` | text | CHECK `~* '^https?://'`; **unique theo `(project_id, url)`** — dán trùng là rác |
+| `provider` | text | suy từ URL bằng `detectProvider` rồi LƯU LẠI (icon + bộ lọc), mặc định `link` |
+| `description` | text | ghi chú: tài liệu dùng để làm gì |
+| `category` | text | nhóm **tự do** (GDD, Art, Kỹ thuật…). Rỗng = chưa phân nhóm. Cố ý không dựng bảng palette: thư viện một dự án chỉ tầm vài chục mục |
+| `sort_order` | int | thứ tự (mặc định 0) |
+| `created_at` / `created_by` | timestamptz / uuid \| null | → `profiles.id` (`on delete set null`) |
+
+- **RLS**: `select` mọi user đã đăng nhập (như `bug_labels`); **`insert` MỞ cho mọi user**
+  (gương `tasks_insert` — thư viện chỉ hữu ích khi ai tìm được tài liệu cũng bỏ vào được),
+  nhưng `with check (created_by = auth.uid())` nên không mạo danh người khác;
+  `update`/`delete` = `is_admin()` HOẶC chính người đã thêm (như bug do mình báo).
+  Realtime + `replica identity full`.
+- **Gắn = COPY, không trỏ FK**: `docToAttachment` sinh một `Attachment` mới (id mới) rồi ghi
+  vào `tasks.attachments` / `features.attachments`. Cố ý: trỏ FK thì xoá một mục trong thư
+  viện sẽ làm rỗng tài liệu của hàng loạt task cũ. Đổi lại, sửa tên trong thư viện KHÔNG
+  cập nhật các task đã gắn — đó là cái giá đã chọn.
+- Trùng lặp nhận diện theo **URL** chứ không theo id (attachment là bản copy nên id khác):
+  `DocPickerModal` khoá mục đã gắn, `AttachmentsField.addFromLibrary` chốt thêm lần nữa.
+- Web: `useProjectDocs` (live) · `lib/projectDocWrites.ts` (`DuplicateDocError` bọc lỗi
+  `23505` của unique index thành câu tiếng Việt). Bot KHÔNG đụng bảng này.
+- **Tạo tài liệu mới bắn thông báo Discord** (`/api/notify-discord`, event `doc_created`,
+  embed viền sky, tiêu đề bấm được mở thẳng tài liệu) — fire-and-forget từ
+  `createProjectDoc`, KHÔNG ping ai và KHÔNG bắn khi sửa.
+
+### `project_doc_pins` (ghim tài liệu — RIÊNG từng người)
+
+`{ user_id → profiles, doc_id → project_docs, pinned_at }`, PK `(user_id, doc_id)` —
+migration `0067`. Ghim đẩy tài liệu lên đầu thư viện **và** lên đầu ô chọn khi gắn vào
+task/feature ("hay dùng" = hay gắn nhất).
+
+> **Vì sao bảng riêng, không thêm cột `pinned` vào `project_docs`**: ghim là sở thích CÁ
+> NHÂN. Một cột trên hàng tài liệu là ghim dùng chung — một người ghim thì cả đội bị đảo
+> thứ tự.
+
+- **RLS chặt hơn cả thư viện**: cả `select`/`insert`/`delete` đều `user_id = auth.uid()`.
+  Người khác **không đọc được** ghim của tôi (kể cả owner — đã kiểm chứng), và không sửa
+  được danh sách của tôi. Không có policy `update`: ghim chỉ có/không. Realtime +
+  `replica identity full` để event DELETE (bỏ ghim) mang đủ cột cho bộ lọc `user_id`.
+- Sắp thứ tự **ở client** (`DocLibrary` / `DocPickerModal`), không ở SQL: gộp vào query là
+  phải join thêm chỉ để đổi thứ tự vài chục dòng. `Array.sort` của JS là stable nên trong
+  mỗi khối (ghim / không ghim) thứ tự gốc `sort_order → mới nhất` giữ nguyên.
+- Web: `useMyDocPins(uid)` trả `Set<docId>` (không lọc theo dự án — RLS đã bó về đúng người,
+  và một người chỉ ghim vài mục) · `setDocPinned` (`upsert` để bấm hai lần / hai tab không
+  ném lỗi trùng khoá).
 
 ---
 
@@ -406,8 +519,50 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 URL) and picks the icon shown on the task card. `storagePath` is set for images uploaded to
 Firebase Storage (kept so the file can be deleted).
 
-**Subtask**: `{ id, title, done }`. Task progress = done/total subtasks; if a task has no
-subtasks, progress falls back to a status stage (`todo`=0, `in_progress`, `review`, `done`=100%).
+**Subtask**: `{ id, title, done, assigneeId?, assigneeName? }`. Task progress = done/total
+subtasks; if a task has no subtasks, progress falls back to a status stage (`todo`=0,
+`in_progress`, `review`, `done`=100%).
+
+> `assigneeId` (→ `profiles.id`) + `assigneeName` (denormalize, như `tasks.assigneeName`):
+> **người làm subtask**, có thể KHÁC người nhận task — giao chéo là chuyện thường. Thêm
+> subtask thì mặc định giao cho CHÍNH NGƯỜI THÊM (`SubtasksField`), đổi được ngay tại chỗ.
+> Hai trường này **tuỳ chọn**: `subtasks` là jsonb nên subtask cũ không có chúng và không có
+> migration nào backfill — mọi chỗ đọc phải chịu được `undefined` (coi như "chưa giao").
+> Dùng ở: **Task của tôi** (mục "Subtask của tôi" — `useMySubtasks` lọc bằng `contains`
+> jsonb `[{"assigneeId": uid}]`, KHÔNG lọc theo `tasks.assignee_id` vì task cha có thể của
+> người khác), **Thống kê** (`workloadRows` gộp task + subtask theo người; thẻ ☑️ Subtask),
+> và **daily report** (Edge Function `daily-report` liệt kê subtask dưới task, ghi kèm tên
+> khi người làm khác người nhận task).
+>
+> **RPC `toggle_my_subtask(p_task_id, p_subtask_id, p_done)`** (migration `0064`) — đường
+> DUY NHẤT để người chỉ-giữ-subtask tick việc của mình. RLS `tasks_update` chỉ cho
+> admin/reporter/assignee của TASK ghi, nên subtask giao chéo sẽ bị chặn nếu ghi thẳng.
+> Cố ý KHÔNG nới `tasks_update`: RLS theo HÀNG chứ không theo cột, nới ra là mở luôn cho
+> họ sửa tiêu đề/hạn/sprint task người khác. Hàm này `SECURITY DEFINER` + `grant execute`
+> cho `authenticated` (khác các definer khác trong repo) vì cổng nằm trong thân hàm: chỉ
+> lật đúng cờ `done` của đúng subtask mang `assigneeId` = người gọi, trả `false` nếu không.
+> Advisor than "signed-in users can execute SECURITY DEFINER" là **chủ đích**, đừng "sửa".
+> Đường này không đẩy checklist sang Notion (chỉ `updateTask` làm) — Notion khớp lại ở lần
+> lưu task kế tiếp từ màn chi tiết.
+
+### Người nhận khi bot tạo task (`assigneeId`)
+
+Bot `task_ops.py create` **mặc định giao cho CHÍNH người tag bot** (`--assignee` bỏ trống →
+`_assignee_fields(..., default_self=True)` tra `BOT_SENDER_ID` ↔ `profiles.discord_id`).
+Trước đây bỏ trống là task không có người nhận, nên "@bot tạo cho tôi task X" ra một task
+nằm im trong Backlog — lỗi đã bị báo.
+
+- Đại từ ngôi thứ nhất (`me` · `tôi` · `mình` · `tui` · `tớ` · `em`) → người gửi. Bộ từ
+  `_SELF_TOKENS` dùng CHUNG cho `create`/`update`/`list`, **không** đi qua
+  `repo.resolve_user()`: hàm đó khớp `display_name` cả một phần, nên `'me'` sẽ dính bất kỳ
+  ai có "me" trong tên. Cố ý KHÔNG nhận `anh`/`chị` — "giao cho anh" còn có thể là người khác.
+- `--assignee none` (hoặc `chưa giao`/`không`) = **cố ý** để trống. Chỉ dùng khi nhập hàng
+  loạt kế hoạch của người khác mà dòng đó không nêu tên ai.
+- `update` **không** bật mặc định này: ở đó "không đưa `--assignee`" nghĩa là "đừng đổi".
+- `create --status` (mặc định `todo`) cho "tạo task X, tick done luôn" xong trong MỘT lượt.
+  Tạo thẳng ở `done` thì `dueDate` = HÔM NAY chứ không phải cuối sprint — `dueDate` của task
+  done là ngày hoàn thành thật, và Edge Function `daily-report` lọc mục "hôm qua đã hoàn
+  thành" theo đúng cột đó.
 
 ### Status columns (Kanban)
 
@@ -565,6 +720,38 @@ Triggers: daily (default 09:00 `Asia/Ho_Chi_Minh`), `@bot sync bug`, or the web
 "Sync Discord" button (queues `bug_sync_requests`, admin-only insert; the service-role
 bot drains it and also pushes pending label edits every `bug_sync_poll_seconds`).
 The bot needs **Manage Threads** (edit thread tags) and **Manage Channels** (create tags).
+
+**Cặp project ↔ forum ở đâu** (migration `0069`): cột `projects.bug_forum_channel_id` +
+`projects.bug_notify_role`, admin đặt trong popup **Dự án** trên web — cùng chỗ với sheet
+weekly và webhook báo cáo. `bot/skills/bug_sync.py:load_forum_configs()` đọc DB trước,
+`bot/settings.json['bug_forums']` chỉ còn là **dự phòng** cho cấu hình cũ (project có ở cả
+hai nơi → DB thắng). Kết quả cache 30 s, nên đổi forum trên web ăn sau **tối đa 30 giây,
+không cần restart bot**.
+
+### `bug_status_notices` (báo lên thread ai đổi trạng thái)
+
+`{ id, bug_id→bugs, project_id→projects, thread_id, from_status, to_status, actor_id→profiles,
+actor_name, status (pending|done|error|skipped), result, created_at, processed_at }` —
+migration `0063`. Đổi trạng thái bug **trên web** → bot đăng một dòng vào ĐÚNG thread forum
+của bug đó: `🔄 <ai> đổi trạng thái trên web: **Fixing** → **Done**`.
+
+Ghi bằng **trigger** `bugs_log_status_change` (`after update of status`), không phải phía
+client — cùng lý do `activity` (0007) / `task_sprints` (0015): status đổi từ NHIỀU đường
+(kéo thẻ Kanban ở `Bugs.tsx`, ô trạng thái trong `BugModal`), ghi ở app là sớm muộn cũng
+quên một đường. RLS: select cho mọi user đã đăng nhập; **không có policy ghi** → client
+không bịa được thông báo mạo danh người khác, chỉ trigger (SECURITY DEFINER) và bot
+(service-role) ghi.
+
+> ⚠️ Trigger chỉ ghi khi `auth.uid() is not null` — bot dùng service-role nên lượt sync
+> Discord→app (bot suy status từ tag) KHÔNG sinh thông báo. Bỏ chốt này là bot tự báo về
+> chính thay đổi nó vừa đọc từ Discord.
+> ⚠️ Bug chưa có `discord_thread_id` thì không ghi gì (chưa có chỗ để báo).
+> Bot: `bug_sync.push_status_notices`, chạy cùng nhịp `push_pending` mỗi
+> `bug_sync_poll_seconds`. Nhiều lượt đổi LIÊN TIẾP của **cùng một người** trên cùng bug
+> được gộp thành MỘT tin (`Fixing → Done`, không phải ba tin); đổi qua đổi lại về chỗ cũ
+> thì bỏ hẳn (`skipped`). Tối đa 20 tin/nhịp, phần dư để nhịp sau (tránh rate limit).
+> Tên người hiện bằng `<@discord_id>` nhưng gửi kèm `AllowedMentions.none()` — hiện đúng
+> danh tính Discord mà KHÔNG ping ai.
 
 ---
 

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import Avatar from './Avatar';
+import MemberAvatar from './MemberAvatar';
 import { daysUntil } from '../lib/format';
 import { taskProgress } from '../lib/sprint';
 import { PRIO_COLOR } from '../lib/taskColors';
@@ -115,7 +115,7 @@ export default function TaskListRow({
 
         {showAssignee && (
           <span className="trow-who">
-            <Avatar name={task.assigneeName || '?'} size="sm" />
+            <MemberAvatar uid={task.assigneeId} name={task.assigneeName || '?'} size="sm" />
             <span className="trow-who-name">{task.assigneeName || 'Chưa giao'}</span>
           </span>
         )}

@@ -23,9 +23,11 @@ import type {
   Feature,
   FeatureLabel,
   Project,
+  ProjectDoc,
   Sprint,
   Subtask,
   Task,
+  TaskSprintEntry,
   TeamMember,
 } from '../types';
 
@@ -51,6 +53,7 @@ export function rowToMember(r: Row): TeamMember {
 export function rowToSprint(r: Row): Sprint {
   return {
     id: r.id,
+    projectId: r.project_id ?? null,
     name: r.name,
     goal: r.goal ?? '',
     status: r.status,
@@ -69,10 +72,14 @@ export function rowToProject(r: Row): Project {
     color: r.color ?? '#6366f1',
     description: r.description ?? '',
     notionProjectId: r.notion_project_id ?? null,
+    // ?? true để chịu được lúc migration 0070 chưa áp — thiếu cột thì giữ hành vi cũ (có sync).
+    notionSyncEnabled: r.notion_sync_enabled ?? true,
     weeklySheetId: r.weekly_sheet_id ?? null,
     releaseSheetId: r.release_sheet_id ?? null,
     costSheetId: r.cost_sheet_id ?? null,
     dailyReportWebhook: r.daily_report_webhook ?? null,
+    bugForumChannelId: r.bug_forum_channel_id ?? null,
+    bugNotifyRole: r.bug_notify_role ?? null,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };
@@ -92,6 +99,7 @@ export function rowToFeature(r: Row): Feature {
     attachments: (r.attachments ?? []) as Attachment[],
     memberIds: r.member_ids ?? [],
     doneAt: Timestamp.fromISO(r.done_at),
+    targetDate: Timestamp.fromISO(r.target_date),
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? '',
   };
@@ -372,6 +380,30 @@ export function rowToTaskReport(r: Row): TaskReport {
     sprintIds: r.sprint_ids ?? [],
     firstInProgressAt: Timestamp.fromISO(r.first_in_progress_at),
     firstDoneAt: Timestamp.fromISO(r.first_done_at),
+  };
+}
+
+/** Một mục thư viện tài liệu của dự án (`project_docs`, migration 0066). */
+export function rowToProjectDoc(r: Row): ProjectDoc {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name ?? '',
+    url: r.url ?? '',
+    provider: r.provider ?? 'link',
+    description: r.description ?? '',
+    category: r.category ?? '',
+    sortOrder: r.sort_order ?? 0,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? null,
+  };
+}
+
+/** Một dòng của `task_sprints` — lịch sử sprint của task (migration 0015). */
+export function rowToTaskSprint(r: Row): TaskSprintEntry {
+  return {
+    sprintId: r.sprint_id,
+    addedAt: Timestamp.fromISO(r.added_at),
   };
 }
 

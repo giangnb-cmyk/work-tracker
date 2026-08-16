@@ -385,7 +385,7 @@ function FeatureDetail({
 }: DetailProps) {
   const { user, isAdmin } = useAuth();
   const { members, features, selectedSprint, selectedSprintId } = useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -451,7 +451,7 @@ function FeatureDetail({
     if (status === task.status) return;
     const justFinished = becameDone(task.status, status);
     void moveTask(task, status, task.order);
-    if (justFinished) confirmDoneNotify({ ...task, status });
+    if (justFinished) notifyDone({ ...task, status });
   }
 
   return (

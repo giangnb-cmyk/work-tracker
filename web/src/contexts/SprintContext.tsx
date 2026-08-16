@@ -40,7 +40,6 @@ const SprintContext = createContext<SprintContextState | null>(null);
 
 export function SprintProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const sprintApi = useSprints(user?.uid ?? '');
   const { members, loading: membersLoading } = useMembers();
   const { projects, loading: projectsLoading } = useProjects();
   const { features, loading: featuresLoading, refetch: refetchFeatures } = useFeatures();
@@ -48,6 +47,8 @@ export function SprintProvider({ children }: { children: ReactNode }) {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     () => localStorage.getItem(PROJECT_KEY),
   );
+  // Sprint thuộc TỪNG dự án (0068) — list bám theo dự án đang chọn.
+  const sprintApi = useSprints(user?.uid ?? '', selectedProjectId);
   const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
 
@@ -60,6 +61,10 @@ export function SprintProvider({ children }: { children: ReactNode }) {
     if (id) localStorage.setItem(PROJECT_KEY, id);
     else localStorage.removeItem(PROJECT_KEY);
     setSelectedProjectId(id);
+    // Sprint của dự án cũ vô nghĩa ở dự án mới — xoá lựa chọn và cho effect mặc định
+    // (bên dưới) chọn lại sprint đang chạy của dự án vừa vào.
+    setSelectedSprintId(null);
+    setTouched(false);
   }
 
   // Deep link ?p=<projectId> (link bug/task chéo dự án): đổi dự án theo link MỘT lần
@@ -74,11 +79,13 @@ export function SprintProvider({ children }: { children: ReactNode }) {
   }, [projects]);
 
   // Default the selection to the active sprint once sprints load (until the user picks one).
+  // Guard theo projectId: ngay sau khi đổi dự án, list sprint CŨ còn lơ lửng một nhịp
+  // trước khi fetch mới về — không guard là mặc định chọn nhầm sprint của dự án cũ.
   useEffect(() => {
     if (touched) return;
-    if (sprintApi.activeSprint) setSelectedSprintId(sprintApi.activeSprint.id);
-    else if (sprintApi.sprints.length > 0) setSelectedSprintId(sprintApi.sprints[0].id);
-  }, [touched, sprintApi.activeSprint, sprintApi.sprints]);
+    const candidate = sprintApi.activeSprint ?? sprintApi.sprints[0] ?? null;
+    if (candidate && candidate.projectId === selectedProjectId) setSelectedSprintId(candidate.id);
+  }, [touched, sprintApi.activeSprint, sprintApi.sprints, selectedProjectId]);
 
   const selectedSprint = useMemo(
     () => sprintApi.sprints.find((s) => s.id === selectedSprintId) ?? null,

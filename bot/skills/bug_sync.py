@@ -19,11 +19,13 @@ Chay: bot.py goi truc tiep; hoac `python skills/bug_sync.py` (mo client ngan).
 """
 
 import asyncio
+import datetime
 import json
 import logging
 import os
 import re
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -49,7 +51,17 @@ log = logging.getLogger("bug_sync")
 
 BUGS = "bugs"
 BUG_LABELS = "bug_labels"
+BUG_NOTICES = "bug_status_notices"
 PROFILES = "profiles"
+PROJECTS = "projects"
+# Cache cau hinh forum doc tu DB (xem load_forum_configs).
+_FORUM_TTL = 30.0
+_forum_cache: tuple[float, list[dict]] | None = None
+# Bao doi trang thai: doc toi da ngan nay dong moi nhip (chan tran bo nho), va GUI toi da
+# ngan nay tin. Sua status hang loat tren web (keo 50 the) ma ban het mot luot la an rate
+# limit Discord; phan con lai van pending, nhip sau gui tiep.
+MAX_NOTICE_ROWS = 200
+MAX_NOTICE_MESSAGES = 20
 MAX_APPLIED_TAGS = 5   # Discord: 1 bai forum toi da 5 tag
 MAX_TAG_NAME = 20      # Discord: ten forum tag toi da 20 ky tu
 MAX_THREAD_NAME = 100  # Discord: ten thread (bai forum) toi da 100 ky tu
@@ -123,14 +135,79 @@ def _status_from_label_names(names: list[str]) -> str:
     return "open"
 
 
-def load_forum_configs() -> list[dict]:
-    """Danh sach {project_id, forum_channel_id} tu settings.json['bug_forums']."""
+# Ten HIEN THI cua tung status khi bao len thread. GUONG BUG_STATUS_LABEL (web/src/types.ts)
+# — co y dung dung ten forum tag de nguoi doc thay chu quen thuoc tren Discord.
+_STATUS_DISPLAY = {
+    "open": "Open", "reopen": "Re-open", "fixing": "Fixing",
+    "pending": "Pending", "deployed": "Deployed", "done": "Done",
+}
+
+
+def _forums_from_settings() -> list[dict]:
+    """Cau hinh forum trong settings.json['bug_forums'] (nguon DU PHONG)."""
     out = []
     for c in _SETTINGS.get("bug_forums") or []:
         pid, fid = c.get("project_id"), c.get("forum_channel_id")
         if pid and fid:
             out.append({"project_id": str(pid), "forum_channel_id": int(fid),
                         "notify_role": c.get("notify_role")})
+    return out
+
+
+def _forums_from_db() -> list[dict]:
+    """Cau hinh forum trong bang `projects` (admin dat o web — migration 0069).
+
+    Cot la TEXT nen phai tu kiem tra dang so: gia tri rac (nguoi dung dan nham) bi bo qua
+    im lang o day, con hon de int() no giua vong dong bo va chet ca luot.
+    """
+    sb = get_client()
+    rows = (
+        sb.table(PROJECTS)
+        .select("id,bug_forum_channel_id,bug_notify_role")
+        .not_.is_("bug_forum_channel_id", "null")
+        .execute()
+        .data
+    ) or []
+    out = []
+    for r in rows:
+        fid = str(r.get("bug_forum_channel_id") or "").strip()
+        if not fid.isdigit():
+            if fid:
+                log.warning("Project %s có bug_forum_channel_id không hợp lệ: %r", r.get("id"), fid)
+            continue
+        out.append({"project_id": str(r["id"]), "forum_channel_id": int(fid),
+                    "notify_role": (r.get("bug_notify_role") or None)})
+    return out
+
+
+def load_forum_configs() -> list[dict]:
+    """Danh sach {project_id, forum_channel_id, notify_role} — DB TRUOC, settings.json SAU.
+
+    Nguon su that la cot `projects.bug_forum_channel_id` (admin sua ngay tren web, khong
+    phai dung vao may chay bot). settings.json['bug_forums'] van doc de cau hinh cu khong
+    vo: project nao CHUA dien o web thi lay theo file. Project co ca hai -> DB thang.
+
+    Ket qua cache _FORUM_TTL giay: ham nay bi goi nhieu lan trong MOT luot dong bo va co
+    ca trong vong poll 60s; khong cache thi moi lan la mot cu goi mang CHAN event loop
+    (ham sync, dang duoc goi thang tu code async). Doi forum tren web an sau toi da 30s.
+    """
+    global _forum_cache
+    now = time.monotonic()
+    if _forum_cache and now - _forum_cache[0] < _FORUM_TTL:
+        return _forum_cache[1]
+
+    from_settings = _forums_from_settings()
+    try:
+        merged = {c["project_id"]: c for c in from_settings}
+        merged.update({c["project_id"]: c for c in _forums_from_db()})
+        out = list(merged.values())
+    except Exception as e:
+        # Supabase chet thi VAN chay duoc bang cau hinh file — khong cache ket qua nay de
+        # nhip sau thu lai DB ngay.
+        log.warning("Đọc cấu hình forum từ DB lỗi (%s) — tạm dùng settings.json", e)
+        return from_settings
+
+    _forum_cache = (now, out)
     return out
 
 
@@ -585,6 +662,128 @@ async def _create_thread(client, sb, ch, avail: dict, label_info: dict, bug: dic
     )
 
 
+# --- Bao doi trang thai bug len thread Discord --------------------------------
+
+def _merge_notice_runs(rows: list[dict]) -> list[dict]:
+    """Gop cac dong pending thanh cac 'chang' de moi chang chi ton MOT tin nhan.
+
+    Gop khi CUNG bug + CUNG nguoi doi va lien tiep nhau: nguoi dung bam nhanh
+    Fixing -> Pending -> Done trong mot luot sua thi thread nhan MOT dong
+    'Fixing -> Done', khong phai ba dong. Nguoi KHAC xen vao giua thi tach chang moi —
+    khong duoc gop, vi gop la gan hanh dong cua nguoi nay cho nguoi kia.
+
+    Giu thu tu thoi gian: rows phai da sap theo created_at.
+    """
+    runs: list[dict] = []
+    last_by_bug: dict[str, dict] = {}
+    for r in rows:
+        bug_id = r["bug_id"]
+        prev = last_by_bug.get(bug_id)
+        # Chi noi dai khi chang truoc CUA BUG NAY cung la chang moi nhat cua no (nguoi khac
+        # xen giua da tao chang khac, prev khi do khong con la chang dang mo).
+        if prev and prev["actor_id"] == r.get("actor_id") and prev["to_status"] == r["from_status"]:
+            prev["to_status"] = r["to_status"]
+            prev["ids"].append(r["id"])
+            continue
+        run = {
+            "bug_id": bug_id, "thread_id": r["thread_id"],
+            "from_status": r["from_status"], "to_status": r["to_status"],
+            "actor_id": r.get("actor_id"), "actor_name": r.get("actor_name") or "",
+            "ids": [r["id"]],
+        }
+        runs.append(run)
+        last_by_bug[bug_id] = run
+    return runs
+
+
+async def _notice_actor_names(sb, actor_ids: list[str]) -> dict:
+    """actor_id -> discord_id (chuoi so) cho nhung nguoi da lien ket Discord."""
+    ids = [a for a in {i for i in actor_ids if i}]
+    if not ids:
+        return {}
+    rows = await asyncio.to_thread(
+        lambda: sb.table(PROFILES).select("id,discord_id").in_("id", ids).execute().data
+    )
+    return {r["id"]: (r.get("discord_id") or "").strip() for r in rows or []}
+
+
+def _notice_text(run: dict, discord_id: str) -> str:
+    """Mot dong bao ai doi trang thai. Nhac ten bang <@id> de hien dung danh tinh Discord
+    cua ho — KHONG ping (allowed_mentions=none o cho gui): bao cho ca thread biet chu khong
+    phai chuong bao ai het."""
+    who = f"<@{discord_id}>" if discord_id.isdigit() else f"**{run['actor_name'] or 'Ai đó'}**"
+    old = _STATUS_DISPLAY.get(run["from_status"], run["from_status"])
+    new = _STATUS_DISPLAY.get(run["to_status"], run["to_status"])
+    return f"🔄 {who} đổi trạng thái trên web: **{old}** → **{new}**"
+
+
+async def _finish_notices(sb, ids: list[str], status: str, result: str = "") -> None:
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        await asyncio.to_thread(
+            lambda: sb.table(BUG_NOTICES).update(
+                {"status": status, "result": result[:300], "processed_at": now_iso}
+            ).in_("id", ids).execute()
+        )
+    except Exception as e:
+        # Khong cap nhat duoc thi dong van pending -> nhip sau gui LAI tin nhan (trung lap).
+        # Hiem (Supabase write), nhung phai thay duoc trong log khi no xay ra.
+        log.warning("Không đánh dấu được %d thông báo đổi trạng thái: %s", len(ids), e)
+
+
+async def push_status_notices(client, sb) -> int:
+    """app -> Discord: bao vao thread bug rang AI vua doi trang thai tren web.
+
+    Nguon la bang `bug_status_notices` (migration 0063) do TRIGGER DB ghi, nen moi duong
+    doi status ben web (keo the Kanban, nut trong BugModal) deu duoc bao — bot doi status
+    (sync tu tag Discord) thi khong, vi trigger bo qua service_role.
+
+    Tra ve so tin nhan da gui.
+    """
+    try:
+        rows = await asyncio.to_thread(
+            lambda: sb.table(BUG_NOTICES)
+            .select("id,bug_id,thread_id,from_status,to_status,actor_id,actor_name")
+            .eq("status", "pending").order("created_at").limit(MAX_NOTICE_ROWS).execute().data
+        )
+    except Exception as e:
+        log.warning("Đọc bug_status_notices lỗi (chưa áp migration 0063?): %s", e)
+        return 0
+    if not rows:
+        return 0
+
+    runs = _merge_notice_runs(rows)
+    # Doi qua doi lai ve dung cho cu (Fixing -> Done -> Fixing) thi khong con gi de bao.
+    noop = [r for r in runs if r["from_status"] == r["to_status"]]
+    for r in noop:
+        await _finish_notices(sb, r["ids"], "skipped", "đổi qua đổi lại về trạng thái cũ")
+    runs = [r for r in runs if r["from_status"] != r["to_status"]]
+
+    if len(runs) > MAX_NOTICE_MESSAGES:
+        log.info("Còn %d thông báo đổi trạng thái để nhịp sau gửi tiếp (mỗi nhịp tối đa %d)",
+                 len(runs) - MAX_NOTICE_MESSAGES, MAX_NOTICE_MESSAGES)
+        runs = runs[:MAX_NOTICE_MESSAGES]
+
+    by_actor = await _notice_actor_names(sb, [r["actor_id"] for r in runs])
+    sent = 0
+    for run in runs:
+        try:
+            tid = int(run["thread_id"])
+            thread = client.get_channel(tid) or await client.fetch_channel(tid)
+            await thread.send(
+                _notice_text(run, by_actor.get(run["actor_id"], "")),
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            await _finish_notices(sb, run["ids"], "done")
+            sent += 1
+        except Exception as e:
+            # Danh dau 'error' chu KHONG de pending: thread bi xoa/khoa thi thu lai moi 20
+            # giay den muon doi cung the, chi to lam ban log.
+            log.warning("Không báo được đổi trạng thái vào thread %s: %s", run["thread_id"], e)
+            await _finish_notices(sb, run["ids"], "error", str(e))
+    return sent
+
+
 def run_once() -> int:
     """Standalone: mo 1 client ngan, sync (2 chieu) tat ca forum, roi thoat."""
     token = os.getenv("DISCORD_TOKEN")
@@ -605,6 +804,9 @@ def run_once() -> int:
     async def on_ready():
         try:
             await push_pending(client, sb)          # day thay doi app -> Discord truoc
+            n = await push_status_notices(client, sb)   # bao ai doi trang thai (0063)
+            if n:
+                print(f"Đã báo {n} lượt đổi trạng thái lên thread Discord.")
             state["results"] = await sync_all(client, sb)  # roi keo Discord -> app
         except Exception as e:
             print("LỖI sync:", e, file=sys.stderr)

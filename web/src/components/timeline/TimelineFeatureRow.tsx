@@ -28,6 +28,15 @@ export default function TimelineFeatureRow({ row, onOpen, scale }: Props) {
   const left = clampPct(pct(row.start));
   const right = clampPct(pct(row.end + DAY));
 
+  // Mốc mong muốn hoàn thành (0071). Trễ = đã qua ngày hẹn mà chưa xong hết task -> cờ đỏ.
+  // Feature chưa có task nào (total 0) KHÔNG tính là xong: nó chỉ là chưa bắt đầu.
+  const targetMs = f?.targetDate?.toMillis() ?? null;
+  const allDone = row.total > 0 && row.done === row.total;
+  const late = targetMs !== null && !allDone && targetMs < Date.now();
+  // Mốc nằm ngoài khung đang xem thì đừng ghim vào mép: nhìn như hẹn đúng hôm nay.
+  const targetPct = targetMs === null ? null : pct(targetMs);
+  const targetInView = targetPct !== null && targetPct >= 0 && targetPct <= 100;
+
   return (
     <div className="tl-row tl-feat" onClick={onOpen} title="Xem danh sách task">
       <div className="tl-row-label">
@@ -35,6 +44,11 @@ export default function TimelineFeatureRow({ row, onOpen, scale }: Props) {
           {f ? `${f.icon} ${f.name}` : '📦 Khác'}{ongoing ? ' 🔁' : ''}
         </span>
         <span className="muted tl-who mono">
+          {targetMs !== null && (
+            <span className={`tl-target-tag${late ? ' late' : ''}`} title={late ? 'Quá hạn mong muốn' : 'Mong muốn hoàn thành'}>
+              🎯 {label(targetMs)}
+            </span>
+          )}
           {ongoing ? `${row.total - row.done} mở` : `${row.done}/${row.total}`}
         </span>
       </div>
@@ -66,6 +80,14 @@ export default function TimelineFeatureRow({ row, onOpen, scale }: Props) {
           </span>
         ) : (
           <span className="tl-nodate muted">chưa có hạn</span>
+        )}
+        {/* Cờ mốc mong muốn — vẽ SAU bar để luôn nằm trên, kể cả khi rơi vào giữa bar. */}
+        {targetInView && (
+          <span
+            className={`tl-target${late ? ' late' : ''}`}
+            style={{ left: `${targetPct}%` }}
+            title={`🎯 Mong muốn xong: ${label(targetMs as number)}${late ? ' — đã quá hạn' : ''}`}
+          />
         )}
       </div>
     </div>

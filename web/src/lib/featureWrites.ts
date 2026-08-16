@@ -17,6 +17,8 @@ export interface FeatureInput {
   memberIds: string[];
   /** Đánh dấu tay là đã xong ngay lúc tạo (import feature đã ship từ lâu) — xem 0031. */
   done: boolean;
+  /** Mốc mong muốn hoàn thành, ISO 'YYYY-MM-DD' ('' / null = chưa hẹn) — xem 0071. */
+  targetDate?: string | null;
 }
 
 export async function createFeature(input: FeatureInput, createdBy: string): Promise<string> {
@@ -33,6 +35,7 @@ export async function createFeature(input: FeatureInput, createdBy: string): Pro
       attachments: input.attachments,
       member_ids: input.memberIds,
       done_at: input.done ? new Date().toISOString() : null,
+      target_date: input.targetDate || null,
       created_by: createdBy || null,
     })
     .select('id')
@@ -47,7 +50,15 @@ export async function createFeature(input: FeatureInput, createdBy: string): Pro
  * Chỉ truyền `done` khi nó THỰC SỰ đổi: gửi `done: true` ở mọi lần lưu sẽ dập mốc cũ
  * bằng thời điểm hiện tại, mất luôn "xong từ bao giờ".
  */
-export type FeaturePatch = Partial<Omit<Feature, 'doneAt'>> & { done?: boolean };
+/**
+ * `done` là boolean cho tiện (lớp này đổi thành mốc `done_at`), `targetDate` là chuỗi ISO
+ * 'YYYY-MM-DD' vì form giữ nó ở dạng đó — cột là `date`, đưa Timestamp vào là mời lỗi lệch
+ * múi giờ một ngày. '' cũng như null = xoá ngày.
+ */
+export type FeaturePatch = Partial<Omit<Feature, 'doneAt' | 'targetDate'>> & {
+  done?: boolean;
+  targetDate?: string | null;
+};
 
 export async function updateFeature(id: string, patch: FeaturePatch): Promise<void> {
   const row: Record<string, unknown> = {};
@@ -60,6 +71,7 @@ export async function updateFeature(id: string, patch: FeaturePatch): Promise<vo
   if (patch.attachments !== undefined) row.attachments = patch.attachments;
   if (patch.memberIds !== undefined) row.member_ids = patch.memberIds;
   if (patch.done !== undefined) row.done_at = patch.done ? new Date().toISOString() : null;
+  if (patch.targetDate !== undefined) row.target_date = patch.targetDate || null;
   const { error } = await supabase.from('features').update(row).eq('id', id);
   if (error) throw error;
 }

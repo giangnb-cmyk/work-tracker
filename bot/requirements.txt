@@ -17,3 +17,9 @@ google-auth>=2.25,<3.0
 # --- Gui mail weekly report (weekly_mail.py): OAuth nguoi dung cho Gmail API. ---
 # Chi CAN cho buoc 'gmail_gateway.py --auth' (dang nhap 1 lan); gui/doc dung requests.
 google-auth-oauthlib>=1.2,<2.0
+# --- Check anh dao/nhai (lens_check.py): Google Lens qua trinh duyet that. ---
+# Sau khi pip install can them: `playwright install chromium`. May chay bot NEN co Chrome
+# that (channel=chrome do bi chan it hon) va can MAN HINH (desktop session) vi trinh duyet
+# mo HEADFUL — headless bi Google CAPTCHA ngay.
+playwright>=1.49,<2.0
+pillow>=10.0,<13.0

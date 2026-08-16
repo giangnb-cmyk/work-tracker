@@ -346,6 +346,10 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 }
 .doc-addbtn:hover { border-color: var(--primary); color: var(--text); background: rgba(99, 102, 241, 0.06); }
 
+/* Hai nút thêm tài liệu nằm cạnh nhau (Thư viện | Dán link) — .doc-addbtn vốn
+   align-self:flex-start nên phải bọc trong hàng flex, không thì chúng xuống dòng. */
+.doc-addbar { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+
 .doc-list { display: flex; flex-direction: column; gap: 0.45rem; }
 .doc-card {
   position: relative; display: flex; align-items: center; gap: 0.25rem;
@@ -441,7 +445,9 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 }
 .st-row + .st-row { border-top: 1px solid var(--border-soft); }
 .st-row:hover { background: rgba(255, 255, 255, 0.04); }
-.st-check { position: relative; display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0; cursor: pointer; }
+/* Chỉ bọc ô tick, KHÔNG bọc tên: tên subtask là vùng bấm riêng để sửa tại chỗ (xem
+   SubtasksField), nên label phải co lại đúng bằng ô tick thay vì chiếm cả hàng. */
+.st-check { position: relative; display: flex; align-items: center; flex: 0 0 auto; cursor: pointer; }
 .st-check input { position: absolute; opacity: 0; pointer-events: none; }
 .st-box {
   width: 18px; height: 18px; flex-shrink: 0; border-radius: 6px; display: grid; place-items: center;
@@ -456,6 +462,39 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .st-row.done .st-box svg { stroke-dashoffset: 0; }
 .st-title { flex: 1; min-width: 0; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.18s ease, opacity 0.18s ease; }
 .st-row.done .st-title { color: var(--muted); text-decoration: line-through; opacity: 0.75; }
+/* ===== Timeline: mốc mong muốn (0071) + sửa mốc phát hành tại chỗ ===== */
+/* Cờ 🎯 trên hàng feature: một vạch dọc mảnh + đầu nhọn, đủ thấy mà không đè lên bar. */
+.tl-target {
+  position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px;
+  background: var(--gold); border-radius: 2px; pointer-events: none; z-index: 3;
+}
+.tl-target::before {
+  content: ''; position: absolute; top: -1px; left: -3px;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 6px solid var(--gold);
+}
+.tl-target.late { background: var(--red); }
+.tl-target.late::before { border-top-color: var(--red); }
+.tl-target-tag { margin-right: 0.4rem; color: var(--gold); }
+.tl-target-tag.late { color: var(--red); }
+/* Nút sửa mốc phát hành: trông như chữ, chỉ hiện nền khi rê vào — hàng version vốn đã dày. */
+.tl-release-btn {
+  font: inherit; color: var(--gold); background: none; border: none; cursor: pointer;
+  padding: 0.1rem 0.3rem; margin-right: 0.25rem; border-radius: 6px;
+}
+.tl-release-btn:hover { background: rgba(251, 191, 36, 0.15); }
+.tl-release-btn.empty { color: var(--muted); }
+.tl-release-edit { display: inline-flex; align-items: center; gap: 0.4rem; }
+/* Sửa tên tại chỗ: nền nhạt khi rê chuột để thấy chữ này bấm được, chứ không thêm nút. */
+.st-title.editable { cursor: text; padding: 0.12rem 0.3rem; margin-left: -0.3rem; border-radius: 6px; }
+.st-title.editable:hover { background: rgba(255, 255, 255, 0.07); }
+.st-title.editable:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+/* Ô sửa phải CHỒNG KHÍT lên chỗ chữ vừa đứng — lệch một nhịp là cả hàng nảy khi bấm vào. */
+.st-edit {
+  flex: 1; min-width: 0; font: inherit; font-size: 0.88rem; color: var(--text);
+  padding: 0.12rem 0.3rem; margin-left: -0.3rem; border-radius: 6px;
+  background: rgba(15, 23, 42, 0.6); border: 1px solid var(--primary); outline: none;
+}
 .st-del {
   opacity: 0; width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center;
   background: none; border: none; border-radius: 7px; color: var(--muted); cursor: pointer;
@@ -464,6 +503,206 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .st-del svg { width: 14px; height: 14px; }
 .st-row:hover .st-del, .st-del:focus-visible { opacity: 1; }
 .st-del:hover { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+/* AssigneePicker — chọn người bằng đúng một avatar (hàng subtask). Kích thước bằng
+   .avatar.sm (24px) nên hàng không co giãn khi đổi người tên dài/ngắn. */
+.apick { position: relative; flex-shrink: 0; line-height: 0; }
+.apick-trigger {
+  display: grid; place-items: center; padding: 0; background: none; border: none;
+  border-radius: 50%; cursor: pointer; transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.apick-trigger:hover:not(:disabled) { transform: scale(1.12); }
+.apick-trigger:disabled { cursor: default; }
+/* Chưa giao: vòng nét đứt mờ, hiện rõ lên khi hover — đủ để thấy "bấm được" mà không ồn. */
+.apick-empty {
+  width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%;
+  border: 1.5px dashed rgba(148, 163, 184, 0.45); color: var(--muted);
+  font-size: 0.9rem; line-height: 1; box-sizing: border-box;
+}
+.apick-empty.sm { border-style: solid; }
+.apick-trigger.empty { opacity: 0.55; }
+.apick-trigger.empty:hover:not(:disabled) { opacity: 1; }
+.st-row.done .apick-trigger { opacity: 0.7; }
+
+/* Panel: absolute + neo mép PHẢI (ô sát lề phải modal, thả từ trái là tràn ra ngoài). */
+.apick-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 60;
+  width: 240px; padding: 0.4rem; border-radius: 12px; line-height: normal;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); animation: fadeIn 0.14s ease;
+}
+.apick-search { width: 100%; font-size: 0.83rem; padding: 0.4rem 0.5rem; margin-bottom: 0.35rem; }
+.apick-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.apick-opt {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.35rem 0.45rem;
+  background: none; border: none; border-radius: 8px; color: var(--text);
+  font: inherit; font-size: 0.85rem; text-align: left; cursor: pointer;
+}
+.apick-opt:hover { background: rgba(255, 255, 255, 0.07); }
+.apick-opt.on { background: rgba(99, 102, 241, 0.18); }
+.apick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apick-role { font-size: 0.7rem; flex-shrink: 0; }
+.apick-none { display: block; padding: 0.5rem 0.45rem; font-size: 0.82rem; }
+
+/* ==========================================================================
+   Tab 📚 Tài liệu — thư viện link của dự án (components/DocLibrary.tsx) và ô chọn
+   để gắn vào task/feature (components/doc/DocPickerModal.tsx).
+   ========================================================================== */
+.doclib-bar { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1.1rem; }
+.doclib-search { max-width: 420px; }
+.doclib-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+/* .chip trong repo đang bị bó trong .log-filters — khai lại cho phạm vi này thay vì nới
+   selector kia ra toàn cục (sẽ đổi hình mọi chip đang có). */
+.doclib-chips .chip {
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border);
+  border-radius: 999px; padding: 0.35rem 0.8rem;
+  color: var(--muted); font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+.doclib-chips .chip:hover { border-color: rgba(99, 102, 241, 0.5); color: var(--text); }
+.doclib-chips .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.doclib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.9rem; }
+/* position:relative + z-index khi hover: ghi chú xổ ra là một lớp absolute đè xuống chân
+   thẻ, phải nổi trên các thẻ bên cạnh trong lưới. */
+.doclib-card {
+  position: relative; display: flex; flex-direction: column; gap: 0.5rem;
+  padding: 0.75rem; border-radius: 14px;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+.doclib-card:hover { border-color: rgba(99, 102, 241, 0.45); transform: translateY(-2px); z-index: 3; }
+/* Thẻ đang ghim: viền vàng + nền ấm nhẹ để nhận ra ngay trong khối đầu lưới. */
+.doclib-card.pinned { border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.05); }
+.doclib-card.pinned:hover { border-color: rgba(251, 191, 36, 0.7); }
+
+/* Hàng đầu: dùng .doc-body/.doc-icon/.doc-text/.doc-name/.doc-sub của AttachmentCard —
+   cùng là một link tài liệu thì phải cùng cỡ chữ và cùng icon. */
+.doclib-head { display: flex; align-items: center; gap: 0.25rem; }
+.doclib-head .doc-body:hover { text-decoration: none; }
+.doclib-head .doc-body:hover .doc-name { color: var(--sky); }
+
+/* Vỏ giữ ĐÚNG một dòng, luôn luôn — nhờ đó thẻ không đổi chiều cao khi ghi chú xổ ra. */
+.doclib-descwrap { position: relative; height: 1.2rem; flex-shrink: 0; }
+.doclib-desc {
+  position: absolute; top: 0; left: 0; right: 0; margin: 0;
+  font-size: 0.8rem; line-height: 1.45; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Hover thẻ: xổ hết ghi chú, ĐÈ lên chân thẻ (nền + viền riêng để chữ không lẫn vào
+   nhóm/tác giả bên dưới). Margin âm bù đúng phần padding thêm vào, để chữ không nhảy chỗ. */
+.doclib-card:hover .doclib-desc {
+  z-index: 6; white-space: normal; overflow: visible;
+  margin: -0.35rem -0.4rem; padding: 0.35rem 0.4rem;
+  background: var(--glass-solid); border: 1px solid var(--border-soft); border-radius: 9px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+
+.doclib-foot { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.doclib-cat {
+  padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600;
+  background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--sky);
+}
+.doclib-by { font-size: 0.7rem; }
+
+/* Hàng hành động riêng ở chân thẻ (sao chép / sửa / xoá) — nút RỜI, một cú bấm. Tách hàng
+   vì thẻ hẹp 300px không đủ chỗ xếp cùng nhóm + tác giả mà không tràn dòng. */
+.doclib-actions {
+  display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem;
+  padding-top: 0.5rem; border-top: 1px solid var(--border-soft);
+}
+.doclib-copied { font-size: 0.7rem; color: var(--green); margin-right: auto; }
+/* Nút hành động ĐÓNG KHUNG (viền + nền mờ, kiểu .tmodal-x) và icon CÓ MÀU theo việc:
+   chép = sky, sửa = indigo, xoá = đỏ, ghim = vàng. Nút trần màu xám lẫn vào nền glass,
+   nhìn không ra chỗ bấm được. */
+.doclib-iconbtn {
+  width: 30px; height: 30px; display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 9px;
+  /* Ruột nút là EMOJI (cùng họ icon màu với sidebar), không phải SVG stroke — nên cỡ
+     icon chỉnh bằng font-size. `color` vẫn giữ cho chữ phụ (nếu có). */
+  color: var(--muted); font-size: 0.82rem; line-height: 1; cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.doclib-iconbtn:hover { background: rgba(255, 255, 255, 0.07); color: var(--text); }
+.doclib-iconbtn.sky { color: var(--sky); border-color: rgba(56, 189, 248, 0.32); }
+.doclib-iconbtn.sky:hover { background: rgba(56, 189, 248, 0.12); color: var(--sky); }
+/* indigo-300 chứ không #6366f1 đặc: nét icon mảnh trên nền tối cần sáng hơn một nấc. */
+.doclib-iconbtn.indigo { color: #a5b4fc; border-color: rgba(99, 102, 241, 0.4); }
+.doclib-iconbtn.indigo:hover { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
+.doclib-iconbtn.danger { color: var(--red); border-color: rgba(239, 68, 68, 0.3); }
+.doclib-iconbtn.danger:hover { background: rgba(239, 68, 68, 0.12); color: var(--red); }
+/* Ghim: cùng một emoji 📌 cho cả hai trạng thái — CHƯA ghim thì xám (grayscale) + mờ,
+   ĐÃ ghim thì lên màu thật kèm khung vàng. Đổi bằng filter chứ không đổi glyph để mắt
+   không phải học hai ký hiệu. */
+.doclib-pin { opacity: 0.5; filter: grayscale(1); }
+.doclib-card:hover .doclib-pin, .doclib-row:hover .doclib-pin { opacity: 1; }
+.doclib-pin.on { opacity: 1; filter: none; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); }
+.doclib-pin.on:hover { background: rgba(251, 191, 36, 0.16); }
+
+/* Khu "Ghim của bạn" trên đầu + divider ngăn với phần còn lại. */
+.doclib-sechead {
+  display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.75rem;
+  font-size: 0.85rem; font-weight: 600; color: var(--muted);
+}
+.doclib-sechead .mono { color: var(--gold); }
+.doclib-divider { height: 1px; background: var(--border-soft); margin: 1.25rem 0; }
+
+/* Chế độ DANH SÁCH: một hàng/tài liệu trong một khối glass, kẻ dòng bằng border-top. */
+.doclib-rows { border-radius: 14px; padding: 0.3rem 0.4rem; }
+.doclib-row { display: flex; align-items: center; gap: 0.55rem; padding: 0.5rem; border-radius: 10px; }
+.doclib-row + .doclib-row { border-top: 1px solid var(--border-soft); }
+.doclib-row:hover { background: rgba(255, 255, 255, 0.04); }
+.doclib-row.pinned { background: rgba(251, 191, 36, 0.04); }
+.doclib-row .doc-body:hover { text-decoration: none; }
+.doclib-row .doc-body:hover .doc-name { color: var(--sky); }
+.doclib-row .doclib-cat { flex-shrink: 0; }
+.doclib-row .doclib-by { white-space: nowrap; flex-shrink: 0; }
+.doclib-row .doclib-copied { margin-right: 0; }
+/* Màn hẹp: bỏ cột người thêm · ngày — giữ tên + nút, đừng để hàng gãy dòng. */
+@media (max-width: 700px) { .doclib-row .doclib-by { display: none; } }
+
+/* Ô chọn tài liệu từ thư viện */
+.docpick-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0.8rem 0; }
+.docpick-row {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%; padding: 0.5rem 0.55rem;
+  background: none; border: 1px solid transparent; border-radius: 10px;
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.docpick-row:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+.docpick-row.on { background: rgba(99, 102, 241, 0.16); border-color: rgba(99, 102, 241, 0.45); }
+.docpick-row.already { opacity: 0.5; cursor: default; }
+.docpick-check { width: 18px; flex-shrink: 0; color: var(--muted); font-size: 1rem; }
+.docpick-row.on .docpick-check { color: var(--primary); }
+.docpick-text { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 0.1rem; }
+.docpick-note { font-size: 0.72rem; flex-shrink: 0; }
+/* Dấu ghim 📌 đứng trước tên trong ô chọn. */
+.docpick-pinmark { margin-right: 0.3rem; font-size: 0.75rem; }
+.docpick-empty { font-size: 0.85rem; margin: 1rem 0; }
+
+/* Khối "Gửi thử báo cáo" trong popup dự án: lùi vào một chút cho thấy rõ đây là công cụ
+   thử, không phải một trường sẽ được lưu cùng dự án. */
+.dr-test {
+  background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-soft);
+  border-radius: 10px; padding: 0.7rem 0.8rem; margin-bottom: 0.75rem;
+}
+.dr-test > span:first-child { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+
+/* "Subtask của tôi" (MyTasks) — nhóm theo task cha, mỗi nhóm một thẻ. */
+.msub-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.msub-group { padding: 0.75rem 0.9rem; border-radius: 12px; }
+.msub-parent {
+  display: flex; align-items: baseline; gap: 0.6rem; width: 100%; padding: 0 0 0.5rem;
+  background: none; border: none; border-bottom: 1px solid var(--border-soft);
+  color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.msub-parent:hover .msub-parent-title { color: var(--sky); }
+.msub-parent-title { font-weight: 600; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msub-parent-meta { font-size: 0.75rem; margin-left: auto; flex-shrink: 0; }
+.msub-items { list-style: none; margin: 0.35rem 0 0; padding: 0; display: flex; flex-direction: column; }
+.msub-item { display: flex; align-items: center; padding: 0.35rem 0.1rem; border-radius: 8px; }
+.msub-item:hover { background: rgba(255, 255, 255, 0.04); }
+.msub-item.done .st-box { background: var(--primary); border-color: var(--primary); }
+.msub-item.done .st-box svg { stroke-dashoffset: 0; }
+.msub-item.done .st-title { color: var(--muted); text-decoration: line-through; opacity: 0.75; }
+
 .st-add { display: flex; gap: 0.4rem; animation: fadeIn 0.2s ease; }
 .st-add .input { flex: 1; }
 .st-addbtn {
@@ -892,6 +1131,8 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tokflt-ops { display: flex; gap: 0.3rem; padding: 0.25rem 0.4rem 0.4rem; }
 .tokflt-op { flex: 1; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: var(--muted); font-size: 0.78rem; padding: 0.3rem; border-radius: 7px; cursor: pointer; }
 .tokflt-op.on { background: var(--primary); color: #fff; border-color: transparent; }
+.tokflt-valsearch { margin: 0 0.4rem 0.4rem; width: calc(100% - 0.8rem); font-size: 0.83rem; padding: 0.4rem 0.5rem; }
+.tokflt-noval { padding: 0.6rem; font-size: 0.82rem; text-align: center; margin: 0; }
 .tokflt-vals { display: flex; flex-direction: column; gap: 1px; max-height: 210px; overflow-y: auto; }
 .tokflt-val { display: flex; align-items: center; gap: 0.4rem; width: 100%; background: none; border: none; color: var(--text); font-size: 0.83rem; padding: 0.42rem 0.45rem; border-radius: 7px; cursor: pointer; text-align: left; }
 .tokflt-val:hover { background: rgba(255, 255, 255, 0.05); }
@@ -901,7 +1142,7 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .tokflt-apply:disabled { opacity: 0.5; cursor: default; }
 
 /* Native <select> popup readability on the dark theme */
-select.bugf-sel option, .select option { background: var(--surface); color: var(--text); }
+.select option { background: var(--surface); color: var(--text); }
 .bugm-discord svg { display: block; }
 
 /* Status accent (kanban dots + list pill) */
@@ -1044,14 +1285,22 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .bugf { display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft); border-radius: 10px; padding: 0.5rem 0.7rem; min-width: 0; height: 44px; }
 .bugf-ic { flex-shrink: 0; width: 18px; text-align: center; font-size: 0.95rem; }
 .bugf-lb { width: 78px; flex-shrink: 0; font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* `flex: 0 1 auto` chứ KHÔNG phải `flex: 1`: popup của <select> gốc luôn rộng đúng bằng
-   thẻ select, nên để nó kéo dài hết ô (ô rộng ~570px ở modal 1200px) là popup thừa ra một
-   mảng trống to. Để rộng theo nội dung, `margin-left: auto` đẩy sang phải như cũ.
-   Không lo layout nhảy: select gốc luôn rộng theo lựa chọn DÀI NHẤT, không theo cái đang
-   chọn, nên đổi giá trị không làm ô co giãn. min/max-width giữ để tên dài không phá ô. */
-.bugf-sel { flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; background: none; border: none; color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: right; cursor: pointer; color-scheme: dark; }
-.bugf-sel:focus { outline: none; }
-.bugf-sel:disabled { color: var(--text); opacity: 0.9; }
+/* SearchableSelect trong ô thông tin bug: lột sạch vỏ `.select` (ô .bugf đã là cái hộp
+   rồi) để trông y như <select> phẳng cũ — giá trị + mũi tên nép phải, nền trong suốt.
+   Chiếm HẾT chỗ còn lại (flex:1) chứ không co theo nội dung: ô co giãn theo lựa chọn là
+   cả lưới nhảy mỗi lần chọn. */
+.bugf-ss { flex: 1; min-width: 0; }
+.bugf-ss .ss-trigger {
+  width: 100%; justify-content: flex-end; padding: 0; background: none; border: none;
+  color: var(--text); font-size: 0.85rem; font-weight: 600; text-align: right;
+}
+.bugf-ss .ss-trigger:focus { outline: none; }
+.bugf-ss .ss-trigger:disabled { opacity: 0.9; }
+/* Neo panel vào mép PHẢI: ô nằm ở cột phải của lưới, thả từ mép trái thì panel (rộng tới
+   420px) tràn khỏi modal và bị `.bugm-scroll` (overflow:auto) cắt cụt. */
+.bugf-ss .ss-panel-overlay { left: auto; right: 0; }
+.bugf-ss .ss-list { max-height: 200px; }
+.bugf-ss .ss-opt, .bugf-ss .ss-search { text-align: left; font-weight: 400; }
 
 /* Doc cards inside the bug modal (link cards + Discord thread) */
 .bug-modal .doc-card { color: var(--text); text-decoration: none; }
@@ -1249,6 +1498,7 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 /* Số phụ đứng cạnh số chính trong cùng một ô, để bảng không phình thêm cột. */
 .perf-sub { font-size: 0.72rem; color: var(--muted); margin-left: 0.3rem; }
 .perf-hint { font-size: 0.82rem; color: var(--muted); margin-bottom: 1rem; }
+.tm-paste-hint { margin-top: 0.6rem; }
 .perf-when { font-size: 0.78rem; white-space: nowrap; }
 /* Header bảng dính lại khi drawer cuộn — theo design_system_guide mục Data Tables. */
 .perf-drawer-scroll { max-height: 55vh; overflow-y: auto; }
@@ -1698,6 +1948,24 @@ select.bugf-sel option, .select option { background: var(--surface); color: var(
 .tm-field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .tm-field > span { font-size: 0.75rem; color: var(--muted); }
 .tm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+
+/* Lịch sử sprint của task (SprintHistory): chuỗi chip sprint + dòng tổng kết tuổi task. */
+.tm-sprints { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.ts-step { display: inline-flex; align-items: center; gap: 0.4rem; }
+.ts-arrow { color: rgba(148, 163, 184, 0.45); user-select: none; }
+.ts-chip {
+  display: inline-flex; align-items: baseline; gap: 0.45rem;
+  padding: 0.28rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+  background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25);
+  color: var(--text);
+}
+.ts-chip small { font-size: 0.7rem; font-weight: 400; color: var(--muted); }
+/* Sprint hiện tại: fill đặc + glow, cùng ngôn ngữ với nav đang active. */
+.ts-chip.now { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 0 12px rgba(99, 102, 241, 0.45); }
+.ts-chip.now small { color: rgba(255, 255, 255, 0.78); }
+.ts-summary { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.ts-summary strong { font-weight: 700; color: var(--text); }
+.ts-summary.warn, .ts-summary.warn strong { color: var(--gold); }
 
 .tmodal-footer { display: flex; align-items: center; gap: 0.6rem; padding: 0.9rem 1.5rem; border-top: 1px solid var(--border-soft); min-height: 56px; }
 .tmodal-foot-spacer { flex: 1; }
@@ -2951,6 +3219,25 @@ table.data-table { width: 100%; border-collapse: collapse; }
   font-size: 0.9rem;
 }
 .mm-note-row p { font-size: 0.84rem; margin: 0.15rem 0; line-height: 1.45; }
+
+/* Nhật ký ghi chú (tab "Lịch sử" trong MemberNoteModal) — lọc theo Sprint / Tháng / Quý. */
+.note-log-empty { font-size: 0.85rem; padding: 0.5rem 0; }
+.note-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+.note-log-select { padding: 0.2rem 0.5rem; font-size: 0.78rem; width: auto; min-width: 140px; }
+/* Cuộn RIÊNG phần nhật ký để tab header + nút luôn trong tầm nhìn dù có nhiều kỳ. */
+.note-log-list { max-height: 320px; overflow-y: auto; padding-right: 0.2rem; }
+.note-log-date { font-size: 0.78rem; }
+.note-log-rating { font-size: 0.8rem; margin-bottom: 0.3rem; }
+/* Mỗi mục note một icon (📋 Tổng quan / ⭐ Nổi bật / ⚠️ Lưu ý) để phân loại nhanh. */
+.note-log-line { display: flex; align-items: baseline; gap: 0.45rem; }
+.note-log-ico { flex-shrink: 0; font-size: 0.85rem; line-height: 1.45; }
 
 /* ============================================================================
    MOBILE — điện thoại 360–430px (trình duyệt + webview Capacitor)

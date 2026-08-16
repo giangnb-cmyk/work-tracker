@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Timestamp } from '../lib/time';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useFeatureAssignees } from '../hooks/useFeatureAssignees';
+import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { becameDone, createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
+import { copyTitle, duplicateTask } from '../lib/duplicateWrites';
+import { notifySubtaskDone } from '../lib/discordNotify';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDateRange, sundayOfWeek, timeAgo, toInputDate } from '../lib/format';
 import AttachmentsField from './task/AttachmentsField';
@@ -12,6 +15,7 @@ import WatchersField from './task/WatchersField';
 import PriorityBadge from './task/PriorityBadge';
 import StatusToggle from './task/StatusToggle';
 import RefImagesSection from './task/RefImagesSection';
+import SprintHistory from './task/SprintHistory';
 import TaskActivity from './TaskActivity';
 import ConfirmDialog from './ConfirmDialog';
 import DateInput from './DateInput';
@@ -48,7 +52,7 @@ export default function TaskModal({
 }: TaskModalProps) {
   const { user, profile, isAdmin, can } = useAuth();
   const { members, sprints, projects, features } = useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const isEdit = Boolean(task);
 
   // 3 mức quyền, từ hẹp đến rộng:
@@ -92,6 +96,25 @@ export default function TaskModal({
     const anchor = sprint?.startDate?.toDate() ?? sprint?.endDate?.toDate();
     return anchor ? toInputDate(Timestamp.fromDate(sundayOfWeek(anchor))) : '';
   });
+  // Hạn chót BÁM THEO sprint: đổi sprint (từ Backlog vào hay sang sprint khác, ở cả tạo
+  // lẫn sửa) là hạn tự nhảy về chủ nhật tuần sprint MỚI — task gánh sang tuần nào thì hạn
+  // tuần đó, không giữ hạn của tuần đã qua (cùng luật moveTaskToSprint). Task done giữ
+  // nguyên: dueDate của nó là NGÀY HOÀN THÀNH THẬT. Hạn nhảy xong vẫn sửa tay được.
+  const prevSprintRef = useRef(task?.sprintId ?? defaultSprintId);
+  useEffect(() => {
+    if (prevSprintRef.current === sprintId) return;
+    prevSprintRef.current = sprintId;
+    if (status === 'done') return;
+    if (!sprintId) {
+      // Về backlog lúc TẠO: bỏ hạn (backlog không hẹn ngày — xem createTask). Lúc SỬA thì
+      // giữ nguyên — xoá ngày người ta đã đặt là quá tay.
+      if (!isEdit) setDue('');
+      return;
+    }
+    const sprint = sprints.find((s) => s.id === sprintId);
+    const anchor = sprint?.startDate?.toDate() ?? sprint?.endDate?.toDate();
+    if (anchor) setDue(toInputDate(Timestamp.fromDate(sundayOfWeek(anchor))));
+  }, [sprintId, status, sprints, isEdit]);
   const [attachments, setAttachments] = useState<Attachment[]>(task?.attachments ?? []);
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);
   const [watcherIds, setWatcherIds] = useState<string[]>(task?.watcherIds ?? []);
@@ -102,12 +125,21 @@ export default function TaskModal({
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmCopy, setConfirmCopy] = useState(false);
   const [notionSyncing, setNotionSyncing] = useState(false);
   const [notionMsg, setNotionMsg] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   // Mô tả: mặc định hiện dạng ĐỌC (giữ xuống dòng), bấm mới ra ô sửa — tránh textarea gạch
   // đỏ chính tả lúc chỉ xem. Chỉ người sửa được (canEditOwn) mới bấm vào để sửa.
   const [editingDesc, setEditingDesc] = useState(false);
+  const [pasting, setPasting] = useState(false);
+
+  // Ctrl+V trong modal: ẢNH -> Ref (upload Storage), LINK -> Tài liệu. Cùng hook với FeatureModal.
+  // Dạng hàm -> callback ổn định -> usePasteAttachment không gắn lại listener mỗi render.
+  const addAttachment = useCallback((att: Attachment) => setAttachments((prev) => [...prev, att]), []);
+  const showError = useCallback((msg: string) => setError(msg), []);
+  // Chỉ nhận dán khi được sửa tài liệu (khớp AttachmentsField/RefImagesSection) và không đang tạo.
+  usePasteAttachment({ disabled: !canEditOwn || creating, onAdd: addAttachment, onError: showError, onBusy: setPasting });
 
   function copyTaskLink() {
     if (!task) return;
@@ -119,7 +151,12 @@ export default function TaskModal({
   }
 
   const sprintName = sprints.find((s) => s.id === sprintId)?.name ?? 'Backlog';
-  const projectName = projects.find((p) => p.id === projectId)?.name;
+  const projectOfTask = projects.find((p) => p.id === projectId);
+  const projectName = projectOfTask?.name;
+  /** Dự án có bật đẩy task sang Notion không (0070) — quyết định nút "Tạo task trên Notion". */
+  const notionSyncEnabled = projectOfTask?.notionSyncEnabled ?? true;
+  /** Dự án có LIÊN KẾT Notion project không — không link thì ẩn mọi UI Notion trong modal. */
+  const notionEnabled = !!projectOfTask?.notionProjectId;
   const projectFeatures = features.filter((f) => f.projectId === projectId);
 
   // Auto-gắn watcher khi TẠO task thuộc feature (0046): "người tham gia" = thêm tay
@@ -183,13 +220,21 @@ export default function TaskModal({
       attachments, subtasks, watcherIds, watcherNames,
     };
     const justFinished = becameDone(base.status, status);
+    // Subtask VỪA chuyển sang done ở lượt lưu này. Phải diff chứ không bắt từng cú bấm:
+    // autosave gom 700ms nên tick liền mấy cái là về cùng một lượt. `=== false` (không phải
+    // falsy) để subtask MỚI thêm vào mà đã tick sẵn không bị tính là "vừa xong".
+    const wasDone = new Map((base.subtasks ?? []).map((s) => [s.id, s.done]));
+    const newlyDoneSubs = subtasks.filter((s) => s.done && wasDone.get(s.id) === false).map((s) => s.title);
     try {
       await updateTask(base, patch, assignee?.notionUserId ?? null, notionProjectId);
       const merged = { ...base, ...patch } as Task;
       savedTaskRef.current = merged;
       lastSavedRef.current = snapshot();
       setSaveState('saved');
-      if (justFinished) confirmDoneNotify(merged, sprintName);
+      if (justFinished) notifyDone(merged, sprintName);
+      // Task xong thì đã có tin "task hoàn thành" rồi — đừng bắn thêm tin subtask cho cùng
+      // một lượt lưu, người đọc kênh sẽ thấy hai tin nói cùng một chuyện.
+      if (newlyDoneSubs.length > 0 && !justFinished) void notifySubtaskDone(merged, newlyDoneSubs);
     } catch (err) {
       console.error('Tự động lưu thất bại', err);
       setSaveState('error');
@@ -230,7 +275,7 @@ export default function TaskModal({
     try {
       await createTask(
         { title, description, sprintId, projectId, featureId, status, priority, points, assigneeId, dueDate, attachments, subtasks, watcherIds },
-        { reporterId: user?.uid ?? '', assigneeName: assignee?.displayName ?? '', assigneeNotionUserId: assignee?.notionUserId ?? null, notionProjectId, watcherNames },
+        { reporterId: user?.uid ?? '', assigneeName: assignee?.displayName ?? '', assigneeNotionUserId: assignee?.notionUserId ?? null, notionProjectId, notionSyncEnabled, watcherNames },
       );
       onClose();
     } catch (err) {
@@ -259,6 +304,46 @@ export default function TaskModal({
     }
   }
 
+  /**
+   * Nhân bản task đang mở (kèm subtask). Phải FLUSH bản nháp đang chờ tự-lưu trước: gõ xong
+   * bấm nhân bản ngay thì `task` trong tay còn là bản CŨ, bản sao sẽ thiếu đúng thứ vừa gõ.
+   */
+  async function handleDuplicate() {
+    if (!task) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (canSave && snapshot() !== lastSavedRef.current) await persist();
+    const assignee = members.find((m) => m.uid === assigneeId) ?? null;
+    const project = projects.find((p) => p.id === projectId) ?? null;
+    const watcherNames = watcherIds
+      .map((id) => members.find((m) => m.uid === id)?.displayName ?? '')
+      .filter(Boolean);
+    try {
+      await duplicateTask(
+        // Lấy state đang hiển thị chứ không phải `task` thô: hai thứ vừa được persist() ở
+        // trên đồng bộ với nhau, nhưng prop `task` chỉ mới lại sau khi realtime đẩy về.
+        {
+          ...task,
+          title, description, sprintId, featureId, status, priority, assigneeId, points,
+          dueDate: due ? Timestamp.fromDate(new Date(due)) : null,
+          attachments, subtasks, watcherIds,
+        },
+        {
+          reporterId: user?.uid ?? '',
+          assigneeName: assignee?.displayName ?? '',
+          assigneeNotionUserId: assignee?.notionUserId ?? null,
+          notionProjectId: project?.notionProjectId ?? null,
+          notionSyncEnabled,
+          watcherNames,
+        },
+      );
+      onClose();
+    } catch (err) {
+      console.error('Nhân bản task thất bại', err);
+      setConfirmCopy(false);
+      setError('Nhân bản thất bại. Kiểm tra quyền hoặc kết nối.');
+    }
+  }
+
   async function handleDelete() {
     if (!task) return;
     try {
@@ -274,10 +359,6 @@ export default function TaskModal({
     saveState === 'saving' ? 'Đang lưu…' :
     saveState === 'error' ? '⚠ Lưu lỗi' :
     saveState === 'saved' ? '✓ Đã lưu' : 'Tự động lưu';
-
-  // Project tắt liên kết Notion (Cấu hình project -> bỏ "Liên kết Notion project")
-  // -> ẩn cả link "Mở task trên Notion" lẫn nút "Tạo task trên Notion".
-  const notionEnabled = !!projects.find((p) => p.id === projectId)?.notionProjectId;
 
   return (
     <div className="modal-overlay" onClick={() => void handleClose()}>
@@ -359,7 +440,14 @@ export default function TaskModal({
 
             {/* Subtasks — ngay dưới thanh tiến độ (tiến độ tính từ đây) */}
             <section className="tm-section">
-              <SubtasksField subtasks={subtasks} onChange={setSubtasks} canEdit={canEditOwn} canToggle={canChangeStatus} />
+              <SubtasksField
+                subtasks={subtasks}
+                onChange={setSubtasks}
+                canEdit={canEditOwn}
+                canToggle={canChangeStatus}
+                members={members}
+                currentUserId={user?.uid ?? ''}
+              />
             </section>
 
             {/* Thông tin — status & priority sống ở header, không lặp lại ở đây */}
@@ -414,10 +502,18 @@ export default function TaskModal({
               <WatchersField members={members} watcherIds={watcherIds} onChange={setWatcherIds} disabled={!canEditFields} excludeIds={watcherExclude} />
             </section>
 
+            {/* Lịch sử sprint — task từng qua sprint nào + tổng tuổi, để lộ task bị kẹt */}
+            {isEdit && task && <SprintHistory task={task} currentSprintId={sprintId} />}
+
             {/* Tài liệu (chỉ link) */}
             <section className="tm-section">
               <h4 className="tm-h"><PaperclipIcon size={16} /> Tài liệu</h4>
-              <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={!canEditOwn} />
+              <AttachmentsField
+                attachments={attachments}
+                onChange={setAttachments}
+                disabled={!canEditOwn}
+                projectId={projectId}
+              />
               {isEdit && notionEnabled && task?.notionUrl && (
                 <a className="notion-row" href={task.notionUrl} target="_blank" rel="noreferrer">📝 Mở task trên Notion →</a>
               )}
@@ -427,7 +523,9 @@ export default function TaskModal({
                   member được giao task mà sync tự động lỗi thì phải tự tạo lại được —
                   RLS tasks_update (0002) vốn cho cả reporter lẫn assignee ghi
                   notion_page_id, nên nới tới đây là khớp đúng quyền ghi thật. */}
-              {isEdit && notionEnabled && task && !task.notionPageId && canChangeStatus && (
+              {/* Dự án tắt sync Notion (0070) hoặc chưa liên kết Notion thì giấu luôn nút —
+                  để đó chỉ mời người ta tạo một trang mà dự án không dùng. */}
+              {isEdit && notionEnabled && task && !task.notionPageId && canChangeStatus && notionSyncEnabled && (
                 <div className="notion-sync-row">
                   <button className="btn-sm" onClick={handleSyncNotion} disabled={notionSyncing}>
                     {notionSyncing ? '⏳ Đang tạo trên Notion…' : '📝 Tạo task trên Notion'}
@@ -439,6 +537,11 @@ export default function TaskModal({
 
             {/* Ref — ảnh tham khảo, section riêng ở dưới cùng */}
             <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={!canEditOwn} />
+            {canEditOwn && (
+              <p className="perf-hint tm-paste-hint">
+                {pasting ? 'Đang tải ảnh vừa dán lên…' : 'Ctrl+V để dán thẳng ảnh (vào Ref) hoặc link (vào Tài liệu).'}
+              </p>
+            )}
 
             {/* Ref dùng chung của feature — CHỈ ĐỌC, và đọc thẳng từ feature chứ không
                 sao chép vào task: thêm ref vào feature sau này thì task cũ vẫn thấy ngay,
@@ -461,6 +564,14 @@ export default function TaskModal({
             {isEdit && canDelete && (
               <button className="btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>🗑 Xoá task</button>
             )}
+            {/* Nhân bản: KHÔNG gắn vào canEditOwn/canDelete — tạo task là quyền mở cho mọi
+                người (RLS tasks_insert), và bản sao là task MỚI của chính người bấm chứ
+                không đụng gì vào task gốc. */}
+            {isEdit && task && (
+              <button className="btn-sm" onClick={() => setConfirmCopy(true)} title="Tạo một task mới y hệt task này, kèm toàn bộ subtask">
+                ⧉ Nhân bản
+              </button>
+            )}
             <div className="tmodal-foot-spacer" />
             {isEdit ? (
               canSave && <span className={`tm-savehint tm-save-${saveState}`}>{saveHint}</span>
@@ -478,6 +589,23 @@ export default function TaskModal({
           <TaskActivity taskId={task.id} actorId={user?.uid ?? ''} actorName={profile?.displayName ?? ''} />
         )}
       </div>
+
+      {confirmCopy && task && (
+        <ConfirmDialog
+          title="Nhân bản task?"
+          message={
+            <>Tạo một task mới tên <strong>“{copyTitle(title)}”</strong>
+              {subtasks.length > 0 && <> kèm <strong>{subtasks.length} subtask</strong></>}.</>
+          }
+          detail={
+            `Bản sao giữ mô tả, người nhận, tài liệu, ref và ${sprintName === 'Backlog' ? 'nằm ở Backlog' : `nằm trong ${sprintName}`}` +
+            ' — nhưng về trạng thái “Cần làm”, subtask bỏ tick hết. Lịch sử, bình luận và trang Notion thì không chép.'
+          }
+          confirmLabel="Nhân bản"
+          onConfirm={handleDuplicate}
+          onCancel={() => setConfirmCopy(false)}
+        />
+      )}
 
       {confirmDelete && task && (
         <ConfirmDialog

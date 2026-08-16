@@ -1,4 +1,4 @@
-import Avatar from '../Avatar';
+import MemberAvatar from '../MemberAvatar';
 import BugLabelChip from './BugLabelChip';
 import { formatDate, timeAgo } from '../../lib/format';
 import type { Bug, BugLabel } from '../../types';
@@ -36,7 +36,7 @@ export default function BugList({ bugs, labelsById, projectName, onOpen }: Props
             </div>
           </div>
           <div className="bug-row-side">
-            {b.assigneeName ? <Avatar name={b.assigneeName} size="sm" /> : <span className="bug-row-unassigned" title="Chưa giao">○</span>}
+            {b.assigneeName ? <MemberAvatar uid={b.assigneeId} name={b.assigneeName} size="sm" /> : <span className="bug-row-unassigned" title="Chưa giao">○</span>}
             <span className="bug-row-updated muted">cập nhật {timeAgo(b.updatedAt) || '—'}</span>
           </div>
         </div>

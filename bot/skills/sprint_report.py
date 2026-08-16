@@ -4,8 +4,9 @@ Dem theo trang thai, chia theo nguoi, story points done/tong, % hoan thanh,
 so ngay con lai den endDate, va danh sach task tre han. Bullet Discord, KHONG bang.
 
 Vi du:
-    python sprint_report.py                 # sprint active
-    python sprint_report.py --sprint "Sprint 12"
+    python sprint_report.py                 # sprint active (du an duy nhat)
+    python sprint_report.py --project "M1"  # sprint active cua du an M1
+    python sprint_report.py --sprint "Sprint 12" --project "M1"
 """
 
 import argparse
@@ -17,6 +18,7 @@ try:
 except Exception:
     pass
 
+import project_repo as prepo
 import task_repo as repo
 from constants import STATUS_DONE, STATUS_ORDER
 
@@ -117,12 +119,16 @@ def _format_report(sprint, tasks, now: datetime) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Bao cao tien do sprint (Discord bot skill).")
     parser.add_argument("--sprint", default="active", help="Ten sprint | 'active' (mac dinh)")
+    parser.add_argument("--project", help="Du an cua sprint (0068 — moi du an mot bo sprint). Bo trong = du an duy nhat")
     args = parser.parse_args()
 
     now = datetime.now(timezone.utc)
     try:
         client = repo.db()
-        sprint = repo.resolve_sprint(client, args.sprint)
+        # 0068: sprint thuoc tung du an, ma cron dat TEN GIONG NHAU cho moi du an moi tuan
+        # — khong khoanh vung du an la 'active'/ten sprint tro thanh hen xui.
+        project = prepo.resolve_project(client, args.project)
+        sprint = repo.resolve_sprint(client, args.sprint, project["_id"])
         tasks = repo.query_tasks(client, sprint_id=sprint["_id"])
     except repo.ResolveError as e:
         die(str(e))

@@ -26,7 +26,7 @@ const MODE_KEY = 'backlogView';
 export default function Backlog() {
   const { user, isAdmin } = useAuth();
   const { members, selectedProjectId, selectedProject } = useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const { tasks, loading } = useProjectTasks(selectedProjectId);
   const [editing, setEditing] = useState<Task | null>(null);
   const [creating, setCreating] = useState(false);
@@ -48,7 +48,7 @@ export default function Backlog() {
     if (status === task.status) return;
     const justFinished = becameDone(task.status, status);
     void moveTask(task, status, task.order);
-    if (justFinished) confirmDoneNotify({ ...task, status });
+    if (justFinished) notifyDone({ ...task, status });
   }
 
   if (!selectedProjectId) {

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useMyTasks } from '../hooks/useMyTasks';
+import { useMySubtasks } from '../hooks/useMySubtasks';
 import { useMyBugs } from '../hooks/useMyBugs';
 import { useBugLabels } from '../hooks/useBugLabels';
 import { useStoredView } from '../hooks/useStoredView';
@@ -9,6 +10,7 @@ import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import TaskRow from './TaskRow';
 import TaskListRow from './TaskListRow';
+import MySubtaskList from './task/MySubtaskList';
 import TaskModal from './TaskModal';
 import CreateTaskCard from './CreateTaskCard';
 import BugList from './bug/BugList';
@@ -26,8 +28,9 @@ const MODE_KEY = 'myTasksView';
 export default function MyTasks() {
   const { user } = useAuth();
   const { sprints, members, selectedSprintId, selectedProjectId, selectedProject } = useSprintContext();
-  const { confirmDoneNotify } = useNotify();
+  const { notifyDone } = useNotify();
   const { tasks, loading } = useMyTasks(user?.uid ?? '');
+  const { items: mySubtasks } = useMySubtasks(user?.uid ?? '');
   const { bugs } = useMyBugs(user?.uid ?? '', selectedProjectId);
   const { labels } = useBugLabels(selectedProjectId);
   const [editing, setEditing] = useState<Task | null>(null);
@@ -61,6 +64,25 @@ export default function MyTasks() {
   );
   const open = scoped.filter((t) => t.status !== 'done').length;
 
+  // Subtask của tôi TRONG DỰ ÁN này, tách làm hai: thuộc sprint đang chọn (hiện ra) và
+  // thuộc sprint khác (chỉ đếm). Bám sprint cùng luật với danh sách task ở trên — không thì
+  // mục này lại phơi việc của mọi sprint trong khi phần trên đã lọc.
+  const projectSubtasks = useMemo(
+    () =>
+      mySubtasks.filter(
+        ({ task }) => selectedProjectId === null || task.projectId === selectedProjectId,
+      ),
+    [mySubtasks, selectedProjectId],
+  );
+  const scopedSubtasks = useMemo(
+    () => projectSubtasks.filter(({ task }) => (task.sprintId ?? null) === (selectedSprintId ?? null)),
+    [projectSubtasks, selectedSprintId],
+  );
+  // Có subtask ở sprint khác thì vẫn hiện TIÊU ĐỀ mục kèm số, không ẩn sạch: mục biến mất
+  // hoàn toàn thì không phân biệt được "mình không có subtask nào" với "tính năng hỏng".
+  const otherSprintSubtasks = projectSubtasks.length - scopedSubtasks.length;
+  const openSubtasks = scopedSubtasks.filter(({ subtask }) => !subtask.done).length;
+
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
   const openBugs = bugs.filter((b) => b.status !== 'done').length;
   const visibleBugs = useMemo(
@@ -72,7 +94,7 @@ export default function MyTasks() {
     if (status === task.status) return;
     const justFinished = becameDone(task.status, status);
     void moveTask(task, status, task.order);
-    if (justFinished) confirmDoneNotify({ ...task, status }, sprintName(task.sprintId));
+    if (justFinished) notifyDone({ ...task, status }, sprintName(task.sprintId));
   }
 
   if (loading) {
@@ -133,6 +155,27 @@ export default function MyTasks() {
             <div className="glass empty">Không có task nào trong {sprintName(selectedSprintId)}.</div>
           )}
         </>
+      )}
+
+      {/* Subtask được giao — đứng riêng vì task cha có thể là của người khác, khi đó nó
+          KHÔNG nằm trong danh sách task ở trên. */}
+      {projectSubtasks.length > 0 && (
+        <section className="mt-bugs">
+          <div className="mt-subhead row between">
+            <div>
+              <h2>☑️ Subtask của tôi</h2>
+              <p className="muted">
+                {scopedSubtasks.length > 0
+                  ? `${openSubtasks} subtask chưa xong · ${scopedSubtasks.length - openSubtasks} đã xong · ${sprintName(selectedSprintId)}`
+                  : `Không có subtask nào trong ${sprintName(selectedSprintId)}`}
+                {otherSprintSubtasks > 0 && ` · ${otherSprintSubtasks} ở sprint khác`}
+              </p>
+            </div>
+          </div>
+          {scopedSubtasks.length > 0 && (
+            <MySubtaskList items={scopedSubtasks} sprintName={sprintName} onOpenTask={setEditing} />
+          )}
+        </section>
       )}
 
       {/* Bug được giao — tách hẳn khỏi task, tiêu đề riêng cho dễ nhìn. */}

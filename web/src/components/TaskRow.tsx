@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import Avatar from './Avatar';
+import MemberAvatar from './MemberAvatar';
 import TaskFlags from './task/TaskFlags';
 import { useSprintContext } from '../contexts/SprintContext';
 import { daysUntil } from '../lib/format';
@@ -182,7 +182,7 @@ export default function TaskRow({
       {/* 2×2 meta grid */}
       <div className="tcard-grid">
         <div className="tcard-cell">
-          <Avatar name={task.assigneeName || '?'} size="md" />
+          <MemberAvatar uid={task.assigneeId} name={task.assigneeName || '?'} size="md" />
           <div className="tcard-cell-text">
             <span className="tcard-val">{task.assigneeName || 'Chưa giao'}</span>
             <span className="tcard-lbl">Assignee</span>

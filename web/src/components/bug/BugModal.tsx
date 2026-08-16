@@ -15,6 +15,7 @@ import ConfirmDialog from '../ConfirmDialog';
 import Lightbox from '../Lightbox';
 import BugLabelChip from './BugLabelChip';
 import BadgeSelect from './BadgeSelect';
+import SearchableSelect from '../SearchableSelect';
 import { MoreVerticalIcon } from '../icons';
 import { BUG_STATUSES, BUG_STATUS_LABEL, type Attachment, type Bug, type BugLabel, type BugStatus } from '../../types';
 
@@ -150,13 +151,30 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
   const sevOpts = grp('severity').map((l) => ({ value: l.id, label: l.name, color: l.color, icon: l.icon }));
   const statusOpts = BUG_STATUSES.map((s) => ({ value: s, label: BUG_STATUS_LABEL[s], color: BUG_STATUS_COLOR[s] }));
 
+  // Nhãn cho ô chọn: icon emoji đứng trước tên. Icon dạng URL (nhãn Discord dùng ảnh
+  // custom emoji) thì bỏ — gõ tìm là gõ theo TÊN, nhét URL vào chuỗi tìm kiếm chỉ tổ nhiễu.
+  const optLabel = (l: BugLabel) => `${l.icon && !l.icon.startsWith('http') ? `${l.icon} ` : ''}${l.name}`;
+
+  /**
+   * Ô chọn nhóm nhãn (Version / Loại / Nền tảng) — SearchableSelect để gõ tìm được, giống
+   * chi tiết task: danh sách version dài hàng chục dòng, cuộn tay tìm '1.1.1.37' thì cực.
+   *
+   * `panel="overlay"` là BẮT BUỘC ở đây: `.bugf` là hàng flex cao cố định 44px, panel
+   * in-flow (mặc định) sẽ nong ô ra và xô lệch cả lưới thông tin khi mở.
+   */
   const groupSelect = (g: LabelGroup) => (
-    <select className="bugf-sel" value={sel(g)} onChange={(e) => setGroup(g, e.target.value)} disabled={!canEdit}>
-      <option value="">— Không —</option>
-      {grp(g).map((l) => (
-        <option key={l.id} value={l.id}>{l.icon && !l.icon.startsWith('http') ? `${l.icon} ` : ''}{l.name}</option>
-      ))}
-    </select>
+    <div className="bugf-ss">
+      <SearchableSelect
+        value={sel(g)}
+        onChange={(v) => setGroup(g, v)}
+        options={grp(g).map((l) => ({ value: l.id, label: optLabel(l) }))}
+        disabled={!canEdit}
+        allowEmpty
+        emptyLabel="— Không —"
+        placeholder="— Không —"
+        panel="overlay"
+      />
+    </div>
   );
 
   return (
@@ -237,23 +255,40 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
           {/* Thông tin */}
           <section className="bugm-section">
             <h4 className="tm-h">📋 Thông tin</h4>
+            {/* Mỗi ô là <div> chứ không phải <label>: SearchableSelect render ra <button>,
+                mà button LÀ phần tử gắn nhãn được — bọc trong <label> thì bấm vào chỗ trống
+                của ô cũng kích hoạt nút, mở/đóng panel loạn xạ. */}
             <div className="bug-info">
-              <label className="bugf"><span className="bugf-ic">🏷️</span><span className="bugf-lb">Version</span>{groupSelect('version')}</label>
-              <label className="bugf">
+              <div className="bugf"><span className="bugf-ic">🏷️</span><span className="bugf-lb">Version</span>{groupSelect('version')}</div>
+              <div className="bugf">
                 <span className="bugf-ic">🚀</span><span className="bugf-lb">Trạng thái</span>
-                <select className="bugf-sel" value={status} onChange={(e) => changeStatus(e.target.value as BugStatus)} disabled={!canEdit}>
-                  {BUG_STATUSES.map((s) => <option key={s} value={s}>{BUG_STATUS_LABEL[s]}</option>)}
-                </select>
-              </label>
-              <label className="bugf">
+                <div className="bugf-ss">
+                  <SearchableSelect
+                    value={status}
+                    onChange={(v) => void changeStatus(v as BugStatus)}
+                    options={BUG_STATUSES.map((s) => ({ value: s, label: BUG_STATUS_LABEL[s] }))}
+                    disabled={!canEdit}
+                    panel="overlay"
+                  />
+                </div>
+              </div>
+              <div className="bugf">
                 <span className="bugf-ic">🙋</span><span className="bugf-lb">Người nhận</span>
-                <select className="bugf-sel" value={assigneeId ?? ''} onChange={(e) => setAssigneeId(e.target.value || null)} disabled={!canEdit}>
-                  <option value="">Chưa giao</option>
-                  {members.map((m) => <option key={m.uid} value={m.uid}>{m.displayName}</option>)}
-                </select>
-              </label>
-              <label className="bugf"><span className="bugf-ic">🐞</span><span className="bugf-lb">Loại</span>{groupSelect('category')}</label>
-              <label className="bugf"><span className="bugf-ic">📱</span><span className="bugf-lb">Nền tảng</span>{groupSelect('platform')}</label>
+                <div className="bugf-ss">
+                  <SearchableSelect
+                    value={assigneeId ?? ''}
+                    onChange={(v) => setAssigneeId(v || null)}
+                    options={members.map((m) => ({ value: m.uid, label: m.displayName }))}
+                    disabled={!canEdit}
+                    allowEmpty
+                    emptyLabel="Chưa giao"
+                    placeholder="Chưa giao"
+                    panel="overlay"
+                  />
+                </div>
+              </div>
+              <div className="bugf"><span className="bugf-ic">🐞</span><span className="bugf-lb">Loại</span>{groupSelect('category')}</div>
+              <div className="bugf"><span className="bugf-ic">📱</span><span className="bugf-lb">Nền tảng</span>{groupSelect('platform')}</div>
             </div>
             {otherLabels.length > 0 && (
               <div className="bugm-others">

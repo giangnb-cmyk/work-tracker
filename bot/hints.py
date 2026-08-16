@@ -27,10 +27,22 @@ TASK_HINT = (
     " TASK SKILL: When the user wants to CREATE, UPDATE, ASSIGN or LIST tasks, run "
     f'`python "{_SKILLS_DIR}/task_ops.py" <subcommand> ...`. Subcommands:\n'
     "- create (anyone): --title (required) [--project <name|id>] [--feature <name|id>] "
-    "[--assignee <name|<@id>>] [--watchers <comma-separated names/mentions>] "
+    "[--assignee <name|me|none|<@id>>] [--watchers <comma-separated names/mentions>] "
+    "[--status <todo|in_progress|review|done, accepts Vietnamese: xong/dang lam...>] "
     "[--sprint <name|active|backlog>] "
     "[--priority <low|medium|high|urgent, accepts Vietnamese: gap/cao/thap...>] "
     "[--points N] [--due YYYY-MM-DD] [--desc ...] [--link <url>] [--link-name <ten>]. "
+    "--assignee is OPTIONAL and DEFAULTS TO THE REQUESTER (the person who tagged the bot): "
+    "leave it out and the skill assigns the task to them. First-person phrasing - 'tao cho "
+    "toi', 'cho minh', 'cho em', 'task cua toi' - means exactly that, so either omit "
+    "--assignee or pass `--assignee me` (the skill maps me/toi/minh/em to the sender via "
+    "their Discord id). Pass a NAME only when the user names someone else. Pass "
+    "`--assignee none` ONLY when the task deliberately belongs to nobody - e.g. bulk-importing "
+    "someone else's plan where that row names no person. NEVER leave a task unassigned just "
+    "because the user did not spell out a name.\n"
+    "--status is OPTIONAL (default todo). 'tao task X, tick done luon' / 'tao task X, xong "
+    "roi' -> create --title \"X\" --status done in ONE call; do NOT create then update. A task "
+    "created as done gets today as its completion date automatically.\n"
     "--due is OPTIONAL: left out, the task's "
     "deadline defaults to the END OF ITS SPRINT (or end of this work week when it has no "
     "sprint), so only pass --due when the user names a specific date. Example 'tao task Fix "
@@ -64,8 +76,10 @@ TASK_HINT = (
     "--watchers \"Anh, Thuy\". On update --watchers REPLACES the whole list (it does not "
     "append), and --watchers \"\" clears it - so when the user wants to ADD someone, list "
     "the existing watchers too.\n"
-    "- list (anyone): [--assignee <name|me>] [--sprint <name|active|backlog>] [--status <...>]. "
-    "'me' maps to the sender. Example 'xem task cua toi' -> list --assignee me.\n"
+    "- list (anyone): [--assignee <name|me>] [--sprint <name|active|backlog>] "
+    "[--project <name|id>] [--status <...>]. 'me' maps to the sender. Sprints belong to one "
+    "project each, so pass --project together with --sprint when there are several projects. "
+    "Example 'xem task cua toi' -> list --assignee me.\n"
     "Relay the script's printed output. The task id in [brackets] is a short id you can reuse.\n"
     "When the script prints a 'Link: <url>' line, that is the task's page on the web app: "
     "ALWAYS include that url in your reply (as-is, never shortened or relabelled) so people "
@@ -109,8 +123,10 @@ TASK_INTAKE_HINT = (
     "6) SECTION HEADERS ('🧑‍💻 Dev', '📚 GD', or an unlabelled block at the top) are NOT tasks - "
     "never create a task for a header line. Record the section name in the --desc of each task "
     "under it, e.g. --desc \"Mục: Dev\". Do NOT guess an assignee from the section: this team's "
-    "GD section contains sound tasks, so the header does not decide who does the work. Leave "
-    "--assignee empty unless the user names a person.\n"
+    "GD section contains sound tasks, so the header does not decide who does the work. When such "
+    "a row names nobody, pass `--assignee none` - do not invent a person from the header, and do "
+    "not fall back on the requester either (they are importing someone else's plan). This is the "
+    "ONE case for `none`: a person asking for their OWN task still gets it assigned to them.\n"
     "7) STRIP DECORATION from titles: Discord emoji shortcodes like ':hgtt_4_stard:', leading "
     "bullets or dashes. Keep the real words.\n"
     "7b) A TITLE MUST START WITH A LETTER OR A DIGIT. Never open a title with an emoji or a "
@@ -139,15 +155,19 @@ FEATURE_HINT = (
 SPRINT_OPS_HINT = (
     " SPRINT ADMIN SKILL: When the user wants to CREATE / UPDATE / LIST sprints themselves "
     "(NOT a progress report - that is the sprint report skill below), run "
-    f'`python "{_SKILLS_DIR}/sprint_ops.py" <subcommand> ...`. Sprints are global, they are '
-    "NOT tied to a project. Subcommands:\n"
-    "- create (ADMIN ONLY): --name (required) [--goal ...] [--status <planning|active|"
-    "completed, accepts 'chuan bi'/'dang chay'/'xong'>] [--start YYYY-MM-DD] [--end YYYY-MM-DD].\n"
-    "- update (ADMIN ONLY): --sprint <name|active> and any of --name --goal --status --start --end.\n"
-    "- list (anyone): no arguments.\n"
-    "Only ONE sprint should be active: the skill refuses a second one and names the current "
-    "active sprint. Relay that refusal and ask the user whether to close the old sprint - do "
-    "NOT pass --force on your own initiative."
+    f'`python "{_SKILLS_DIR}/sprint_ops.py" <subcommand> ...`. Sprints BELONG TO ONE PROJECT '
+    "(each project has its own independent sprint list; a weekly sprint is auto-created per "
+    "project every Monday). Subcommands:\n"
+    "- create (ADMIN ONLY): --name (required) [--project <name|id>] [--goal ...] [--status "
+    "<planning|active|completed, accepts 'chuan bi'/'dang chay'/'xong'>] [--start YYYY-MM-DD] "
+    "[--end YYYY-MM-DD]. Omit --project only if the team has a single project.\n"
+    "- update (ADMIN ONLY): --sprint <name|active> [--project <name|id>] and any of --name "
+    "--goal --status --start --end. Pass --project when sprint names repeat across projects "
+    "(weekly sprints share the same name).\n"
+    "- list (anyone): [--project <name|id>] — omit to list every project's sprints.\n"
+    "Only ONE sprint per project should be active: the skill refuses a second one and names "
+    "the current active sprint. Relay that refusal and ask the user whether to close the old "
+    "sprint - do NOT pass --force on your own initiative."
 )
 
 PROJECT_HINT = (
@@ -166,8 +186,9 @@ PROJECT_HINT = (
 SPRINT_REPORT_HINT = (
     " SPRINT REPORT SKILL: When the user asks for a sprint report / progress "
     "('bao cao sprint', 'tien do sprint', 'sprint dang chay the nao'), run "
-    f'`python "{_SKILLS_DIR}/sprint_report.py" [--sprint <name|active>]` (omit --sprint '
-    "for the active sprint). Relay the printed report as-is."
+    f'`python "{_SKILLS_DIR}/sprint_report.py" [--sprint <name|active>] [--project <name|id>]` '
+    "(omit --sprint for the active sprint; omit --project only if the team has a single "
+    "project - sprints belong to one project each). Relay the printed report as-is."
 )
 
 WEEKLY_REPORT_HINT = (
@@ -226,6 +247,47 @@ DOC_HINT = (
     "that folder url in your reply (as-is) so the user can open the whole document folder."
 )
 
+IMAGE_CHECK_HINT = (
+    " IMAGE COPY CHECK SKILL (anyone): When the user wants to check whether an IMAGE is "
+    "copied / cloned / plagiarised / infringes copyright ('check ảnh có bị đạo/nhái/copy "
+    "không', 'ảnh này có trùng trên mạng không', 'kiểm tra bản quyền ảnh', 'reverse image', "
+    "'truy nguồn ảnh'), run "
+    f'`python "{_SKILLS_DIR}/lens_check.py" --url "<image_url>"`. The image url(s) are handed '
+    "to you in the prompt as a line '[Ảnh đính kèm — N ảnh ...]: <url> <url> ...' — pass each "
+    "VERBATIM inside double quotes; the Discord CDN url contains '?' and '&' that MUST stay "
+    "intact. Never invent, shorten or reorder a url. The script opens a REAL Chrome window "
+    "and takes ~30-60s per image — ALWAYS set a generous Bash timeout (180000ms); at most 2 "
+    "--url per call.\n"
+    "  FILTER: when the user wants results restricted to a domain/context ('chỉ ảnh liên "
+    "quan game', 'lọc theo anime', 'trong app khác'), add --query \"<keyword>\" (e.g. "
+    "--query \"game\") — it is typed into Lens's 'Thêm vào nội dung tìm kiếm' box so GOOGLE "
+    "does the filtering on the visually-similar results. The exact-match section is NEVER "
+    "filtered (a copy is a copy wherever it sits). Pick a short keyword in the user's "
+    "language; do not stack many words.\n"
+    "  It uploads the image to Google Lens, scrapes the 'Hình ảnh trùng khớp' (visual "
+    "matches) tab — the team's preferred source — downloads the page-1 results and compares "
+    "each to the original by perceptual hash. Output: 🟠 nearly identical pixels, 🟡 quite "
+    "similar, ⚪ different-but-maybe-redrawn. Add --exact ONLY when the user explicitly asks "
+    "which pages use the exact same file (adds the 🔴 'exact matches' section).\n"
+    "  VERIFY WITH YOUR OWN EYES — this is the point of the feature: the output prints file "
+    "paths of the original (ref-*.png) and every downloaded match (match-*.jpg). Read the "
+    "ref image and the match files to LOOK at them, then judge: same artwork "
+    "(copy/crop/recolor/REDRAWN) vs merely the same style. Reply with your verdict per match "
+    "and the links VERBATIM so people can open them.\n"
+    "  CRITICAL — pixel distance is NOT the verdict: the hash only catches near-identical "
+    "files. Game art that was REDRAWN/traced lands in the ⚪ section with a high distance, "
+    "yet is exactly what the team needs to catch. So when 🔴/🟠 are empty, NEVER reply "
+    "'không tìm thấy' while ⚪ results exist: open the ref + the top ⚪ files, compare with "
+    "your eyes, and report what you actually see (same asset redrawn? same composition? just "
+    "the genre look?). Only when the eyeball check ALSO shows nothing may you say no copy was "
+    "found — and note Google only sees what it has indexed (not a legal guarantee).\n"
+    "  If it prints 'LOI: Google đang tạm chặn' (CAPTCHA), tell the user to retry in a few "
+    f'minutes, or fall back to `python "{_SKILLS_DIR}/image_check.py" --url "..."` (Google '
+    "Vision Web Detection — weaker results but API-based, no browser).\n"
+    "  If the prompt has NO image url but the user asks to check one, tell them to ATTACH the "
+    "image (or REPLY to a message that has the image) and tag you again."
+)
+
 SHEET_HINT = (
     " GOOGLE SHEETS SKILL (live, CHI DOC): When the user asks about data inside a "
     "Google Sheet in the shared Drive folder ('sheet', 'bang tinh', 'file tren drive', "
@@ -257,6 +319,8 @@ SKILL_TOOL_PATTERNS = [
     f'Bash(python "{_SKILLS_DIR}/weekly_mail.py":*)',
     f'Bash(python "{_SKILLS_DIR}/member_dm.py":*)',
     f'Bash(python "{_SKILLS_DIR}/doc_search.py":*)',
+    f'Bash(python "{_SKILLS_DIR}/image_check.py":*)',
+    f'Bash(python "{_SKILLS_DIR}/lens_check.py":*)',
 ]
 
 
@@ -273,6 +337,7 @@ def build_hints(sheets_enabled: bool) -> str:
         + WEEKLY_REPORT_HINT
         + MEMBER_DM_HINT
         + DOC_HINT
+        + IMAGE_CHECK_HINT
     )
     if sheets_enabled:
         hints += SHEET_HINT

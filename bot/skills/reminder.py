@@ -110,36 +110,45 @@ def _sprint_name(client, sprint_id) -> str:
     return repo.sprint_name(client, sprint_id)
 
 
-def build_done_message(client, task: dict) -> str:
-    """Tao thong bao task hoan thanh, chi ping nguoi co discordId.
+# Vien EMBED "task hoan thanh" — xanh la (--green cua design system). CA BON loai tin
+# (task moi/task xong/subtask xong/tai lieu) deu la embed cung khuon, phan biet bang MAU
+# + header — nguon su that: web/api/_discord.ts (chu thich mau o dau file do).
+DONE_EMBED_COLOR = 0x22C55E
 
-    Tieng Viet co dau. Assignee duoc khen rieng; reporter + watchers vao 'cc',
-    da bo trung id (khong ping 1 nguoi 2 lan).
+
+def build_done_message(client, task: dict):
+    """Thong bao task hoan thanh: (content, embed) — chi ping nguoi co discordId.
+
+    EMBED cung khuon voi tin "task moi" cua web: author = loai tin, title = ten task BAM
+    DUOC, moi thong tin mot dong gian '\\n\\n', vien XANH LA de nhin mau la biet loai.
+    Ping nam o `content` NGOAI embed — mention trong embed khong bao. Cung format voi web
+    (_discord.buildDoneMessage) de web va bot bao giong nhau. Ping gom assignee + cc
+    (reporter + watchers), da bo trung id.
     """
     cache = {}
     assignee_did = _discord_id(client, task.get("assigneeId"), cache)
-
-    title = task.get("title", "(không tên)")
-    sprint = _sprint_name(client, task.get("sprintId"))
-    # Tieu de task lam header '##' cho noi bat; sprint trong ngoac neu co that.
-    header = f"## {title}"
-    if sprint and sprint not in ("backlog", "?"):
-        header += f" (sprint {sprint})"
-    lines = ["✅ Task đã hoàn thành:", header]
-
-    # Gom TAT CA nguoi can ping vao MOT dong: assignee truoc, roi cc (reporter + watchers),
-    # da bo trung. Thay cho kieu cu "assignee lam tot lam ... cc ...".
     ping_ids = ([assignee_did] if assignee_did else []) + _cc_discord_ids(
         client, task, cache, exclude=assignee_did
     )
-    if ping_ids:
-        lines.append("Mọi người nắm thông tin nhé " + " ".join(f"<@{d}>" for d in ping_ids))
 
-    # Link task o dong rieng: bam thang vao task khoi phai tu mo web di tim.
-    url = web_link.task_url(task.get("id") or task.get("_id"))
+    title = task.get("title", "(không tên)")
+    url = web_link.task_url(task.get("id") or task.get("_id"), task.get("projectId"))
+    sprint = _sprint_name(client, task.get("sprintId"))
+    sprint_label = sprint if sprint and sprint not in ("backlog", "?") else "Backlog"
+
+    lines = [
+        f"🎯 **Người làm:** {task.get('assigneeName') or 'chưa giao'}",
+        f"🏃 **Sprint:** {sprint_label}",
+    ]
+    embed = discord.Embed(title=title, color=DONE_EMBED_COLOR, description="\n\n".join(lines))
     if url:
-        lines.append(url)
-    return "\n".join(lines)
+        embed.url = url  # ten task bam duoc → mo task tren web
+    embed.set_author(name="✅ Task đã hoàn thành")
+
+    content = ""
+    if ping_ids:
+        content = "Mọi người nắm thông tin nhé " + " ".join(f"<@{d}>" for d in ping_ids)
+    return content, embed
 
 
 def _cc_discord_ids(client, task, cache, exclude) -> list:
@@ -176,8 +185,8 @@ def notify_done(task_or_id) -> bool:
         log.warning("Không tìm thấy task để thông báo hoàn thành.")
         return False
 
-    content = build_done_message(client, task)
-    return post_to_discord(token, channel_id, content) == 0
+    content, embed = build_done_message(client, task)
+    return post_to_discord(token, channel_id, content, embed=embed) == 0
 
 
 def _done_channel_id() -> int:
@@ -188,8 +197,12 @@ def _done_channel_id() -> int:
 
 # --- Phan 2: gui Discord (tach rieng khoi query) ----------------------------
 
-def post_to_discord(token: str, channel_id: int, content: str) -> int:
-    """Dang 1 tin nhan vao kenh roi thoat. Tra ve exit code (0 = ok)."""
+def post_to_discord(token: str, channel_id: int, content: str, embed=None) -> int:
+    """Dang 1 tin nhan vao kenh roi thoat. Tra ve exit code (0 = ok).
+
+    `embed` tuy chon (tin "task hoan thanh" dung); content rong + co embed van hop le,
+    nhung content rong MA khong embed thi Discord tu choi — truyen `content or None`.
+    """
     intents = discord.Intents.default()
     client = discord.Client(intents=intents)
     state = {"code": 0}
@@ -199,7 +212,8 @@ def post_to_discord(token: str, channel_id: int, content: str) -> int:
         try:
             channel = client.get_channel(channel_id) or await client.fetch_channel(channel_id)
             await channel.send(
-                content=content,
+                content=content or None,
+                embed=embed,
                 allowed_mentions=discord.AllowedMentions(users=True),
             )
             print("Đã gửi vào kênh", channel_id)

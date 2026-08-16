@@ -11,11 +11,16 @@ import { endOfWorkWeek, sundayOfWeek } from './format';
 import { Timestamp } from './time';
 import type { NewTaskInput, Sprint, Task, TaskStatus } from '../types';
 
-interface CreateOpts {
+export interface CreateOpts {
   reporterId: string;
   assigneeName: string;
   assigneeNotionUserId?: string | null;
   notionProjectId?: string | null;
+  /**
+   * Dự án này có đẩy task sang Notion không (`projects.notion_sync_enabled`, 0070).
+   * Bỏ trống = BẬT: chỗ gọi cũ chưa truyền thì giữ nguyên hành vi trước đây.
+   */
+  notionSyncEnabled?: boolean;
   watcherNames: string[];
 }
 
@@ -39,14 +44,15 @@ export function descWithLongTitle(title: string, description: string): string {
 
 export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise<string> {
   // Auto due window: starts today. Hạn chót: người tạo chọn thì tôn trọng; không chọn mà
-  // task VÀO SPRINT thì mặc định cuối tuần làm việc; còn task BACKLOG (không sprint) thì
-  // ĐỂ TRỐNG — backlog là chỗ đậu chưa hẹn ngày, tự điền hạn là ra một đống task "trễ" ảo.
+  // task VÀO SPRINT thì mặc định CUỐI SPRINT (chủ nhật tuần sprint — xem defaultSprintDue);
+  // còn task BACKLOG (không sprint) thì ĐỂ TRỐNG — backlog là chỗ đậu chưa hẹn ngày, tự
+  // điền hạn là ra một đống task "trễ" ảo.
   const now = new Date();
   const dueStart = Timestamp.fromDate(now);
   const dueDate = input.dueDate
     ? Timestamp.fromDate(input.dueDate)
     : input.sprintId
-      ? Timestamp.fromDate(endOfWorkWeek(now))
+      ? Timestamp.fromDate(await defaultSprintDue(input.sprintId, now))
       : null;
   // Tên dài mà chưa có mô tả → chép tiêu đề vào mô tả để đọc được ở chi tiết.
   const description = descWithLongTitle(input.title, input.description);
@@ -96,9 +102,9 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     attachments: input.attachments ?? [],
     watcherIds: input.watcherIds ?? [],
   } as Task;
-  // Project không liên kết Notion (notionProjectId rỗng) -> KHÔNG tự tạo page: UI đã ẩn
-  // hết icon/nút Notion, tạo page mồ côi ở đây thì không ai thấy mà quản.
-  if (opts.notionProjectId) {
+  // Dự án tắt sync Notion (0070) HOẶC chưa liên kết Notion project -> KHÔNG đẻ trang:
+  // database Notion là kho dùng chung, trang mồ côi không ai thấy mà quản.
+  if (opts.notionSyncEnabled !== false && opts.notionProjectId) {
     void syncNewToNotion(id, created, opts.assigneeNotionUserId, opts.notionProjectId);
   }
   // Báo Discord có task mới (webhook) — fire-and-forget, không chặn việc tạo nếu lỗi.
@@ -116,6 +122,28 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
     dueDate,
   });
   return id;
+}
+
+/**
+ * Hạn mặc định khi tạo task VÀO SPRINT mà không chọn ngày: CHỦ NHẬT của tuần sprint
+ * (sprint = 1 tuần Mon→Sun; cùng luật với TaskModal, moveTaskToSprint và bot _due_window).
+ * Tra ngày sprint ngay tại đây để MỌI đường tạo task (TaskModal, QuickAddTaskRow…) chung
+ * một luật — `endOfWorkWeek(now)` cũ neo vào tuần HIỆN TẠI, tạo task cho sprint tuần khác
+ * là hạn rơi sai tuần. Sprint không tra được / không có ngày thì lùi về cuối tuần làm việc.
+ */
+async function defaultSprintDue(sprintId: string, now: Date): Promise<Date> {
+  const { data, error } = await supabase
+    .from('sprints')
+    .select('start_date, end_date')
+    .eq('id', sprintId)
+    .maybeSingle();
+  if (error) {
+    // Hạn mặc định là phụ — không vì nó mà chặn việc tạo task, nhưng phải ghi lại để lần ra.
+    console.warn('Không tra được ngày sprint để đặt hạn mặc định, dùng cuối tuần hiện tại:', error.message);
+    return endOfWorkWeek(now);
+  }
+  const anchor = data?.start_date ?? data?.end_date;
+  return anchor ? sundayOfWeek(new Date(anchor)) : endOfWorkWeek(now);
 }
 
 export async function updateTask(
@@ -175,6 +203,33 @@ export async function moveTaskToSprint(task: Task, sprint: Sprint): Promise<void
   }
   const { error } = await supabase.from('tasks').update(patch).eq('id', task.id);
   if (error) throw error;
+}
+
+/**
+ * Tick/bỏ tick MỘT subtask được giao cho chính người đang đăng nhập — dùng ở mục
+ * "Subtask của tôi" (Task của tôi), nơi task cha có thể là của người khác.
+ *
+ * Đi qua RPC `toggle_my_subtask` (migration 0064) chứ không `updateTask`: RLS `tasks_update`
+ * chỉ cho admin/reporter/assignee của TASK ghi, nên người chỉ giữ một subtask sẽ bị chặn.
+ * RPC hẹp hơn RLS ở chiều ngược lại — nó chỉ lật đúng cờ `done` của đúng subtask mình giữ.
+ *
+ * Trả về false khi server từ chối (subtask không phải của mình / task đã bị xoá).
+ *
+ * LƯU Ý: đường này KHÔNG đẩy checklist sang Notion (updateTask mới làm). Notion sẽ khớp lại
+ * ở lần lưu task kế tiếp từ màn chi tiết; Postgres vẫn là nguồn sự thật.
+ */
+export async function toggleMySubtask(
+  taskId: string,
+  subtaskId: string,
+  done: boolean,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('toggle_my_subtask', {
+    p_task_id: taskId,
+    p_subtask_id: subtaskId,
+    p_done: done,
+  });
+  if (error) throw error;
+  return data === true;
 }
 
 /** True only on the transition into `done` (avoids re-notifying already-done tasks). */
@@ -250,6 +305,48 @@ async function syncNewToNotion(
   }
 }
 
+/**
+ * Trang Notion đã bị XOÁ/ARCHIVE bên Notion -> `notionPageId` thành link chết.
+ *
+ * Không nhận ra nó thì mỗi lần lưu task lại ném đúng một lỗi vào Nhật ký lỗi, mãi mãi
+ * (đã bị báo: một task đẻ 4 lỗi trong 3 phút). Khớp theo NỘI DUNG lỗi vì gateway Notion
+ * chỉ trả về `detail` là câu tiếng Anh của API — không có mã máy đọc.
+ */
+function isDeadNotionPage(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  // HẸP có chủ đích: chỉ ba câu Notion dùng cho "trang không còn nữa". KHÔNG bắt chuỗi
+  // "not found" trống trơn — lỗi cấu hình sai cột trả về "property ... not found", gỡ link
+  // vì lý do đó là mất liên kết của một trang vẫn còn sống.
+  return /is archived|unarchive|could not find (block|page|database)/i.test(msg);
+}
+
+/** Gỡ link Notion chết khỏi task để thôi thử lại. Nút "Tạo task trên Notion" hiện lại. */
+async function clearNotionLink(taskId: string): Promise<void> {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ notion_page_id: null, notion_url: null })
+    .eq('id', taskId);
+  if (error) console.error('Gỡ liên kết Notion hỏng thất bại', error);
+}
+
+/**
+ * Dự án có bật đẩy sang Notion không (`projects.notion_sync_enabled`, 0070).
+ *
+ * Hỏi ở TẦNG GHI chứ không nhận từ UI như `createTask`: đường cập nhật có nhiều lối vào
+ * (lưu ở màn chi tiết, kéo thả Kanban, gắn feature…) và chỉ cần MỘT lối quên truyền cờ là
+ * dự án đã tắt vẫn bắn sang Notion. Một select nhỏ, và chỉ chạy khi task THẬT SỰ có link.
+ */
+async function notionSyncOn(projectId: string | null | undefined): Promise<boolean> {
+  if (!projectId) return true; // task không thuộc dự án nào -> giữ hành vi cũ
+  const { data, error } = await supabase
+    .from('projects')
+    .select('notion_sync_enabled')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (error) return true; // đọc hỏng thì đừng im lặng nuốt mất đồng bộ
+  return data?.notion_sync_enabled !== false;
+}
+
 async function safeNotionUpdate(
   notionPageId: string,
   task: Task,
@@ -258,8 +355,20 @@ async function safeNotionUpdate(
   subtasksChanged = false,
 ) {
   try {
+    if (!(await notionSyncOn(task.projectId))) return;
     await updateNotionPage(notionPageId, task, assigneeNotionUserId, notionProjectId, subtasksChanged);
   } catch (err) {
+    if (isDeadNotionPage(err)) {
+      await clearNotionLink(task.id);
+      // Báo MỘT lần rồi thôi (link đã gỡ nên không có lần sau) — người dùng cần biết task
+      // này từ giờ không còn dính Notion, chứ im lặng thì lần sau họ tưởng vẫn đang đồng bộ.
+      reportError(
+        'Notion · gỡ liên kết',
+        new Error(`Trang Notion của task “${task.title}” đã bị xoá/lưu trữ bên Notion.`),
+        'Đã gỡ liên kết để thôi báo lỗi mỗi lần lưu. Cần lại thì mở task rồi bấm “Tạo task trên Notion”.',
+      );
+      return;
+    }
     reportError('Notion · cập nhật', err, 'Thay đổi vẫn đã lưu trong app; chỉ trang Notion là chưa theo kịp.');
   }
 }

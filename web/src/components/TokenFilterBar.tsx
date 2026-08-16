@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { foldDiacritics as fold } from '../lib/text';
 
 /**
  * Thanh lọc kiểu GitLab: chọn facet → toán tử → giá trị → thêm một token.
@@ -31,6 +32,9 @@ export interface FacetDef<F extends string> {
   icon: string;
 }
 
+/** Trên ngưỡng này thì danh sách giá trị mới kèm ô gõ tìm (dưới đó liếc là thấy). */
+const SEARCH_MIN_OPTS = 8;
+
 interface Props<F extends string> {
   facets: FacetDef<F>[];
   /** Các lựa chọn của một facet. Phải ổn định theo deps của phía gọi (useCallback). */
@@ -55,6 +59,8 @@ export default function TokenFilterBar<F extends string>({
   const [facet, setFacet] = useState<F | null>(null);
   const [op, setOp] = useState<'is' | 'not'>('is');
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  /** Gõ tìm trong danh sách giá trị — danh sách version/nhãn/người dài tới hàng chục dòng. */
+  const [valQuery, setValQuery] = useState('');
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,9 +77,17 @@ export default function TokenFilterBar<F extends string>({
     setFacet(null);
     setOp('is');
     setPicked(new Set());
+    setValQuery('');
   }
 
   const opts = useMemo(() => (facet ? optsOf(facet) : []), [facet, optsOf]);
+  // Ô tìm chỉ hiện khi danh sách đủ dài để phải tìm — 5 trạng thái thì thêm ô nhập là thừa.
+  const searchable = opts.length > SEARCH_MIN_OPTS;
+  const shownOpts = useMemo(() => {
+    const q = fold(valQuery.trim());
+    if (!q) return opts;
+    return opts.filter((o) => fold(o.label).includes(q));
+  }, [opts, valQuery]);
   const facetLabel = useMemo(() => {
     const m = new Map(facets.map((f) => [f.key, f.label]));
     return (f: F) => m.get(f) ?? f;
@@ -152,8 +166,19 @@ export default function TokenFilterBar<F extends string>({
                   <button className={`tokflt-op${op === 'is' ? ' on' : ''}`} onClick={() => setOp('is')}>là</button>
                   <button className={`tokflt-op${op === 'not' ? ' on' : ''}`} onClick={() => setOp('not')}>không phải</button>
                 </div>
+                {searchable && (
+                  <input
+                    className="input tokflt-valsearch"
+                    value={valQuery}
+                    onChange={(e) => setValQuery(e.target.value)}
+                    placeholder="Gõ để tìm…"
+                    autoFocus
+                  />
+                )}
                 <div className="tokflt-vals">
-                  {opts.map((o) => (
+                  {shownOpts.length === 0 ? (
+                    <p className="tokflt-noval muted">Không có kết quả.</p>
+                  ) : shownOpts.map((o) => (
                     <button
                       key={o.value}
                       className={`tokflt-val${picked.has(o.value) ? ' on' : ''}`}

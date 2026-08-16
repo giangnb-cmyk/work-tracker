@@ -36,6 +36,7 @@ from dotenv import load_dotenv
 
 import permissions
 import task_repo as repo
+import web_link
 from constants import STATUS_DONE
 from errors import PermissionDenied
 
@@ -116,7 +117,11 @@ def build_message(name: str, done: int, pending_tasks: list, overdue: int,
     tail = f" (trong đó ⏰ {overdue} task trễ hạn)" if overdue else ""
     lines.append(f"📌 Còn tồn đọng: **{pending}** task{tail}")
     for t in _pending_sorted(pending_tasks)[:MAX_LISTED_TASKS]:
-        lines.append(f"- [{repo.short_id(t['_id'])}] {t.get('title', '')}")
+        # Tieu de la masked link `[tieu de](url)` -> bam mo dung task (kem ?p=<projectId>).
+        # ']' trong tieu de se cat link som -> doi thanh ')' cho an toan (hiem, task_title lam sach).
+        title = (t.get("title") or repo.short_id(t["_id"])).replace("]", ")")
+        url = web_link.task_url(t.get("_id"), t.get("projectId"))
+        lines.append(f"- [{title}]({url})" if url else f"- {title}")
     if pending > MAX_LISTED_TASKS:
         lines.append(f"…và {pending - MAX_LISTED_TASKS} task khác trên bảng nhé.")
     seed = f"{now.date().isoformat()}:{name}"

@@ -4,7 +4,7 @@ import { createFeatureLabel } from '../lib/featureLabelWrites';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { sortFeatureLabels } from '../lib/featureLabelSort';
-import { formatDate } from '../lib/format';
+import { formatDate, toInputDate } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import AttachmentsField from './task/AttachmentsField';
@@ -13,6 +13,8 @@ import WatchersField from './task/WatchersField';
 import LabelSelect from './LabelSelect';
 import EmojiPicker from './EmojiPicker';
 import ConfirmDialog from './ConfirmDialog';
+import DateInput from './DateInput';
+import DuplicateFeatureModal from './DuplicateFeatureModal';
 import Switch from './Switch';
 import { labelGroup } from '../lib/bugLabelGroups';
 import {
@@ -48,6 +50,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
   const { user, isAdmin } = useAuth();
   const { members, refetchFeatures } = useSprintContext();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const isEdit = Boolean(feature);
   const [name, setName] = useState(feature?.name ?? '');
   const [icon, setIcon] = useState(feature?.icon ?? '🧩');
@@ -58,6 +61,8 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
   /** Đánh dấu tay đã xong (0031). `wasDone` để chỉ gửi khi ĐỔI — xem FeaturePatch. */
   const wasDone = Boolean(feature?.doneAt);
   const [done, setDone] = useState(wasDone);
+  /** Mốc mong muốn hoàn thành (0071) — giữ ở dạng ISO 'YYYY-MM-DD', đúng thứ DateInput dùng. */
+  const [targetDate, setTargetDate] = useState(() => toInputDate(feature?.targetDate ?? null));
   // Cùng mảng `attachments` với task (phân biệt bằng `kind`), nên dùng lại nguyên
   // AttachmentsField (link) + RefImagesSection (ảnh) của TaskModal.
   const [attachments, setAttachments] = useState<Attachment[]>(feature?.attachments ?? []);
@@ -128,7 +133,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
    * tự sắp lại, snapshot đổi theo và tự-lưu bắn một lần ghi vô nghĩa dù người dùng chưa
    * chạm vào gì.
    */
-  const snapshot = () => JSON.stringify({ name, icon, description, kind, labelIds, attachments, memberIds, done });
+  const snapshot = () => JSON.stringify({ name, icon, description, kind, labelIds, attachments, memberIds, done, targetDate });
   const lastSavedRef = useRef<string | null>(null);
   if (lastSavedRef.current === null) lastSavedRef.current = snapshot();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,7 +152,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
     try {
       await updateFeature(feature.id, {
         name: name.trim(), icon, description: description.trim(), kind,
-        labelIds: orderedLabelIds, attachments, memberIds,
+        labelIds: orderedLabelIds, attachments, memberIds, targetDate,
         ...(done !== savedDoneRef.current ? { done } : {}),
       });
       savedDoneRef.current = done;
@@ -172,7 +177,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, icon, description, kind, labelIds, attachments, memberIds, done]);
+  }, [name, icon, description, kind, labelIds, attachments, memberIds, done, targetDate]);
 
   /** Đóng: đẩy nốt lần sửa đang chờ, kẻo bấm đóng nhanh là mất. */
   async function handleClose() {
@@ -191,7 +196,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
     try {
       const input: FeatureInput = {
         projectId, name, icon, color: feature?.color ?? '#6366f1', description, kind,
-        labelIds: orderedLabelIds, attachments, memberIds, done,
+        labelIds: orderedLabelIds, attachments, memberIds, done, targetDate,
       };
       await createFeature(input, user?.uid ?? '');
       onCreated?.(orderedLabelIds);
@@ -300,9 +305,30 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
               {done && wasDone && feature?.doneAt
                 ? `Đã đánh dấu hoàn thành ${formatDate(feature.doneAt)}.`
                 : 'Bật nếu feature đã xong nhưng không có task nào để tính (import từ dự án chạy trước đó).'}
+              {/* Luật ưu tiên (isFeatureDone): có task thì task quyết định — nói rõ ở đây
+                  để người bật công tắc không thắc mắc vì sao card vẫn "chưa xong". */}
+              {' '}Feature đang có task thì tiến độ tính theo task — thêm task mới vào feature
+              đã xong là nó tự mở lại cho tới khi task đó xong.
             </p>
           </div>
         )}
+
+        {/* Mốc HẸN của riêng feature (0071) — khác ngày phát hành của version, vốn là mốc
+            chung cho hàng chục feature. Vẽ thành cờ 🎯 trên Timeline. */}
+        <div className="field">
+          <span className="field-label">Mong muốn hoàn thành</span>
+          <DateInput
+            value={targetDate}
+            onChange={setTargetDate}
+            disabled={saving}
+            ariaLabel="Mốc mong muốn hoàn thành feature"
+          />
+          <p className="fk-hint">
+            {targetDate
+              ? 'Hiện thành cờ 🎯 trên Timeline; quá ngày mà chưa xong thì cờ chuyển đỏ.'
+              : 'Để trống = chưa hẹn ngày. Đây là mốc riêng của feature này, có thể sớm hơn ngày phát hành của version chứa nó.'}
+          </p>
+        </div>
 
         <div className="grid-2">
           <div className="field">
@@ -346,7 +372,12 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
         </div>
 
         <div className="field">
-          <AttachmentsField attachments={attachments} onChange={setAttachments} disabled={saving} />
+          <AttachmentsField
+            attachments={attachments}
+            onChange={setAttachments}
+            disabled={saving}
+            projectId={projectId}
+          />
         </div>
         <RefImagesSection attachments={attachments} onChange={setAttachments} disabled={saving} />
         <p className="perf-hint" style={{ marginTop: '0.75rem' }}>
@@ -367,6 +398,20 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
                   🗑 Xoá feature
                 </button>
               )}
+              {/* Chỉ admin: tạo feature vốn là admin-only (RLS features_insert), nhân bản
+                  cũng là tạo. Huỷ timer tự-lưu trước khi mở — cùng lý do như handleDelete. */}
+              {isAdmin && feature && (
+                <button
+                  className="btn-sm"
+                  title="Tạo feature mới y hệt feature này, kèm toàn bộ task bên trong"
+                  onClick={() => {
+                    if (timerRef.current) clearTimeout(timerRef.current);
+                    setDuplicating(true);
+                  }}
+                >
+                  ⧉ Nhân bản
+                </button>
+              )}
               <span className={`tm-savehint tm-save-${saveState}`}>{saveHint}</span>
               <button className="btn-sm" onClick={() => void handleClose()}>Đóng</button>
             </>
@@ -380,6 +425,19 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
           )}
         </div>
       </div>
+
+      {duplicating && feature && (
+        <DuplicateFeatureModal
+          feature={feature}
+          onCancel={() => setDuplicating(false)}
+          onDone={async () => {
+            // Nạp lại danh sách feature rồi đóng: không refetch thì feature mới chỉ hiện ra
+            // ở lần vào lại trang, người dùng tưởng bấm hụt.
+            await refetchFeatures();
+            onClose();
+          }}
+        />
+      )}
 
       {confirmDelete && feature && (
         <ConfirmDialog

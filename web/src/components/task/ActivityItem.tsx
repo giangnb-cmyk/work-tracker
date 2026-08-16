@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Avatar from '../Avatar';
+import MemberAvatar from '../MemberAvatar';
 import Linkify from '../Linkify';
 import { PencilIcon } from '../icons';
 import { editComment } from '../../lib/activityWrites';
@@ -67,7 +67,7 @@ export default function ActivityItem({ activity, canEdit }: Props) {
 
   return (
     <li className="tm-feed-item">
-      <Avatar name={name} size="sm" />
+      <MemberAvatar uid={activity.actorId} name={name} size="sm" />
       <div className="tm-feed-body">
         <div className="tm-feed-line">
           <span className="tm-feed-said">

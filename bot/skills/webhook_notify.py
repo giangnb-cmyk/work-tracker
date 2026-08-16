@@ -15,19 +15,29 @@ log = logging.getLogger("webhook_notify")
 
 _URL_ENV = "DISCORD_WEBHOOK_URL"
 
+# BAT BUOC: Cloudflare cua Discord CHAN request khong co User-Agent tu te (tra 403 "error
+# code: 1010"). urllib mac dinh gui 'Python-urllib/3.x' -> bi chan, nen thong bao task moi
+# lang le khong gui duoc. Web chay bang fetch (co UA trinh duyet) nen khong dinh. Dat UA
+# theo dung format Discord khuyen nghi 'DiscordBot ($url, $version)'.
+_USER_AGENT = "DiscordBot (https://m-plan.easygoing.vn, 1.0)"
+
 
 def is_configured() -> bool:
     """Đã đặt DISCORD_WEBHOOK_URL hay chưa."""
     return bool((os.getenv(_URL_ENV) or "").strip())
 
 
-def post(content: str = "", user_ids=None, embeds=None) -> bool:
+def post(content: str = "", user_ids=None, embeds=None, url: str | None = None) -> bool:
     """Post 1 tin vào webhook, CHỈ ping các id trong user_ids. True nếu Discord trả 2xx.
 
     embeds: list embed Discord (thẻ đẹp có màu, tiêu đề bấm được…). Ping phải nằm ở
     content NGOÀI embed — mention trong embed không tạo thông báo.
+
+    url: webhook đích. Truyền vào = webhook RIÊNG của dự án (projects.daily_report_webhook);
+    bỏ trống mới lùi về DISCORD_WEBHOOK_URL dùng chung. Chỗ gọi nào biết dự án thì PHẢI
+    truyền — env dùng chung trỏ vào kênh của MỘT dự án, mọi dự án khác dùng nó là báo nhầm chỗ.
     """
-    url = (os.getenv(_URL_ENV) or "").strip()
+    url = (url or os.getenv(_URL_ENV) or "").strip()
     if not url:
         return False
     # allowed_mentions.parse=[] để '@everyone'/role trong text không vô tình ping cả kênh.
@@ -37,7 +47,10 @@ def post(content: str = "", user_ids=None, embeds=None) -> bool:
         payload["embeds"] = embeds
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+        url,
+        data=data,
+        headers={"Content-Type": "application/json", "User-Agent": _USER_AGENT},
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
