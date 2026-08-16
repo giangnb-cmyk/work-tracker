@@ -44,10 +44,12 @@ interface MobileNavProps {
  * Tab "Thêm" mở bottom sheet chứa các view còn lại + hồ sơ + đổi dự án + đăng xuất.
  */
 export default function MobileNav({ active, onSelect }: MobileNavProps) {
-  const { profile, isAdmin, isOwner, signOut } = useAuth();
+  const { profile, isAdmin, isOwner, can, signOut } = useAuth();
   const { selectedProject, selectProject } = useSprintContext();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  // Cùng điều kiện với adminNav ở Sidebar: member có 'sprint.manage' thấy mục Quản lý Sprint.
+  const adminNav = MORE_ADMIN.filter((n) => isAdmin || (n.id === 'sprints' && can('sprint.manage')));
 
   // View đang mở nằm trong sheet → tab "Thêm" nhận trạng thái active.
   const moreActive = !TABS.some((t) => t.id === active);
@@ -125,10 +127,10 @@ export default function MobileNav({ active, onSelect }: MobileNavProps) {
               </button>
             ))}
 
-            {isAdmin && (
+            {adminNav.length > 0 && (
               <>
                 <hr className="sheet-sep" />
-                {MORE_ADMIN.map((n) => (
+                {adminNav.map((n) => (
                   <button
                     key={n.id}
                     className={`nav-item${active === n.id ? ' active' : ''}`}

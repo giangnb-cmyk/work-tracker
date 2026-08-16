@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchAccessConfig, saveAccessConfig } from '../lib/accessConfig';
 import MemberDmTest from './MemberDmTest';
+import RoleManager from './RoleManager';
 
 /** Admin-only: manage who may sign in (allowlist of emails and/or domains). */
 export default function Settings() {
@@ -100,6 +101,8 @@ export default function Settings() {
           {error && <span className="error-text" style={{ margin: 0 }}>{error}</span>}
         </div>
       </div>
+
+      <RoleManager />
 
       <MemberDmTest />
     </div>

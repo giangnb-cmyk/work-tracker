@@ -52,8 +52,8 @@ function Gate() {
   }
   if (!user) return <Login />;
 
-  // First login: make the user pick their job discipline before entering the app.
-  if (profile && !profile.jobRole) return <RolePicker />;
+  // First login: make the user pick their role (bảng roles, 0072) before entering the app.
+  if (profile && !profile.roleId) return <RolePicker />;
 
   return (
     <SprintProvider>

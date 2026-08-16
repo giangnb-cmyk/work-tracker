@@ -34,7 +34,7 @@ const TaskDeepLink = lazyView(() => import('./TaskDeepLink'));
 
 /** Main authenticated shell: nav + top bar + the active view. */
 export default function Layout() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, can } = useAuth();
   // View lái bằng URL (lib/router) để mọi tab/bug/task đều có link gửi được.
   // Path gốc '/' parse ra 'dashboard' — vào dự án vẫn thấy trang tổng quan trước.
   const route = useRoute();
@@ -43,8 +43,10 @@ export default function Layout() {
   // của Sidebar nên không thể lệch khi thêm view admin mới. View toàn-web (team/settings/
   // log) mở ở GlobalAdmin NGOÀI dự án, không dựng ở đây — ai lỡ điều hướng tới trong lúc
   // đang ở dự án thì đưa về Thống kê thay vì màn trắng.
+  // 'sprints' mở thêm cho member có 'sprint.manage' (0074) — khớp bộ lọc adminNav ở Sidebar.
+  const canViewAdmin = (v: typeof route.view) => isAdmin || (v === 'sprints' && can('sprint.manage'));
   const guarded =
-    isGlobalAdminView(route.view) || (ADMIN_ONLY_VIEWS.includes(route.view) && !isAdmin);
+    isGlobalAdminView(route.view) || (ADMIN_ONLY_VIEWS.includes(route.view) && !canViewAdmin(route.view));
   const activeView = guarded ? 'dashboard' : route.view;
 
   // Deep link task theo id (/tasks/<id>) HOẶC short_code (/t/<mã>) — hai path loại trừ nhau.

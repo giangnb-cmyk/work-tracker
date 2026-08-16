@@ -334,6 +334,34 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .perm-row input[type="checkbox"] { accent-color: var(--primary); cursor: pointer; }
 .perm-row small { font-size: 0.78rem; }
 
+/* RoleManager (tab Cấu hình) — list role + form tạo/sửa. */
+.rolemgr-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem; }
+.rolemgr-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.65rem; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-soft);
+}
+.rolemgr-icon { flex-shrink: 0; width: 26px; text-align: center; font-size: 1.1rem; }
+.rolemgr-name { font-weight: 600; flex-shrink: 0; min-width: 120px; }
+.rolemgr-perms { flex: 1; min-width: 0; font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rolemgr-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.rolemgr-form { border-top: 1px dashed var(--border); padding-top: 1rem; margin-top: 0.5rem; }
+.rolemgr-icon-row { display: flex; gap: 0.35rem; flex-wrap: wrap; margin: -0.35rem 0 0.9rem; }
+.rolemgr-icon-btn {
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 1rem;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-soft);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rolemgr-icon-btn:hover { border-color: rgba(99, 102, 241, 0.45); }
+.rolemgr-icon-btn.on { border-color: var(--primary); background: rgba(99, 102, 241, 0.18); }
+.btn-sm.danger { color: var(--red); border-color: rgba(239, 68, 68, 0.3); }
+.btn-sm.danger:hover { background: rgba(239, 68, 68, 0.12); }
+@media (max-width: 640px) {
+  .rolemgr-row { flex-wrap: wrap; }
+  .rolemgr-perms { flex-basis: 100%; order: 4; white-space: normal; }
+}
+
 /* Documents (task modal): link cards + kebab menu. Icon appears once a link is pasted. */
 .doc-field { display: flex; flex-direction: column; gap: 0.6rem; }
 .doc-addrow { display: flex; align-items: center; gap: 0.45rem; animation: fadeIn 0.2s ease; }

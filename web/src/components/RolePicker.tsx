@@ -1,23 +1,26 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { JOB_ROLES, type JobRole } from '../types';
+import { useRoles } from '../hooks/useRoles';
+import type { TeamRole } from '../types';
 
 /**
- * First-login popup: the user picks their job discipline. Blocking — it stays up
- * until a role is chosen (writes `jobRole` on their user doc).
+ * First-login popup: user mới chọn role của mình từ bảng `roles` (0072 — admin tạo,
+ * kèm icon + bộ quyền). Blocking — đứng đó tới khi chọn xong (ghi profiles.role_id;
+ * trigger DB tự đồng bộ job_role để icon khắp app hiện đúng).
  */
 export default function RolePicker() {
-  const { profile, setJobRole } = useAuth();
-  const [saving, setSaving] = useState<JobRole | null>(null);
+  const { profile, setRole } = useAuth();
+  const { roles, loading } = useRoles();
+  const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function pick(role: JobRole) {
-    setSaving(role);
+  async function pick(role: TeamRole) {
+    setSaving(role.id);
     setError(null);
     try {
-      await setJobRole(role);
+      await setRole(role.id);
     } catch (err) {
-      console.error('Đặt vai trò công việc thất bại', err);
+      console.error('Chọn role thất bại', err);
       setError('Không lưu được. Thử lại nhé.');
       setSaving(null);
     }
@@ -31,16 +34,22 @@ export default function RolePicker() {
           Bạn phụ trách mảng nào trong team? Chọn để hệ thống hiển thị đúng vai trò của bạn.
         </p>
 
+        {loading && <p className="muted">Đang tải danh sách role…</p>}
+
+        {!loading && roles.length === 0 && (
+          <p className="muted">Chưa có role nào — nhờ admin tạo role trong tab Cấu hình rồi tải lại trang.</p>
+        )}
+
         <div className="role-grid">
-          {JOB_ROLES.map((r) => (
+          {roles.map((r) => (
             <button
               key={r.id}
               className="role-card"
               disabled={saving !== null}
-              onClick={() => pick(r.id)}
+              onClick={() => pick(r)}
             >
               <span className="role-icon">{r.icon}</span>
-              <span className="role-label">{r.label}</span>
+              <span className="role-label">{r.name}</span>
               {saving === r.id && <span className="muted" style={{ fontSize: '0.72rem' }}>Đang lưu…</span>}
             </button>
           ))}

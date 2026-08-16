@@ -104,7 +104,10 @@ export default function ProjectSelect() {
               </div>
             ))}
             {projects.length === 0 && !isAdmin && (
-              <div className="glass empty">Chưa có dự án nào. Nhờ admin tạo dự án nhé.</div>
+              // 0073: member chỉ thấy dự án mình có tên trong Thành viên dự án.
+              <div className="glass empty">
+                Bạn chưa được thêm vào dự án nào. Nhờ admin thêm bạn vào dự án nhé.
+              </div>
             )}
           </div>
         )}

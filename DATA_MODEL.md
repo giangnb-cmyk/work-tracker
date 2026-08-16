@@ -30,8 +30,9 @@ Created/merged on first Google sign-in.
 | `displayName` | string    | Full name from Google                                        |
 | `photoURL`    | string    | Avatar url (may be empty)                                    |
 | `role`        | string    | permission level: `owner` \| `admin` \| `member` (default `member`, enum `user_role`) |
-| `perms`       | string[]  | quyền lẻ admin cấp thêm cho member: `task.delete` \| `feature.create` (migration 0034). Admin nghiễm nhiên có đủ — mảng này chỉ có nghĩa với member. |
-| `jobRole`     | string    | job discipline (see enum below); chosen at first sign-in     |
+| `perms`       | string[]  | quyền lẻ admin cấp thêm cho member (migration 0034, mở rộng 0074 — xem block Quyền lẻ). Admin nghiễm nhiên có đủ — mảng này chỉ có nghĩa với member. |
+| `roleId`      | uuid      | role động (bảng `roles`, 0072) — user tự chọn LẦN ĐẦU ở RolePicker, sau đó chỉ admin đổi (trigger `profiles_guard_role_id`). Đổi role tự đồng bộ `job_role` theo `roles.legacy_job_role`. |
+| `jobRole`     | string    | job discipline (enum, legacy — see below); giờ do trigger đồng bộ từ role, chỉ còn để hiển thị icon |
 | `discordId`   | string    | Discord user id, links a Discord account to this user (opt.) |
 | `notionUserId`| string    | Notion user id, for assigning the Notion "people" prop (opt.)|
 | `createdAt`   | Timestamp | first sign-in                                                |
@@ -53,13 +54,25 @@ Created/merged on first Google sign-in.
 > chỉnh được (và không tự hạ vai trò owner qua UI). Bot gom owner vào `ADMIN_ROLES`
 > (`skills/constants.py`) — bot không có skill đổi vai trò nên không phân biệt owner/admin.
 >
-> **Quyền lẻ (`perms`, migration 0034)** — admin cấp thêm từng quyền cho member trên tab
-> Thành viên: `task.delete` (xoá task BẤT KỲ — RLS `tasks_delete`) và `feature.create`
-> (tạo feature — RLS `features_insert`; sửa/xoá feature vẫn admin). RLS đọc qua
-> `has_perm(p)` (admin luôn true); trigger `profiles_guard_perms` chặn member tự sửa
-> `perms` của chính mình. Nguồn danh sách quyền + nhãn UI: `MEMBER_PERMS` trong
-> `web/src/types.ts`. Bot KHÔNG đọc `perms` — gate của bot vẫn là admin-only
-> (`skills/permissions.py`, cố ý chặt hơn RLS).
+> **Quyền lẻ (`perms`, migration 0034 + 0074)** — admin cấp thêm từng quyền cho member
+> trên tab Thành viên. Bộ quyền hiện có (nguồn nhãn UI: `MEMBER_PERMS` trong
+> `web/src/types.ts`; mỗi quyền khớp một policy RLS):
+> `task.delete` · `task.edit_any` · `feature.create` · `feature.edit` · `feature.delete`
+> · `sprint.manage` (kèm mở màn Quản lý Sprint trên web) · `bug.edit_any` · `bug.delete`
+> · `label.manage` (nhãn bug + nhãn feature) · `doc.manage` (tài liệu dự án, 0075)
+> · `project.members` (thêm/gỡ thành viên dự án).
+> RLS đọc qua `has_perm(p)` (admin/owner luôn true) — từ 0072 hàm này gộp CẢ quyền theo
+> role: `perms` lẻ ∪ `roles.perms` của role đang mang. Trigger `profiles_guard_perms`
+> chặn member tự sửa `perms` của chính mình. Bot KHÔNG đọc `perms` — gate của bot vẫn là
+> admin-only (`skills/permissions.py`, cố ý chặt hơn RLS).
+>
+> **Role động (bảng `roles`, migration 0072)** — admin tạo role (tên + icon + bộ quyền,
+> màn Cấu hình → "Role trong team"); user mới đăng nhập bị chặn ở `RolePicker` cho tới khi
+> chọn một role (`profiles.role_id`). Member chỉ TỰ chọn được khi `role_id` đang NULL;
+> đổi về sau là việc admin (trigger `profiles_guard_role_id`). Xoá role → `role_id` của
+> người mang nó về NULL (FK `on delete set null`) → đăng nhập lại sẽ chọn lại.
+> `roles.legacy_job_role` map role chuẩn về enum `job_role` cũ — trigger tự đồng bộ
+> `profiles.job_role` khi `role_id` đổi, nên icon theo chuyên môn ở các màn cũ vẫn đúng.
 >
 > **Job role (`jobRole`)** — a separate discipline field the user picks on first sign-in:
 > `developer` · `2d_artist` · `game_designer` · `sound_designer` · `ui_artist` · `animator`
@@ -72,6 +85,29 @@ Created/merged on first Google sign-in.
 >    lưu member với vị trí mới sẽ ném `22P02 invalid input value for enum` (xem 0040).
 >
 > It does not affect permissions.
+
+---
+
+## `roles` (role động — migration 0072)
+
+Role do admin tạo (màn Cấu hình → "Role trong team"): tên + icon + **bộ quyền** đi kèm.
+User mới đăng nhập chọn một role ở `RolePicker` (ghi `profiles.role_id`). Seed sẵn 8 role
+chuẩn khớp `JOB_ROLES` cũ; member cũ được backfill theo `job_role`.
+
+| Field             | Type        | Notes                                                        |
+|-------------------|-------------|--------------------------------------------------------------|
+| `id`              | uuid (PK)   | `gen_random_uuid()`                                          |
+| `name`            | text        | unique theo `lower(name)`                                    |
+| `icon`            | text        | emoji, mặc định `👤`                                         |
+| `perms`           | string[]    | cùng không gian giá trị với `profiles.perms` (`MEMBER_PERMS`) |
+| `sort`            | int         | thứ tự hiện trong picker                                     |
+| `legacy_job_role` | enum \| null| map về enum `job_role` cũ (role tuỳ chỉnh = null)            |
+
+- **RLS**: đọc mở cho user đã đăng nhập; ghi admin-only (role mang quyền = surface phân quyền).
+- Quyền hiệu lực của một người = `profiles.perms` ∪ `roles.perms` (gộp trong `has_perm()`;
+  client soi ở `AuthContext.can()`). Realtime bật.
+- Web: `useRoles` (hook), `RoleManager` (CRUD, tab Cấu hình), `RolePicker` (chọn lần đầu),
+  `MemberModal` (admin gán role), `lib/roleWrites.ts`.
 
 ---
 
@@ -207,9 +243,15 @@ cho vào dự án. Bảng N-N thuần, không có id riêng — khoá chính là
 | `added_at`   | timestamptz | mặc định `now()`                                              |
 | `added_by`   | uuid \| null| → `profiles.id` (`on delete set null`) — ai đã thêm người này |
 
-- **RLS**: `select` mở cho mọi user đã đăng nhập (roster dự án không nhạy cảm); `insert`/`delete`
-  chỉ `is_admin()` (đã bao owner). Realtime bật + `replica identity full` để event DELETE mang
-  đủ cột cho bộ lọc `project_id=eq.<id>`.
+- **RLS** (siết ở 0073/0074): `select` = admin / chính mình / người CÙNG dự án
+  (`is_project_member()`); `insert`/`delete` theo `has_perm('project.members')` (bao admin).
+  Realtime bật + `replica identity full` để event DELETE mang đủ cột cho bộ lọc
+  `project_id=eq.<id>`.
+- **Bảng này quyết định AI THẤY DỰ ÁN NÀO (0073)**: `projects_select` = admin HOẶC có tên
+  trong `project_members` của dự án đó. Member chưa được thêm vào dự án nào đăng nhập sẽ
+  thấy trang chọn dự án trống. ⚠️ Mới chặn ở cấp DỰ ÁN — select của các bảng con
+  (tasks/sprints/features/bugs/…) vẫn `using(true)`; UI không dẫn tới được nhưng REST
+  trực tiếp vẫn đọc được, siết tiếp là việc riêng.
 - **Backfill** (chạy trong migration): gieo mỗi dự án bằng tất cả người đã dính task của nó
   (assignee + reporter + watchers), miễn còn hồ sơ thật — dự án đang chạy không trống trơn.
 - Web: tab **Thành viên** trong dự án (`ProjectMembers` + `useProjectMembers`); thêm/gỡ qua

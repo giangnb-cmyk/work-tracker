@@ -7,14 +7,15 @@
 
 import { supabase } from '../supabase';
 import type { PostgrestError } from '@supabase/supabase-js';
-import type { JobRole, MemberPerm, TeamMember, UserRole } from '../types';
+import type { MemberPerm, TeamMember, UserRole } from '../types';
 
 export interface MemberInput {
   displayName: string;
   email: string;
   role: UserRole;
   perms: MemberPerm[];
-  jobRole: JobRole;
+  /** Role động (0072) — trigger DB tự đồng bộ job_role theo legacy_job_role của role. */
+  roleId: string | null;
   discordId: string;
   notionUserId: string;
 }
@@ -70,7 +71,7 @@ export async function createMember(input: MemberInput): Promise<string> {
       email: input.email.trim(),
       role: input.role,
       perms: input.perms,
-      job_role: input.jobRole,
+      role_id: input.roleId,
       discord_id: input.discordId.trim(),
       notion_user_id: input.notionUserId.trim(),
       photo_url: '',
@@ -87,6 +88,8 @@ export async function updateMember(uid: string, patch: Partial<TeamMember>): Pro
   if (patch.email !== undefined) row.email = patch.email;
   if (patch.role !== undefined) row.role = patch.role;
   if (patch.perms !== undefined) row.perms = patch.perms;
+  // roleId null = bỏ role; trigger profiles_guard_role_id tự đồng bộ job_role theo role mới.
+  if (patch.roleId !== undefined) row.role_id = patch.roleId || null;
   if (patch.jobRole !== undefined) row.job_role = patch.jobRole;
   if (patch.discordId !== undefined) row.discord_id = patch.discordId;
   if (patch.notionUserId !== undefined) row.notion_user_id = patch.notionUserId;

@@ -52,7 +52,7 @@ const FEATURE_VIEW_KEY = 'featuresView';
 
 /** Features tab: a card grid of the project's features; open one to see its tasks. */
 export default function Features() {
-  const { user, isAdmin, can } = useAuth();
+  const { user, can } = useAuth();
   // Tạo feature: admin hoặc member được cấp 'feature.create' (RLS features_insert, 0034).
   // Sửa/xoá feature vẫn admin-only — quyền lẻ chỉ mở phần TẠO.
   const canCreate = can('feature.create');
@@ -252,7 +252,7 @@ export default function Features() {
         loading={tasksLoading}
         refetchTasks={refetchTasks}
         onBack={() => setSelectedId(null)}
-        onEdit={isAdmin ? () => setEditingFeature(selected) : undefined}
+        onEdit={can('feature.edit') ? () => setEditingFeature(selected) : undefined}
         editingFeature={editingFeature}
         onCloseEdit={() => setEditingFeature(null)}
       />

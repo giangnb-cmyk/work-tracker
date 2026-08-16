@@ -18,7 +18,7 @@ import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
 import { logVisit } from '../lib/visitWrites';
 import { navigate } from '../lib/router';
 import { rowToMember } from '../lib/mappers';
-import type { JobRole, MemberPerm, TeamMember, UserRole } from '../types';
+import type { MemberPerm, TeamMember, UserRole } from '../types';
 
 /** Minimal user shape the app consumes (keeps `uid` naming across components). */
 interface AppUser {
@@ -71,7 +71,12 @@ interface AuthState {
   error: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
-  setJobRole: (jobRole: JobRole) => Promise<void>;
+  /**
+   * Chọn role (bảng roles, 0072) cho CHÍNH mình — flow RolePicker lần đầu đăng nhập.
+   * Trigger `profiles_guard_role_id` chỉ cho member tự chọn khi role_id đang trống;
+   * đổi về sau là việc của admin (MemberModal).
+   */
+  setRole: (roleId: string) => Promise<void>;
   /**
    * Tự sửa hồ sơ của CHÍNH mình (tên, Discord id, Notion id).
    * RLS `profiles_update` cho phép `id = auth.uid()`, nhưng WITH CHECK ép role phải giữ
@@ -169,7 +174,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [viewAsAdmin, setViewAsAdminState] = useState(
     () => sessionStorage.getItem(PREVIEW_ADMIN_KEY) === '1',
   );
+  /** Quyền theo role động (roles.perms) — has_perm() phía DB đã gộp, đây là bản soi client. */
+  const [rolePerms, setRolePerms] = useState<MemberPerm[]>([]);
   const handledUser = useRef<string | null>(null);
+
+  // Nạp bộ quyền của role đang mang. Không realtime: role đổi quyền là việc hiếm,
+  // reload là ăn — RLS phía DB mới là tầng chặn thật.
+  useEffect(() => {
+    const roleId = profile?.roleId;
+    if (!roleId) {
+      setRolePerms([]);
+      return;
+    }
+    let cancelled = false;
+    void supabase
+      .from('roles')
+      .select('perms')
+      .eq('id', roleId)
+      .single()
+      .then(({ data, error: err }) => {
+        if (!cancelled) setRolePerms(err ? [] : ((data?.perms ?? []) as MemberPerm[]));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.roleId]);
 
   useEffect(() => {
     async function handle(u: User | null) {
@@ -250,10 +279,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }
 
-  async function setJobRole(jobRole: JobRole) {
+  async function setRole(roleId: string) {
     if (!user) return;
-    await supabase.from('profiles').update({ job_role: jobRole }).eq('id', user.uid);
-    setProfile((p) => (p ? { ...p, jobRole } : p));
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role_id: roleId })
+      .eq('id', user.uid)
+      .select()
+      .single();
+    if (error) throw error;
+    // Lấy nguyên hàng về: trigger vừa đồng bộ cả job_role theo legacy_job_role của role.
+    setProfile(rowToMember(data));
   }
 
   async function updateProfile(patch: OwnProfileInput) {
@@ -293,7 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   function can(perm: MemberPerm): boolean {
     if (viewAsMember) return false;
-    return isRealAdmin || (profile?.perms ?? []).includes(perm);
+    return isRealAdmin || (profile?.perms ?? []).includes(perm) || rolePerms.includes(perm);
   }
 
   /**
@@ -344,11 +380,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       signIn,
       signOut,
-      setJobRole,
+      setRole,
       updateProfile,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, profile, loading, error, isRealAdmin, isRealOwner, viewAsMember, viewAsAdmin],
+    [user, profile, loading, error, isRealAdmin, isRealOwner, viewAsMember, viewAsAdmin, rolePerms],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

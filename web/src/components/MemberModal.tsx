@@ -7,13 +7,12 @@ import { fetchMemberNotes } from '../lib/memberReviewWrites';
 import { formatDate, formatIsoDate, formatVnd, todayIso } from '../lib/format';
 import DateInput from './DateInput';
 import MoneyInput from './cost/MoneyInput';
+import { useRoles } from '../hooks/useRoles';
 import type { CompChange, MemberSprintNote, SalaryPlanRow } from '../types';
 import {
-  JOB_ROLES,
   MEMBER_PERMS,
   NOTE_RATINGS,
   USER_ROLE_LABEL,
-  type JobRole,
   type MemberPerm,
   type TeamMember,
   type UserRole,
@@ -35,7 +34,10 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
   const [email, setEmail] = useState(member?.email ?? '');
   const [role, setRole] = useState<UserRole>(member?.role ?? 'member');
   const [perms, setPerms] = useState<MemberPerm[]>(member?.perms ?? []);
-  const [jobRole, setJobRole] = useState<JobRole>(member?.jobRole ?? 'developer');
+  // Role động (0072) — thay cho select enum "Chuyên môn" cũ; job_role giờ do trigger DB
+  // tự đồng bộ theo legacy_job_role của role nên không sửa tay ở đây nữa.
+  const [roleId, setRoleId] = useState<string>(member?.roleId ?? '');
+  const { roles } = useRoles();
   const [discordId, setDiscordId] = useState(member?.discordId ?? '');
   const [notionUserId, setNotionUserId] = useState(member?.notionUserId ?? '');
   // Lương + thời gian làm việc (bảng member_compensation, toàn cục). Nạp riêng vì admin-only.
@@ -140,7 +142,7 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
     }
     setSaving(true);
     setError(null);
-    const input: MemberInput = { displayName, email, role, perms, jobRole, discordId, notionUserId };
+    const input: MemberInput = { displayName, email, role, perms, roleId: roleId || null, discordId, notionUserId };
     try {
       let uid: string;
       if (isEdit && member) {
@@ -149,7 +151,8 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
           email: email.trim(),
           role,
           perms,
-          jobRole,
+          // Chuỗi rỗng = bỏ role (memberWrites đổi thành NULL) — vẫn phải gửi để xoá được.
+          roleId,
           discordId: discordId.trim(),
           notionUserId: notionUserId.trim(),
         });
@@ -209,10 +212,11 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
                 <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ten@easygoing.vn" />
               </label>
               <label className="field">
-                <span>Chuyên môn</span>
-                <select className="select" value={jobRole} onChange={(e) => setJobRole(e.target.value as JobRole)}>
-                  {JOB_ROLES.map((r) => (
-                    <option key={r.id} value={r.id}>{r.icon} {r.label}</option>
+                <span>Role</span>
+                <select className="select" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+                  <option value="">— Chưa chọn —</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>{r.icon} {r.name}</option>
                   ))}
                 </select>
               </label>
@@ -251,6 +255,16 @@ export default function MemberModal({ member, onClose }: MemberModalProps) {
             {role === 'member' ? (
               <div className="field">
                 <span className="field-label">Quyền thêm</span>
+                {(() => {
+                  const r = roles.find((x) => x.id === roleId);
+                  if (!r || r.perms.length === 0) return null;
+                  const names = MEMBER_PERMS.filter((p) => r.perms.includes(p.id)).map((p) => p.label);
+                  return (
+                    <p className="muted" style={{ fontSize: '0.8rem', margin: '0 0 0.4rem' }}>
+                      Role {r.icon} {r.name} đã kèm sẵn: {names.join(', ')} — không cần tick lại.
+                    </p>
+                  );
+                })()}
                 <div className="perm-list">
                   {MEMBER_PERMS.map((p) => (
                     <label key={p.id} className="perm-row">

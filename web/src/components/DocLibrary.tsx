@@ -29,7 +29,7 @@ const MODE_KEY = 'docLibView';
  * của TaskModal/FeatureModal (DocPickerModal đọc cùng hook này).
  */
 export default function DocLibrary() {
-  const { user, isAdmin } = useAuth();
+  const { user, can } = useAuth();
   const { selectedProjectId, selectedProject, members } = useSprintContext();
   const { docs, loading } = useProjectDocs(selectedProjectId);
   const { pinnedIds } = useMyDocPins(user?.uid ?? '');
@@ -75,8 +75,8 @@ export default function DocLibrary() {
     }
   }
 
-  /** Sửa/xoá được khi: admin, hoặc chính người đã thêm (khớp RLS 0066). */
-  const canEdit = (d: ProjectDoc) => isAdmin || d.createdBy === user?.uid;
+  /** Sửa/xoá được khi: có 'doc.manage' (bao admin), hoặc chính người đã thêm (khớp RLS 0075). */
+  const canEdit = (d: ProjectDoc) => can('doc.manage') || d.createdBy === user?.uid;
 
   async function handleDelete() {
     if (!confirmDel) return;

@@ -31,10 +31,10 @@ const URL_RE = /https?:\/\/[^\s)]+/g;
 
 /** Bug detail: header badges · info grid (grouped tags) · media/links · footer. */
 export default function BugModal({ bug, projectId, labels, defaultStatus, onClose }: Props) {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, can } = useAuth();
   const { members } = useSprintContext();
   const isEdit = Boolean(bug);
-  const canEdit = !isEdit || isAdmin || bug?.reporterId === user?.uid || bug?.assigneeId === user?.uid;
+  const canEdit = !isEdit || can('bug.edit_any') || bug?.reporterId === user?.uid || bug?.assigneeId === user?.uid;
 
   const [title, setTitle] = useState(bug?.title ?? '');
   const [description, setDescription] = useState(bug?.description ?? '');
@@ -346,7 +346,7 @@ export default function BugModal({ bug, projectId, labels, defaultStatus, onClos
 
         {/* Footer */}
         <div className="bugm-footer">
-          {isEdit && (isAdmin || bug?.reporterId === user?.uid) && (
+          {isEdit && (can('bug.delete') || bug?.reporterId === user?.uid) && (
             <button className="btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>🗑 Xoá</button>
           )}
           <span style={{ flex: 1 }} />

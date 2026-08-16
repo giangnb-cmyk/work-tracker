@@ -25,7 +25,7 @@ const MODE_KEY = 'bugsView';
 
 /** Bugs tab: per-project bug tracker with a Kanban board and a list view. */
 export default function Bugs() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, can } = useAuth();
   const { selectedProjectId, selectedProject, members } = useSprintContext();
   const { bugs, loading } = useBugs(selectedProjectId);
   const { labels } = useBugLabels(selectedProjectId);
@@ -45,7 +45,8 @@ export default function Bugs() {
   const [fixedRange, setFixedRange] = useState<DateRange | null>(null);
 
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels]);
-  const canEditBug = (b: Bug) => isAdmin || b.reporterId === user?.uid || b.assigneeId === user?.uid;
+  // 'bug.edit_any' (0074) — can() đã bao admin; reporter/assignee tự sửa bug của mình như cũ.
+  const canEditBug = (b: Bug) => can('bug.edit_any') || b.reporterId === user?.uid || b.assigneeId === user?.uid;
 
   // Bug đang mở suy ra TỪ URL (/bugs/<số>) — mở/đóng modal là đổi path, nhờ đó link
   // trên thanh địa chỉ luôn gửi được cho người khác. Danh sách chưa tải xong thì
@@ -137,7 +138,7 @@ export default function Bugs() {
           </p>
         </div>
         <div className="row" style={{ gap: '0.6rem', alignItems: 'center' }}>
-          {isAdmin && labels.length === 0 && (
+          {can('label.manage') && labels.length === 0 && (
             <button className="btn-sm" onClick={seed} disabled={seeding}>
               {seeding ? 'Đang tạo…' : '＋ Bộ nhãn mặc định'}
             </button>

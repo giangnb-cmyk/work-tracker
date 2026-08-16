@@ -29,6 +29,7 @@ import type {
   Task,
   TaskSprintEntry,
   TeamMember,
+  TeamRole,
 } from '../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -42,11 +43,23 @@ export function rowToMember(r: Row): TeamMember {
     photoURL: r.photo_url ?? '',
     role: r.role,
     perms: r.perms ?? [],
+    roleId: r.role_id ?? undefined,
     jobRole: r.job_role ?? undefined,
     discordId: r.discord_id ?? undefined,
     notionUserId: r.notion_user_id ?? undefined,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     lastSeenAt: Timestamp.fromISO(r.last_seen_at) ?? undefined,
+  };
+}
+
+export function rowToRole(r: Row): TeamRole {
+  return {
+    id: r.id,
+    name: r.name,
+    icon: r.icon ?? '👤',
+    perms: r.perms ?? [],
+    sort: r.sort ?? 0,
+    legacyJobRole: r.legacy_job_role ?? undefined,
   };
 }
 

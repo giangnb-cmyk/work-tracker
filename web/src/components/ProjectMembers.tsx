@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectMembers } from '../hooks/useProjectMembers';
+import { useRoles } from '../hooks/useRoles';
 import { removeProjectMember } from '../lib/projectMemberWrites';
 import Avatar from './Avatar';
 import ConfirmDialog from './ConfirmDialog';
@@ -14,14 +15,18 @@ import { JOB_ROLE_LABEL, USER_ROLE_LABEL, type TeamMember } from '../types';
  * Roster TOÀN BỘ (tạo/sửa hồ sơ, vai trò) nằm ở trang chọn dự án, không ở đây.
  */
 export default function ProjectMembers() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  // 'project.members' (0074) — can() đã bao admin; lead được cấp quyền cũng thêm/gỡ được.
+  const canManage = can('project.members');
   const { members, membersLoading, selectedProjectId, selectedProject } = useSprintContext();
   const { memberships, loading: mLoading } = useProjectMembers(selectedProjectId);
+  const { roles } = useRoles();
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<TeamMember | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(members.map((m) => [m.uid, m])), [members]);
+  const roleById = useMemo(() => new Map(roles.map((r) => [r.id, r])), [roles]);
   const existingIds = useMemo(() => new Set(memberships.map((m) => m.userId)), [memberships]);
 
   // Ghép quan hệ thô với roster; hồ sơ đã xoá (còn trong bảng nhưng mất profiles) thì bỏ.
@@ -64,7 +69,7 @@ export default function ProjectMembers() {
             được thêm vào dự án.
           </p>
         </div>
-        {isAdmin && (
+        {canManage && (
           <button className="btn-primary" onClick={() => setAdding(true)}>+ Thêm thành viên</button>
         )}
       </div>
@@ -72,7 +77,7 @@ export default function ProjectMembers() {
       {projectMembers.length === 0 ? (
         <div className="glass empty">
           Chưa có thành viên nào trong dự án.{' '}
-          {isAdmin
+          {canManage
             ? 'Bấm “Thêm thành viên” để chọn từ danh sách người đã vào web.'
             : 'Nhờ admin thêm bạn vào dự án nhé.'}
         </div>
@@ -86,7 +91,7 @@ export default function ProjectMembers() {
                 <th>Chuyên môn</th>
                 <th>Vai trò</th>
                 <th>Discord ID</th>
-                {isAdmin && <th></th>}
+                {canManage && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -99,7 +104,14 @@ export default function ProjectMembers() {
                     </div>
                   </td>
                   <td className="muted">{m.email || '—'}</td>
-                  <td className="muted">{m.jobRole ? JOB_ROLE_LABEL[m.jobRole] : '—'}</td>
+                  {/* Ưu tiên role động (0072); người chưa chọn role rơi về enum cũ. */}
+                  <td className="muted">
+                    {(() => {
+                      const r = m.roleId ? roleById.get(m.roleId) : undefined;
+                      if (r) return `${r.icon} ${r.name}`;
+                      return m.jobRole ? JOB_ROLE_LABEL[m.jobRole] : '—';
+                    })()}
+                  </td>
                   <td>
                     <span
                       className={`badge ${
@@ -110,7 +122,7 @@ export default function ProjectMembers() {
                     </span>
                   </td>
                   <td className="muted mono" style={{ fontSize: '0.78rem' }}>{m.discordId || '—'}</td>
-                  {isAdmin && (
+                  {canManage && (
                     <td>
                       <button className="btn-sm btn-danger" onClick={() => setRemoving(m)}>Gỡ</button>
                     </td>
@@ -122,10 +134,10 @@ export default function ProjectMembers() {
         </div>
       )}
 
-      {!isAdmin && (
+      {!canManage && (
         <p className="muted" style={{ fontSize: '0.8rem', marginTop: '1rem' }}>
-          Chỉ admin mới thêm/gỡ thành viên của dự án. Quản lý hồ sơ (vai trò, Discord ID) nằm ở mục
-          “Thành viên” trên trang chọn dự án.
+          Chỉ admin (hoặc người được cấp quyền “Thành viên dự án”) mới thêm/gỡ thành viên của dự án.
+          Quản lý hồ sơ (vai trò, Discord ID) nằm ở mục “Thành viên” trên trang chọn dự án.
         </p>
       )}
 

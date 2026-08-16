@@ -45,9 +45,9 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 /** Admin dialog to create/edit a feature within a project. */
 export default function FeatureModal({ feature, projectId, onClose, onCreated }: FeatureModalProps) {
-  // isAdmin đã bao cả owner (is_admin() ở 0037 tính owner là admin) — khớp policy
-  // features_delete, nút chỉ hiện đúng với người RLS sẽ cho qua.
-  const { user, isAdmin } = useAuth();
+  // can() đã bao admin/owner (has_perm ở DB cũng vậy) — nút chỉ hiện đúng với người
+  // RLS sẽ cho qua: xoá theo 'feature.delete', nhân bản = tạo theo 'feature.create' (0074).
+  const { user, can } = useAuth();
   const { members, refetchFeatures } = useSprintContext();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
@@ -393,14 +393,14 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
         <div className="modal-actions">
           {isEdit ? (
             <>
-              {isAdmin && (
+              {can('feature.delete') && (
                 <button className="btn-sm btn-danger" onClick={() => setConfirmDelete(true)}>
                   🗑 Xoá feature
                 </button>
               )}
-              {/* Chỉ admin: tạo feature vốn là admin-only (RLS features_insert), nhân bản
-                  cũng là tạo. Huỷ timer tự-lưu trước khi mở — cùng lý do như handleDelete. */}
-              {isAdmin && feature && (
+              {/* Nhân bản = TẠO feature (RLS features_insert theo 'feature.create').
+                  Huỷ timer tự-lưu trước khi mở — cùng lý do như handleDelete. */}
+              {can('feature.create') && feature && (
                 <button
                   className="btn-sm"
                   title="Tạo feature mới y hệt feature này, kèm toàn bộ task bên trong"

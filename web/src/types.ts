@@ -24,12 +24,46 @@ export type TaskSource = 'web' | 'discord';
  * Giá trị phải khớp chuỗi RLS dùng trong migration; thêm quyền mới = thêm vào đây
  * + policy tương ứng, KHÔNG cần đổi schema.
  */
-export type MemberPerm = 'task.delete' | 'feature.create';
+export type MemberPerm =
+  | 'task.delete'
+  | 'task.edit_any'
+  | 'feature.create'
+  | 'feature.edit'
+  | 'feature.delete'
+  | 'sprint.manage'
+  | 'bug.edit_any'
+  | 'bug.delete'
+  | 'label.manage'
+  | 'doc.manage'
+  | 'project.members';
 
 export const MEMBER_PERMS: { id: MemberPerm; label: string; hint: string }[] = [
   { id: 'task.delete', label: 'Xoá task', hint: 'Xoá được task bất kỳ (mặc định chỉ admin và người tạo task)' },
-  { id: 'feature.create', label: 'Tạo feature', hint: 'Tạo feature mới; sửa/xoá feature vẫn là việc của admin' },
+  { id: 'task.edit_any', label: 'Sửa mọi task', hint: 'Sửa task bất kỳ, không chỉ task mình tạo / được giao' },
+  { id: 'feature.create', label: 'Tạo feature', hint: 'Tạo feature mới' },
+  { id: 'feature.edit', label: 'Sửa feature', hint: 'Sửa thông tin feature bất kỳ' },
+  { id: 'feature.delete', label: 'Xoá feature', hint: 'Xoá feature bất kỳ' },
+  { id: 'sprint.manage', label: 'Quản lý sprint', hint: 'Tạo / sửa / xoá sprint — mở được màn Quản lý Sprint' },
+  { id: 'bug.edit_any', label: 'Sửa mọi bug', hint: 'Sửa bug bất kỳ, không chỉ bug mình báo / được giao' },
+  { id: 'bug.delete', label: 'Xoá bug', hint: 'Xoá bug bất kỳ (mặc định chỉ admin và người báo bug)' },
+  { id: 'label.manage', label: 'Quản lý nhãn', hint: 'Thêm / sửa / xoá nhãn bug và nhãn feature' },
+  { id: 'doc.manage', label: 'Quản lý tài liệu', hint: 'Sửa / xoá tài liệu dự án của người khác (mặc định chỉ admin và người tạo)' },
+  { id: 'project.members', label: 'Thành viên dự án', hint: 'Thêm / gỡ người khỏi dự án — người có quyền này tự vào được dự án bất kỳ' },
 ];
+
+/**
+ * Role động (bảng `roles`, 0072): admin đặt tên + icon + bộ quyền; user mới chọn ở
+ * RolePicker. Khác UserRole (owner/admin/member — cấp truy cập) và khác JobRole
+ * (enum cũ, giờ chỉ để hiển thị icon — server tự đồng bộ từ legacyJobRole khi đổi role).
+ */
+export interface TeamRole {
+  id: string;
+  name: string;
+  icon: string;
+  perms: MemberPerm[];
+  sort: number;
+  legacyJobRole?: JobRole;
+}
 
 /** Job discipline — separate from the admin/member permission role. */
 export type JobRole =
@@ -229,6 +263,8 @@ export interface TeamMember {
   role: UserRole;
   /** Quyền lẻ được cấp thêm — chỉ có nghĩa với member; admin có đủ mọi quyền. */
   perms: MemberPerm[];
+  /** Role động (bảng roles) — quyền theo role gộp trong has_perm()/can(). */
+  roleId?: string;
   jobRole?: JobRole;
   discordId?: string;
   notionUserId?: string;

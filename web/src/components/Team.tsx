@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useMemberComp } from '../hooks/useMemberComp';
+import { useRoles } from '../hooks/useRoles';
 import { useStoredView } from '../hooks/useStoredView';
 import { deleteMember } from '../lib/memberWrites';
 import Avatar from './Avatar';
@@ -21,6 +22,7 @@ const PERM_LABEL: Record<string, string> = Object.fromEntries(MEMBER_PERMS.map((
 export default function Team() {
   const { isAdmin } = useAuth();
   const { members, membersLoading } = useSprintContext();
+  const { roles } = useRoles();
   const [view, selectView] = useStoredView<TeamView>('teamAdminView', TEAM_VIEWS, 'roster');
   // Màn Lương chỉ dành cho admin (RLS member_compensation cũng chặn đọc) — member kẹt
   // localStorage 'salary' thì rơi về hồ sơ. Chỉ mở socket comp khi thật sự đứng ở màn Lương.
@@ -104,7 +106,14 @@ export default function Team() {
                   </div>
                 </td>
                 <td className="muted">{m.email || '—'}</td>
-                <td className="muted">{m.jobRole ? JOB_ROLE_LABEL[m.jobRole] : '—'}</td>
+                {/* Ưu tiên role động (0072); người chưa chọn role rơi về enum cũ. */}
+                <td className="muted">
+                  {(() => {
+                    const r = m.roleId ? roles.find((x) => x.id === m.roleId) : undefined;
+                    if (r) return `${r.icon} ${r.name}`;
+                    return m.jobRole ? JOB_ROLE_LABEL[m.jobRole] : '—';
+                  })()}
+                </td>
                 <td>
                   <span
                     className={`badge ${

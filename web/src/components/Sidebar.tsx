@@ -55,9 +55,12 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ active, onSelect }: SidebarProps) {
-  const { profile, isAdmin, isOwner, isRealAdmin, isRealOwner, viewAsMember, viewAsAdmin, setViewAsMember, setViewAsAdmin, signOut } = useAuth();
+  const { profile, isAdmin, isOwner, isRealAdmin, isRealOwner, viewAsMember, viewAsAdmin, setViewAsMember, setViewAsAdmin, can, signOut } = useAuth();
   const { selectedProject, selectProject } = useSprintContext();
   const [editingProfile, setEditingProfile] = useState(false);
+  // Member được cấp 'sprint.manage' (0074) thấy riêng mục Quản lý Sprint trong nhóm
+  // Quản trị — các mục còn lại vẫn admin-only. Layout guard dùng cùng điều kiện.
+  const adminNav = ADMIN_NAV.filter((n) => isAdmin || (n.id === 'sprints' && can('sprint.manage')));
   // Đang đứng trong một view quản trị thì mở sẵn — không thì mục đang chọn bị giấu trong
   // nhóm đóng, người dùng không thấy mình đang ở đâu.
   const inAdminView = ADMIN_ONLY_VIEWS.includes(active);
@@ -85,7 +88,7 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
         </button>
       ))}
 
-      {isAdmin && (
+      {adminNav.length > 0 && (
         <div className="nav-group">
           <button
             className={`nav-item nav-group-head${adminOpen ? ' open' : ''}`}
@@ -101,7 +104,7 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
           </button>
           {adminOpen && (
             <div className="nav-sub">
-              {ADMIN_NAV.map((n) => (
+              {adminNav.map((n) => (
                 <button
                   key={n.id}
                   className={`nav-item nav-sub-item${active === n.id ? ' active' : ''}`}
