@@ -57,6 +57,12 @@ Created/merged on first Google sign-in.
 > **Quyền lẻ (`perms`, migration 0034 + 0074)** — admin cấp thêm từng quyền cho member
 > trên tab Thành viên. Bộ quyền hiện có (nguồn nhãn UI: `MEMBER_PERMS` trong
 > `web/src/types.ts`; mỗi quyền khớp một policy RLS):
+> **MẶC ĐỊNH cho mọi người đã đăng nhập** (migration `0079`, không cần role/cấp lẻ):
+> `task.delete` · `task.edit_any` · `label.manage` · `doc.manage`. Cài trong `has_perm()` —
+> MỘT chỗ, nên cả 12 policy RLS gọi hàm đó tự ăn theo, khỏi sửa từng cái. Web đọc cùng danh
+> sách qua `DEFAULT_MEMBER_PERMS` (`types.ts`) để nút hiện đúng thứ server cho phép; sửa một
+> bên mà quên bên kia là nút bấm bị RLS chặn, hoặc quyền có thật mà nút bị giấu.
+>
 > `task.delete` · `task.edit_any` · `feature.create` · `feature.edit` · `feature.delete`
 > · `sprint.manage` (kèm mở màn Quản lý Sprint trên web) · `bug.edit_any` · `bug.delete`
 > · `label.manage` (nhãn bug + nhãn feature) · `doc.manage` (tài liệu dự án, 0075)

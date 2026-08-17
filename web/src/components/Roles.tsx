@@ -6,17 +6,6 @@ import ConfirmDialog from './ConfirmDialog';
 import RoleEditor from './RoleEditor';
 import { MEMBER_PERMS, type TeamRole } from '../types';
 
-/** Bao nhiêu người đang mang mỗi role (theo `profiles.role_id`). */
-function useMemberCounts(): Map<string, number> {
-  const { members } = useMembers();
-  return useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of members) {
-      if (p.roleId) m.set(p.roleId, (m.get(p.roleId) ?? 0) + 1);
-    }
-    return m;
-  }, [members]);
-}
 
 /**
  * Tab **Role** (khu quản trị) — trước đây nằm lọt trong tab Cấu hình, giờ đứng riêng.
@@ -27,7 +16,15 @@ function useMemberCounts(): Map<string, number> {
  */
 export default function Roles() {
   const { roles, loading } = useRoles();
-  const counts = useMemberCounts();
+  const { members } = useMembers();
+  /** Bao nhiêu người đang mang mỗi role (theo `profiles.role_id`). */
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of members) {
+      if (p.roleId) m.set(p.roleId, (m.get(p.roleId) ?? 0) + 1);
+    }
+    return m;
+  }, [members]);
   const [q, setQ] = useState('');
   /** id role đang mở màn sửa; '' = vừa tạo role mới nên chưa biết id; null = đang ở list. */
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -71,7 +68,9 @@ export default function Roles() {
     return (
       <RoleEditor
         roleId={editingId}
+        roles={roles}
         counts={counts}
+        members={members}
         onBack={() => setEditingId(null)}
         onPick={setEditingId}
         onCreate={handleCreate}

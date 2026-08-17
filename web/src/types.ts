@@ -37,6 +37,17 @@ export type MemberPerm =
   | 'doc.manage'
   | 'project.members';
 
+/**
+ * Quyền MẶC ĐỊNH cho mọi người đã đăng nhập — không cần role, không cần cấp lẻ.
+ *
+ * GƯƠNG với danh sách trong `has_perm()` (migration `0079`). Server mới là nơi quyết định;
+ * đây chỉ để UI hiện đúng nút. Đổi một bên thì PHẢI đổi bên kia, không thì hoặc nút hiện ra
+ * rồi bấm bị RLS chặn, hoặc quyền có thật mà nút bị giấu.
+ */
+export const DEFAULT_MEMBER_PERMS: MemberPerm[] = [
+  'task.delete', 'task.edit_any', 'label.manage', 'doc.manage',
+];
+
 export const MEMBER_PERMS: { id: MemberPerm; label: string; hint: string }[] = [
   { id: 'task.delete', label: 'Xoá task', hint: 'Xoá được task bất kỳ (mặc định chỉ admin và người tạo task)' },
   { id: 'task.edit_any', label: 'Sửa mọi task', hint: 'Sửa task bất kỳ, không chỉ task mình tạo / được giao' },
