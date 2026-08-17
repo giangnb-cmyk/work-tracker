@@ -6,6 +6,7 @@ import Avatar from './Avatar';
 
 // Cùng kiểu lazy như Layout: mấy trang bảng nặng chỉ tải khi mở tới.
 const Team = lazyView(() => import('./Team'));
+const Roles = lazyView(() => import('./Roles'));
 const Visits = lazyView(() => import('./Visits'));
 const Settings = lazyView(() => import('./Settings'));
 const SystemLog = lazyView(() => import('./SystemLog'));
@@ -14,6 +15,7 @@ const Reviews = lazyView(() => import('./Reviews'));
 
 const TABS: { id: ViewId; label: string; icon: string }[] = [
   { id: 'team', label: 'Thành viên', icon: '👥' },
+  { id: 'roles', label: 'Role', icon: '🎭' },
   { id: 'reviews', label: 'Đánh giá', icon: '📝' },
   { id: 'costs', label: 'Chi phí', icon: '💰' },
   { id: 'visits', label: 'Truy cập', icon: '👣' },
@@ -21,8 +23,12 @@ const TABS: { id: ViewId; label: string; icon: string }[] = [
   { id: 'log', label: 'Hệ thống', icon: '🖥️' },
 ];
 
-function isTab(v: ViewId): v is 'team' | 'reviews' | 'costs' | 'visits' | 'settings' | 'log' {
-  return v === 'team' || v === 'reviews' || v === 'costs' || v === 'visits' || v === 'settings' || v === 'log';
+type TabId = 'team' | 'roles' | 'reviews' | 'costs' | 'visits' | 'settings' | 'log';
+
+function isTab(v: ViewId): v is TabId {
+  // Đọc thẳng từ TABS: thêm tab mới mà quên sửa hàm này thì tab đó luôn rơi về 'team' —
+  // đúng cái bẫy của bản viết tay liệt kê từng id.
+  return TABS.some((t) => t.id === v);
 }
 
 /**
@@ -76,6 +82,7 @@ export default function GlobalAdmin() {
             fallback={<div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>}
           >
             {active === 'team' && <Team />}
+            {active === 'roles' && <Roles />}
             {active === 'reviews' && <Reviews />}
             {active === 'costs' && <CostAdmin />}
             {active === 'visits' && <Visits />}

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchAccessConfig, saveAccessConfig } from '../lib/accessConfig';
 import MemberDmTest from './MemberDmTest';
-import RoleManager from './RoleManager';
 
 /** Admin-only: manage who may sign in (allowlist of emails and/or domains). */
 export default function Settings() {
@@ -102,8 +101,8 @@ export default function Settings() {
         </div>
       </div>
 
-      <RoleManager />
-
+      {/* Role dọn sang TAB RIÊNG (Roles.tsx) — nó là một màn quản trị đủ nặng (list + sửa
+          quyền), nhét chung vào Cấu hình thì cả hai đều chật. */}
       <MemberDmTest />
     </div>
   );

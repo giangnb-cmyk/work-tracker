@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { navigate } from '../lib/router';
-import { formatDate } from '../lib/format';
+import { formatDate, formatDayMonth } from '../lib/format';
 import Avatar from './Avatar';
 import MemberPreviewBar from './MemberPreviewBar';
 import ProjectModal from './ProjectModal';
@@ -31,10 +31,14 @@ export default function ProjectSelect() {
     <div key={p.id} className={`project-card-wrap${p.isActive ? '' : ' paused'}`}>
       <button className="project-card glass" onClick={() => selectProject(p.id)}>
         <span className="project-icon" style={{ background: `${p.color}22` }}>{p.icon}</span>
-        <span className="project-name">
-          {p.name}
-          {!p.isActive && <span className="project-paused-tag">⏸ Tạm dừng</span>}
-        </span>
+        <span className="project-name">{p.name}</span>
+        {/* Nhãn đứng thành DÒNG RIÊNG, không nhét trong .project-name: tên dự án dài tự
+            xuống dòng, nhãn dính đuôi thì nó kẹp vào giữa chữ trông như một phần của tên. */}
+        {!p.isActive && (
+          <span className="project-paused-tag" title={p.pausedAt ? `Tạm dừng từ ${formatDate(p.pausedAt)}` : 'Tạm dừng'}>
+            ⏸ Tạm dừng{p.pausedAt ? ` · ${formatDayMonth(p.pausedAt)}` : ''}
+          </span>
+        )}
         <span className="project-meta">
           {p.notionProjectId ? '🔗 Notion · ' : ''}{formatDate(p.createdAt)}
         </span>

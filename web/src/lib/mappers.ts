@@ -86,6 +86,7 @@ export function rowToProject(r: Row): Project {
     description: r.description ?? '',
     // ?? true: thiếu cột (migration chưa áp) thì giữ hành vi cũ — đang chạy, có sync.
     isActive: r.is_active ?? true,
+    pausedAt: Timestamp.fromISO(r.paused_at),
     notionProjectId: r.notion_project_id ?? null,
     notionSyncEnabled: r.notion_sync_enabled ?? true,
     weeklySheetId: r.weekly_sheet_id ?? null,

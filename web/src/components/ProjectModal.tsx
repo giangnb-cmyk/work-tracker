@@ -12,6 +12,7 @@ import { supabase } from '../supabase';
 import SearchableSelect from './SearchableSelect';
 import Switch from './Switch';
 import ConfirmDialog from './ConfirmDialog';
+import { formatDate } from '../lib/format';
 import type { Project } from '../types';
 
 interface ProjectModalProps {
@@ -216,7 +217,9 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
             <>✅ Dự án chạy bình thường: nhắc task hằng ngày, báo cáo 10:30, weekly report,
               DM tuần và đồng bộ bug forum đều tính dự án này.</>
           ) : (
-            <>⏸️ <strong>Tạm dừng</strong> — mọi việc chạy nền bỏ qua dự án này: không nhắc task,
+            <>⏸️ <strong>Tạm dừng</strong>
+              {project?.pausedAt && !project.isActive ? ` từ ${formatDate(project.pausedAt)}` : ''} —
+              mọi việc chạy nền bỏ qua dự án này: không nhắc task,
               không báo cáo 10:30, không weekly report, không DM tuần, không sync bug forum.
               Dữ liệu <strong>giữ nguyên</strong> và vẫn vào xem/sửa bình thường.</>
           )}

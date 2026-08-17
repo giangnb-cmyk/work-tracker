@@ -1,5 +1,5 @@
 // useRoles — live list of custom roles (bảng `roles`, 0072). Dùng ở RolePicker
-// (user mới chọn role), RoleManager (admin CRUD) và MemberModal (admin gán role).
+// (user mới chọn role), tab Role — Roles/RoleEditor (admin CRUD) và MemberModal (admin gán role).
 
 import { useCallback } from 'react';
 import { supabase } from '../supabase';

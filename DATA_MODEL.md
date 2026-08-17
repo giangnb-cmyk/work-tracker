@@ -175,6 +175,7 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `icon`            | string         | emoji shown on the project card                           |
 | `color`           | string         | accent token/hex for the card                             |
 | `description`     | string         | optional short description                                |
+| `pausedAt`        | Timestamp \| null | Tạm dừng TỪ LÚC NÀO (migration `0077`). **Trigger `projects_stamp_paused_at` tự đóng dấu** bằng giờ server khi `is_active` đổi, và xoá khi bật lại — app không bao giờ ghi cột này (cờ đổi được từ web/bot/SQL, ai quên gửi kèm mốc là lệch ngay). Bất biến: `paused_at IS NOT NULL` ⟺ `is_active = false` |
 | `isActive`        | boolean        | **`false` = dự án TẠM DỪNG** (migration `0076`) — mọi việc chạy nền bỏ qua nó (xem dưới). Vẫn xem/sửa bình thường trong app: đây là cờ tắt TỰ ĐỘNG, không phải khoá truy cập (khoá truy cập là `project_members`). Mặc định `true` |
 | `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
 | `notionSyncEnabled` | boolean      | `false` = tạo task trong dự án này **không** đẻ trang Notion, và nút "Tạo task trên Notion" ở task chi tiết cũng ẩn (migration `0070`). Áp dụng cho CẢ web (`createTask`) lẫn bot (`task_ops._sync_create`). Mặc định `true`. Độc lập với `notionProjectId`: tắt sync vẫn giữ liên kết để bật lại |
@@ -692,6 +693,10 @@ Ghi các hành động quản trị mà `activity` (per-task, cascade khi xoá t
 - `member.perms` — trigger `after insert or update on profiles` khi **role HOẶC perms** đổi (bỏ
   qua lượt tự tạo hồ sơ lúc đăng nhập và mọi update không đụng role/perms). `meta =
   {member_name, role_old/new, perms_old/new}`.
+- `project.active` — trigger `after update on projects` khi **`is_active` đổi** (migration
+  `0078`); MỘT action cho cả hai chiều, `summary` nói rõ "Tạm dừng dự án: X" hay "Bật lại
+  dự án: X". `meta = {project_name, is_active, paused_at}`. Mọi lần lưu dự án khác (đổi
+  webhook, sheet, tên…) KHÔNG đẻ log — không thì nhật ký thành nhật ký chỉnh tả.
 
 Cùng pattern `activity` (0007): ghi bằng **trigger SECURITY DEFINER** nên không giả mạo/bỏ sót
 được; **không có policy insert** → client không tự bịa dòng log. RLS select `is_admin()` (như

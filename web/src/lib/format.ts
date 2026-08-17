@@ -12,6 +12,13 @@ export function formatDate(ts: Timestamp | null | undefined): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+/** 'dd/mm' — dạng ngắn cho chỗ chật (nhãn, chip). Năm đầy đủ để ở tooltip. */
+export function formatDayMonth(ts: Timestamp | null | undefined): string {
+  const d = tsToDate(ts);
+  if (!d) return '—';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+}
+
 export function toInputDate(ts: Timestamp | null | undefined): string {
   const d = tsToDate(ts);
   if (!d) return '';

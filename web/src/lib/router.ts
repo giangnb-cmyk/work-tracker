@@ -9,7 +9,7 @@ import { useSyncExternalStore } from 'react';
 /** Mọi tab của app. Path hợp lệ = '/' + id (riêng board có alias đẹp /sprint). */
 export const ALL_VIEWS = [
   'dashboard', 'board', 'mytasks', 'features', 'backlog', 'bugs', 'timeline', 'docs', 'members',
-  'performance', 'sprints', 'reviews', 'visits', 'costs', 'team', 'log', 'settings',
+  'performance', 'sprints', 'reviews', 'visits', 'costs', 'team', 'roles', 'log', 'settings',
 ] as const;
 export type ViewId = (typeof ALL_VIEWS)[number];
 
@@ -18,7 +18,7 @@ export type ViewId = (typeof ALL_VIEWS)[number];
  * không nằm trong sidebar dự án. Bao quát cả web nên không gắn với dự án đang chọn.
  * (Khác `members` — đó là roster CỦA dự án, nằm trong sidebar dự án.)
  */
-export const GLOBAL_ADMIN_VIEWS: readonly ViewId[] = ['team', 'reviews', 'visits', 'settings', 'log', 'costs'];
+export const GLOBAL_ADMIN_VIEWS: readonly ViewId[] = ['team', 'roles', 'reviews', 'visits', 'settings', 'log', 'costs'];
 export function isGlobalAdminView(view: ViewId): boolean {
   return GLOBAL_ADMIN_VIEWS.includes(view);
 }

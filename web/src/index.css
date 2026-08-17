@@ -490,6 +490,83 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .st-row.done .st-box svg { stroke-dashoffset: 0; }
 .st-title { flex: 1; min-width: 0; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.18s ease, opacity 0.18s ease; }
 .st-row.done .st-title { color: var(--muted); text-decoration: line-through; opacity: 0.75; }
+/* ===== Tab ROLE — bố cục mượn Discord, màu/chữ theo design system của app =====
+   Danh sách: thanh tìm + nút tạo, bảng 3 cột (tên · số người · hành động).
+   Màn sửa: hai cột — mọi role bên trái, thẻ Hiển thị/Quyền bên phải. */
+.role-toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.5rem; }
+.role-search { position: relative; flex: 1; max-width: 420px; display: block; }
+.role-search-wide { max-width: none; margin-bottom: 1rem; }
+.role-search .input { padding-left: 2.1rem; width: 100%; }
+.role-search-icon { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); opacity: 0.6; font-size: 0.85rem; }
+.role-hint { font-size: 0.82rem; margin-bottom: 1rem; }
+
+.role-table { padding: 0.35rem 0.5rem 0.5rem; }
+.role-thead {
+  display: grid; grid-template-columns: 1fr 120px 96px; gap: 0.5rem; align-items: center;
+  padding: 0.6rem 0.75rem; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 700;
+}
+.role-row {
+  display: grid; grid-template-columns: 1fr 120px 96px; gap: 0.5rem; align-items: center;
+  padding: 0.7rem 0.75rem; border-top: 1px solid var(--border-soft); border-radius: 9px;
+  cursor: pointer; transition: background 0.15s ease;
+}
+.role-row:hover { background: rgba(255, 255, 255, 0.04); }
+.role-cell-name { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.role-dot { font-size: 1.05rem; line-height: 1; flex-shrink: 0; }
+.role-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-permcount { font-size: 0.75rem; flex-shrink: 0; }
+.role-col-members { color: var(--muted); font-size: 0.85rem; }
+.role-row-actions { display: flex; gap: 0.35rem; justify-content: flex-end; opacity: 0; transition: opacity 0.15s ease; }
+.role-row:hover .role-row-actions, .role-row:focus-within .role-row-actions { opacity: 1; }
+
+.role-editor { display: grid; grid-template-columns: 232px 1fr; gap: 1.25rem; align-items: start; }
+.role-side { position: sticky; top: 0; }
+.role-side-top { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+.role-side-top .btn-sm:first-child { flex: 1; }
+.role-side-list { display: flex; flex-direction: column; gap: 0.15rem; max-height: 70vh; overflow-y: auto; }
+.role-side-item {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left;
+  padding: 0.45rem 0.6rem; border-radius: 8px; border: none; background: none;
+  color: var(--text); font: inherit; font-size: 0.86rem; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.role-side-item:hover { background: rgba(255, 255, 255, 0.05); }
+.role-side-item.on { background: rgba(99, 102, 241, 0.18); }
+.role-side-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Nền/viền/blur lấy từ .glass của design system — đừng chép lại ở đây rồi trôi lệch. */
+.role-pane { padding: 1.25rem 1.4rem; }
+.role-pane-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.role-pane-head h2 { font-size: 0.92rem; letter-spacing: 0.05em; color: var(--muted); margin: 0; }
+.role-tabs { display: flex; gap: 1.2rem; border-bottom: 1px solid var(--border-soft); margin: 1rem 0 1.25rem; }
+.role-tab {
+  background: none; border: none; padding: 0.5rem 0.1rem; color: var(--muted); font: inherit;
+  font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.role-tab.on { color: var(--text); border-bottom-color: var(--primary); }
+.role-pane-body { display: flex; flex-direction: column; }
+.role-icon-preview {
+  width: 40px; height: 40px; display: grid; place-items: center; font-size: 1.3rem;
+  border-radius: 10px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-soft);
+}
+/* Một quyền = một dòng: chữ bên trái, công tắc bên phải (giống ảnh Permissions). */
+.perm-item {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+  padding: 0.85rem 0; border-top: 1px solid var(--border-soft);
+}
+.perm-item:first-of-type { border-top: none; }
+.perm-item-text { min-width: 0; }
+.perm-item-label { font-weight: 600; font-size: 0.9rem; }
+.perm-item-hint { font-size: 0.8rem; margin: 0.2rem 0 0; }
+
+@media (max-width: 820px) {
+  .role-editor { grid-template-columns: 1fr; }
+  .role-side-list { flex-direction: row; overflow-x: auto; max-height: none; }
+  .role-side-item { width: auto; flex-shrink: 0; }
+  .role-thead, .role-row { grid-template-columns: 1fr 72px 84px; }
+  .role-row-actions { opacity: 1; }
+}
+
 /* ===== Dự án TẠM DỪNG (0076) — khu riêng ở màn chọn dự án =====
    Thẻ xám đi + nhãn ⏸, KHÔNG mờ tới mức khó đọc: dự án dừng vẫn phải tra cứu được.
    Dự án đang chạy giữ nguyên UI cũ, không đụng một dòng nào. */
@@ -503,7 +580,10 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .project-card-wrap.paused .project-card:hover { filter: saturate(0.6); opacity: 1; }
 .project-card-wrap.paused .project-icon { filter: grayscale(1); }
 .project-paused-tag {
-  margin-left: 0.5rem; padding: 0.05rem 0.4rem; border-radius: 999px;
+  /* Dòng riêng dưới tên. Kéo lên bằng margin âm để nó DÍNH vào tên chứ không trôi lơ lửng
+     giữa tên và dòng ngày (thẻ là flex column, gap 0.6rem). */
+  align-self: flex-start; margin-top: -0.35rem;
+  padding: 0.05rem 0.4rem; border-radius: 999px;
   background: rgba(148, 163, 184, 0.18); border: 1px solid var(--border-soft);
   color: var(--muted); font-size: 0.68rem; font-weight: 600; white-space: nowrap;
 }

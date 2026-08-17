@@ -141,6 +141,9 @@ export const AUDIT_ACTION_META: Record<string, { label: string; icon: string; to
   'task.delete': { label: 'Xoá task', icon: '🗑️', tone: 'danger' },
   'feature.create': { label: 'Tạo feature', icon: '🧩', tone: 'ok' },
   'member.perms': { label: 'Đổi quyền', icon: '🔑', tone: 'warn' },
+  // Một action cho CẢ tắt lẫn bật (0078) — tách hai chip lọc chỉ để phân biệt chiều thì
+  // thừa, `summary` đã nói rõ "Tạm dừng" hay "Bật lại". tone 'warn' vì tắt là thứ đáng chú ý.
+  'project.active': { label: 'Bật/tắt dự án', icon: '⏸️', tone: 'warn' },
 };
 
 /** An in-app notification delivered to one user (the web half of completion notices). */
@@ -363,6 +366,11 @@ export interface Project {
    * bình thường; đây là cờ tắt TỰ ĐỘNG, không phải khoá quyền truy cập.
    */
   isActive: boolean;
+  /**
+   * Thời điểm bị chuyển sang tạm dừng (migration `0077`). Trigger DB tự đóng dấu bằng giờ
+   * SERVER; app KHÔNG bao giờ ghi cột này. `null` ⟺ `isActive = true`.
+   */
+  pausedAt: Timestamp | null;
   /** Notion Projects DB page id — lets task syncs set the Notion "Project" relation. */
   notionProjectId: string | null;
   /**
