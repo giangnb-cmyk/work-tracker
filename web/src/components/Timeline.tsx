@@ -256,6 +256,29 @@ export default function Timeline() {
     [rows, labels, projectStartMs],
   );
 
+  /**
+   * TOÀN BỘ version của dự án cho panel quản lý — khác versionRows: biểu đồ lọc bỏ
+   * version chưa chốt ngày + chưa có việc (chống nhiễu), nên version vừa tạo "biến mất"
+   * nếu không có chỗ này để nhìn.
+   */
+  const versionLabels = useMemo(
+    () =>
+      labels
+        .filter((l) => labelGroup(l.name) === 'version')
+        .sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true })),
+    [labels],
+  );
+
+  /** Số feature đang gắn từng nhãn (chỉ tính feature của dự án đang chọn). */
+  const featureCountByLabel = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of features) {
+      if (f.projectId !== selectedProjectId) continue;
+      for (const id of f.labelIds) m.set(id, (m.get(id) ?? 0) + 1);
+    }
+    return m;
+  }, [features, selectedProjectId]);
+
   const span = Math.max(DAY, domain.end + DAY - domain.start);
 
   /** Các Thứ 2 trong khung — mỗi mốc là một CỘT tuần của trục. */
@@ -299,10 +322,10 @@ export default function Timeline() {
             <button
               className="btn-sm"
               onClick={() => { setVersionFormOpen((o) => !o); setVError(null); }}
-              title="Tạo version mới — feature pick version từ danh sách này"
+              title="Danh sách version của dự án — xem / tạo / xoá"
               aria-expanded={versionFormOpen}
             >
-              ＋ Version
+              🏷️ Versions{versionLabels.length > 0 ? ` (${versionLabels.length})` : ''}
             </button>
           )}
           {isAdmin && (
@@ -324,29 +347,66 @@ export default function Timeline() {
 
       {versionFormOpen && can('label.manage') && (
         <div className="glass tl-vform">
-          <label className="field">
-            <span>Tên version</span>
-            <input
-              className="input"
-              placeholder="vd: 1.2.x"
-              value={vName}
-              maxLength={40}
-              onChange={(e) => setVName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void createVersion(); } }}
-            />
-          </label>
-          <label className="field">
-            <span>Ngày phát hành (tuỳ chọn)</span>
-            <DateInput value={vDate} onChange={setVDate} ariaLabel="Ngày phát hành version mới" />
-          </label>
-          <button className="btn-sm" onClick={() => void createVersion()} disabled={vBusy || !vName.trim()}>
-            {vBusy ? 'Đang tạo…' : 'Tạo version'}
-          </button>
+          <div className="tl-vform-new">
+            <label className="field">
+              <span>Tên version</span>
+              <input
+                className="input"
+                placeholder="vd: 1.2.x"
+                value={vName}
+                maxLength={40}
+                onChange={(e) => setVName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void createVersion(); } }}
+              />
+            </label>
+            <label className="field">
+              <span>Ngày phát hành (tuỳ chọn)</span>
+              <DateInput value={vDate} onChange={setVDate} ariaLabel="Ngày phát hành version mới" />
+            </label>
+            <button className="btn-sm" onClick={() => void createVersion()} disabled={vBusy || !vName.trim()}>
+              {vBusy ? 'Đang tạo…' : '＋ Tạo version'}
+            </button>
+          </div>
+          {vError && <p className="error-text tl-vform-hint">{vError}</p>}
+
+          {/* Danh sách ĐẦY ĐỦ — kể cả version chưa chốt ngày + chưa gắn feature, thứ
+              biểu đồ cố tình giấu (chống nhiễu) nên phải xem được ở đây. */}
+          <div className="tl-vlist">
+            {versionLabels.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>Chưa có version nào — tạo cái đầu tiên ở trên.</p>
+            ) : (
+              versionLabels.map((l) => {
+                const count = featureCountByLabel.get(l.id) ?? 0;
+                const releaseMs = l.releaseDate?.toMillis() ?? null;
+                return (
+                  <div key={l.id} className="tl-vlist-row">
+                    <span className="tl-vlist-name">🏷️ {l.name}</span>
+                    <span className="muted mono">
+                      {releaseMs !== null ? `🚩 ${label(releaseMs)}` : 'chưa chốt ngày'}
+                    </span>
+                    <span className="muted">{count} feature</span>
+                    {count === 0 && releaseMs === null && (
+                      <span className="muted tl-vlist-note">chưa lên biểu đồ</span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn-sm btn-danger tl-vlist-del"
+                      title={`Xoá version ${l.name}`}
+                      onClick={() => setConfirmDelVersion(l)}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
           <p className="muted tl-vform-hint">
             Version tạo ở đây; feature pick version trong màn sửa feature (ô "Version delivery").
-            Chưa chốt ngày thì bar suy từ hạn task, chốt rồi thì bar chạy theo lịch.
+            Chưa chốt ngày thì bar suy từ hạn task, chốt rồi thì bar chạy theo lịch — sửa mốc
+            bằng nút 🚩 trên hàng version của biểu đồ.
           </p>
-          {vError && <p className="error-text tl-vform-hint">{vError}</p>}
         </div>
       )}
 
@@ -412,9 +472,10 @@ export default function Timeline() {
                           </span>
                         ) : (
                           <>
-                            {/* Khoảng thời gian của bản: [phát hành bản trước → phát hành
-                                bản này] (hoặc suy từ hạn task khi chưa chốt ngày). */}
-                            {v.hasDates && `${label(v.start)}–${label(v.end)} · `}
+                            {/* Khoảng thời gian CHỈ hiện khi chưa chốt ngày (suy từ hạn
+                                task); đã chốt thì 🚩 + bar nói đủ — cột nhãn có 240px,
+                                nhét cả hai là tên version bị ép mất. */}
+                            {v.hasDates && v.releaseMs === null && `${label(v.start)}–${label(v.end)} · `}
                             {isAdmin && v.label ? (
                               <button
                                 type="button"
