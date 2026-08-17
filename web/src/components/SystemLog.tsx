@@ -79,6 +79,22 @@ export default function SystemLog() {
         <p>Nhật ký hệ thống — chỉ admin xem được. Ghi lại ai xoá task, ai tạo feature, ai đổi vai trò/quyền của thành viên.</p>
       </div>
 
+      {/* Hàng 1: phạm vi (dự án nào) — hàng 2: loại hành động + tìm kiếm. */}
+      <div className="log-controls log-controls-project">
+        <select
+          className="select log-project-filter"
+          value={projFilter}
+          onChange={(e) => setProjFilter(e.target.value)}
+          aria-label="Lọc theo dự án"
+        >
+          <option value="all">📁 Tất cả dự án</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.icon} {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="log-controls">
         <div className="log-filters">
           <button className={`chip${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>
@@ -94,19 +110,6 @@ export default function SystemLog() {
             </button>
           ))}
         </div>
-        <select
-          className="select log-project-filter"
-          value={projFilter}
-          onChange={(e) => setProjFilter(e.target.value)}
-          aria-label="Lọc theo dự án"
-        >
-          <option value="all">📁 Tất cả dự án</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.icon} {p.name}
-            </option>
-          ))}
-        </select>
         <div className="log-search">
           <span className="log-search-icon" aria-hidden>🔍</span>
           <input

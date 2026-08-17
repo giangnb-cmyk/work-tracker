@@ -2948,7 +2948,9 @@ table.data-table { width: 100%; border-collapse: collapse; }
   gap: 0.75rem; margin-bottom: 1.1rem;
 }
 .log-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.log-project-filter { width: auto; max-width: 220px; }
+/* Hàng chọn dự án đứng riêng NGAY TRÊN hàng chip — sát lại cho đọc thành một khối lọc. */
+.log-controls-project { justify-content: flex-start; margin-bottom: 0.6rem; }
+.log-project-filter { width: auto; min-width: 200px; max-width: 280px; }
 .log-search { position: relative; flex: 1; min-width: 220px; max-width: 360px; }
 .log-search-icon {
   position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
