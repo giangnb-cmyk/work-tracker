@@ -41,6 +41,8 @@ export default function SystemLog() {
   const { members, projects } = useSprintContext();
   const { entries, loading } = useAuditLog();
   const [filter, setFilter] = useState<string | 'all'>('all');
+  /** Lọc theo dự án; 'all' = mọi dự án (gồm cả dòng không thuộc dự án nào, vd Đổi quyền). */
+  const [projFilter, setProjFilter] = useState<string | 'all'>('all');
   const [query, setQuery] = useState('');
 
   // Ảnh đại diện người thực hiện — tra theo actorId; không có (Bot / hồ sơ đã xoá) thì để trống.
@@ -59,11 +61,12 @@ export default function SystemLog() {
     const q = query.trim().toLowerCase();
     return entries.filter((e) => {
       if (filter !== 'all' && e.action !== filter) return false;
+      if (projFilter !== 'all' && e.projectId !== projFilter) return false;
       if (!q) return true;
       const p = e.projectId ? projectById.get(e.projectId) : undefined;
       return haystack(e, p?.name ?? '').includes(q);
     });
-  }, [entries, filter, query, projectById]);
+  }, [entries, filter, projFilter, query, projectById]);
 
   if (loading) {
     return <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>;
@@ -91,6 +94,19 @@ export default function SystemLog() {
             </button>
           ))}
         </div>
+        <select
+          className="select log-project-filter"
+          value={projFilter}
+          onChange={(e) => setProjFilter(e.target.value)}
+          aria-label="Lọc theo dự án"
+        >
+          <option value="all">📁 Tất cả dự án</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.icon} {p.name}
+            </option>
+          ))}
+        </select>
         <div className="log-search">
           <span className="log-search-icon" aria-hidden>🔍</span>
           <input

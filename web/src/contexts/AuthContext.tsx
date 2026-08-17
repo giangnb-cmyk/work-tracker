@@ -18,7 +18,6 @@ import { fetchAccessConfig, isEmailAllowed } from '../lib/accessConfig';
 import { logVisit } from '../lib/visitWrites';
 import { navigate } from '../lib/router';
 import { rowToMember } from '../lib/mappers';
-import { DEFAULT_MEMBER_PERMS } from '../types';
 import type { MemberPerm, TeamMember, UserRole } from '../types';
 
 /** Minimal user shape the app consumes (keeps `uid` naming across components). */
@@ -327,11 +326,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Chế độ xem thử hạ về member THƯỜNG — không tính cả perms lẻ của chính mình,
    * để admin thấy đúng giao diện của member chưa được cấp gì.
+   *
+   * Từ 0082 KHÔNG còn quyền cấp cứng: "mặc định" chỉ là bộ tick sẵn khi tạo role
+   * (DEFAULT_MEMBER_PERMS), quyền hiệu lực luôn là perms lẻ ∪ perms của role.
    */
   function can(perm: MemberPerm): boolean {
-    // Quyền mặc định (0079) đứng TRƯỚC cả cờ xem thử: member thật cũng có nó, nên "xem như
-    // thành viên" mà giấu đi là vẽ sai chính cái đang muốn xem thử.
-    if (DEFAULT_MEMBER_PERMS.includes(perm)) return true;
     if (viewAsMember) return false;
     return isRealAdmin || (profile?.perms ?? []).includes(perm) || rolePerms.includes(perm);
   }

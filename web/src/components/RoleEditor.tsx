@@ -232,26 +232,21 @@ export default function RoleEditor({
             </span>
 
             {shownPerms.map((p) => {
-              // Quyền mặc định (0079): AI CŨNG có sẵn, role không cấp thêm được gì. Hiện
-              // công tắc bật + khoá thay vì giấu đi — giấu thì admin tưởng chưa ai có quyền
-              // đó; mà để bấm được thì bấm xong chẳng đổi gì, còn khó hiểu hơn.
+              // "Bật sẵn" (0082): chỉ là giá trị KHỞI TẠO khi tạo role mới — công tắc
+              // vẫn bật/tắt tự do, không còn khoá như thời quyền-cấp-cứng (0079).
               const isDefault = DEFAULT_MEMBER_PERMS.includes(p.id);
               return (
-                <div key={p.id} className={`perm-item${isDefault ? ' is-default' : ''}`}>
+                <div key={p.id} className="perm-item">
                   <div className="perm-item-text">
                     <div className="perm-item-label">
                       {p.label}
-                      {isDefault && <span className="perm-default-tag">Mặc định cho mọi người</span>}
+                      {isDefault && <span className="perm-default-tag">Bật sẵn cho role mới</span>}
                     </div>
-                    <p className="perm-item-hint muted">
-                      {p.hint}
-                      {isDefault && ' — mọi thành viên đã có sẵn quyền này, không cần role.'}
-                    </p>
+                    <p className="perm-item-hint muted">{p.hint}</p>
                   </div>
                   <Switch
-                    checked={isDefault || perms.includes(p.id)}
+                    checked={perms.includes(p.id)}
                     onChange={(on) => togglePerm(p.id, on)}
-                    disabled={isDefault}
                     label=""
                     ariaLabel={`Bật/tắt quyền ${p.label}`}
                   />

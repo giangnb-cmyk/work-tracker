@@ -57,11 +57,12 @@ Created/merged on first Google sign-in.
 > **Quyền lẻ (`perms`, migration 0034 + 0074)** — admin cấp thêm từng quyền cho member
 > trên tab Thành viên. Bộ quyền hiện có (nguồn nhãn UI: `MEMBER_PERMS` trong
 > `web/src/types.ts`; mỗi quyền khớp một policy RLS):
-> **MẶC ĐỊNH cho mọi người đã đăng nhập** (migration `0079`, không cần role/cấp lẻ):
-> `task.delete` · `task.edit_any` · `label.manage` · `doc.manage`. Cài trong `has_perm()` —
-> MỘT chỗ, nên cả 12 policy RLS gọi hàm đó tự ăn theo, khỏi sửa từng cái. Web đọc cùng danh
-> sách qua `DEFAULT_MEMBER_PERMS` (`types.ts`) để nút hiện đúng thứ server cho phép; sửa một
-> bên mà quên bên kia là nút bấm bị RLS chặn, hoặc quyền có thật mà nút bị giấu.
+> **Quyền "bật sẵn" theo role** (migration `0082`, thay cơ chế cấp-cứng của `0079`):
+> `task.create` · `task.delete` · `task.edit_any` · `label.manage` · `doc.manage`.
+> KHÔNG còn nằm cứng trong `has_perm()` — migration seed chúng vào mọi role có sẵn, web
+> tick sẵn khi tạo role mới (`DEFAULT_MEMBER_PERMS`, `types.ts`), và admin bật/tắt được
+> từng quyền theo role trong RoleEditor. Người chưa có role thì không có gì (fail-closed;
+> RolePicker chặn tới khi chọn role nên nhóm này thực tế rỗng).
 >
 > `task.create` (tạo task — `tasks_insert`, 0081; seed sẵn vào mọi role hiện có)
 > · `task.delete` · `task.edit_any` · `feature.create` · `feature.edit` · `feature.delete`

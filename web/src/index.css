@@ -558,7 +558,6 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .perm-item-text { min-width: 0; }
 .perm-item-label { font-weight: 600; font-size: 0.9rem; }
 .perm-item-hint { font-size: 0.8rem; margin: 0.2rem 0 0; }
-.perm-item.is-default .perm-item-label { color: var(--muted); }
 .perm-default-tag {
   margin-left: 0.5rem; padding: 0.1rem 0.4rem; border-radius: 999px;
   background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35);
@@ -2949,6 +2948,7 @@ table.data-table { width: 100%; border-collapse: collapse; }
   gap: 0.75rem; margin-bottom: 1.1rem;
 }
 .log-filters { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.log-project-filter { width: auto; max-width: 220px; }
 .log-search { position: relative; flex: 1; min-width: 220px; max-width: 360px; }
 .log-search-icon {
   position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);

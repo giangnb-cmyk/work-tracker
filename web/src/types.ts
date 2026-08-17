@@ -39,14 +39,13 @@ export type MemberPerm =
   | 'project.members';
 
 /**
- * Quyền MẶC ĐỊNH cho mọi người đã đăng nhập — không cần role, không cần cấp lẻ.
- *
- * GƯƠNG với danh sách trong `has_perm()` (migration `0079`). Server mới là nơi quyết định;
- * đây chỉ để UI hiện đúng nút. Đổi một bên thì PHẢI đổi bên kia, không thì hoặc nút hiện ra
- * rồi bấm bị RLS chặn, hoặc quyền có thật mà nút bị giấu.
+ * Quyền BẬT SẴN theo role (0082): tick sẵn khi TẠO role mới, và migration đã seed vào
+ * mọi role có sẵn. KHÔNG còn cấp cứng trong `has_perm()` như thời 0079 — admin bật/tắt
+ * được từng quyền này theo role trong RoleEditor như mọi quyền khác. Vì thế web KHÔNG
+ * được coi đây là "luôn có": quyền hiệu lực vẫn đọc từ perms lẻ ∪ perms của role.
  */
 export const DEFAULT_MEMBER_PERMS: MemberPerm[] = [
-  'task.delete', 'task.edit_any', 'label.manage', 'doc.manage',
+  'task.create', 'task.delete', 'task.edit_any', 'label.manage', 'doc.manage',
 ];
 
 export const MEMBER_PERMS: { id: MemberPerm; label: string; hint: string }[] = [

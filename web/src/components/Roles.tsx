@@ -4,7 +4,7 @@ import { useMembers } from '../hooks/useMembers';
 import { createRole, deleteRole } from '../lib/roleWrites';
 import ConfirmDialog from './ConfirmDialog';
 import RoleEditor from './RoleEditor';
-import { MEMBER_PERMS, type TeamRole } from '../types';
+import { DEFAULT_MEMBER_PERMS, MEMBER_PERMS, type TeamRole } from '../types';
 
 
 /**
@@ -44,7 +44,8 @@ export default function Roles() {
     setError(null);
     try {
       const maxSort = roles.reduce((m, r) => Math.max(m, r.sort), 0);
-      const id = await createRole({ name: 'Role mới', icon: '👤', perms: [] }, maxSort + 1);
+      // Role mới mang sẵn bộ quyền "bật sẵn" (0082) — admin vào tắt bớt, thay vì tick lại từ đầu.
+      const id = await createRole({ name: 'Role mới', icon: '👤', perms: [...DEFAULT_MEMBER_PERMS] }, maxSort + 1);
       setEditingId(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tạo role thất bại (cần quyền admin).');
