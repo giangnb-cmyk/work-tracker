@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { FeatureRow } from '../../lib/timelineRows';
 
 const DAY = 86_400_000;
@@ -9,6 +10,8 @@ export interface TimelineScale {
   clampPct: (v: number) => number;
   todayPct: number;
   label: (ms: number) => string;
+  /** Lưới kẻ dọc ranh giới tuần — cha tính theo bề rộng khung, mọi hàng dùng chung. */
+  grid?: CSSProperties;
 }
 
 interface Props {
@@ -20,7 +23,7 @@ interface Props {
 
 /** Một hàng feature trong Timeline. Bấm vào để xem danh sách task trong popup. */
 export default function TimelineFeatureRow({ row, onOpen, scale }: Props) {
-  const { pct, clampPct, todayPct, label } = scale;
+  const { pct, clampPct, todayPct, label, grid } = scale;
   const f = row.feature;
   const color = f?.color ?? OTHER_COLOR;
   const ongoing = f?.kind === 'ongoing';
@@ -52,7 +55,7 @@ export default function TimelineFeatureRow({ row, onOpen, scale }: Props) {
           {ongoing ? `${row.total - row.done} mở` : `${row.done}/${row.total}`}
         </span>
       </div>
-      <div className="tl-track">
+      <div className="tl-track" style={grid}>
         {todayPct >= 0 && todayPct <= 100 && (
           <span className="tl-today faint" style={{ left: `${todayPct}%` }} />
         )}

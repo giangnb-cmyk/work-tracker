@@ -6,15 +6,17 @@ import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import DateRangePicker from './DateRangePicker';
 import DateInput from './DateInput';
 import TaskModal from './TaskModal';
-import { updateFeatureLabel } from '../lib/featureLabelWrites';
+import ConfirmDialog from './ConfirmDialog';
+import { createFeatureLabel, deleteFeatureLabel, updateFeatureLabel } from '../lib/featureLabelWrites';
+import { labelGroup } from '../lib/bugLabelGroups';
 import { toInputDate } from '../lib/format';
 import { Timestamp } from '../lib/time';
-import { TIMELINE_PRESETS, startOfDay, type DateRange } from '../lib/dateRange';
+import { TIMELINE_PRESETS, startOfDay, startOfWeek, type DateRange } from '../lib/dateRange';
 import { buildVersionRows, type FeatureRow, type TaskBar, type VersionRow } from '../lib/timelineRows';
 import { requestReleaseSync } from '../lib/releaseSyncWrites';
 import TimelineFeatureRow, { type TimelineScale } from './timeline/TimelineFeatureRow';
 import FeatureTasksModal from './timeline/FeatureTasksModal';
-import type { Feature, Task } from '../types';
+import type { Feature, FeatureLabel, Task } from '../types';
 
 const DAY = 86_400_000;
 
@@ -31,7 +33,7 @@ function label(ms: number): string {
  * tương lai).
  */
 export default function Timeline() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, can } = useAuth();
   const { selectedProjectId, selectedProject, features } = useSprintContext();
   const { tasks, loading } = useProjectTasks(selectedProjectId);
   const { labels } = useFeatureLabels(selectedProjectId);
@@ -45,6 +47,17 @@ export default function Timeline() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   /** Nhãn version đang sửa mốc phát hành tại chỗ (id); null = không sửa cái nào. */
   const [editingRelease, setEditingRelease] = useState<string | null>(null);
+  /**
+   * Form tạo version — Timeline là NƠI DUY NHẤT tạo version (FeatureModal giờ chỉ pick):
+   * version là mốc lộ trình, tạo ở đúng màn nhìn lộ trình thì mới thấy ngay nó nằm đâu.
+   */
+  const [versionFormOpen, setVersionFormOpen] = useState(false);
+  const [vName, setVName] = useState('');
+  const [vDate, setVDate] = useState('');
+  const [vBusy, setVBusy] = useState(false);
+  const [vError, setVError] = useState<string | null>(null);
+  /** Version chờ xác nhận xoá (thao tác không hoàn tác — bắt buộc ConfirmDialog). */
+  const [confirmDelVersion, setConfirmDelVersion] = useState<FeatureLabel | null>(null);
 
   /**
    * Chốt mốc phát hành cho một version. Không đóng ô sửa ngay: người ta hay gõ lại vài lần
@@ -83,6 +96,53 @@ export default function Timeline() {
     } finally {
       setSyncing(false);
       setTimeout(() => setSyncMsg(null), 8000);
+    }
+  }
+
+  /** Tạo version = tạo nhãn version (+ mốc phát hành nếu có). Realtime tự đưa vào list. */
+  async function createVersion() {
+    const nm = vName.trim();
+    if (!nm || !selectedProjectId) return;
+    // Chặn sớm tên không đúng dạng version: tạo xong mà groupFeaturesByVersion không nhận
+    // ra thì nó thành nhãn nhóm thường, "biến mất" khỏi Timeline — khó hiểu hơn nhiều.
+    if (labelGroup(nm) !== 'version') {
+      setVError('Tên version phải là dạng số — vd 1.2.x, 2.0, v1.3 — để hệ thống nhận ra đây là version.');
+      return;
+    }
+    if (labels.some((l) => l.name.toLowerCase() === nm.toLowerCase())) {
+      setVError('Version này đã có rồi.');
+      return;
+    }
+    setVError(null);
+    setVBusy(true);
+    try {
+      // Version luôn xám (#94a3b8) — cùng quy ước với FeatureModal trước đây.
+      await createFeatureLabel(
+        { projectId: selectedProjectId, name: nm, color: '#94a3b8', icon: '', releaseDate: vDate || null },
+        user?.uid ?? '',
+      );
+      setVName('');
+      setVDate('');
+      setSyncMsg(`Đã tạo version ${nm} — gắn feature vào version ở màn sửa feature (ô "Version delivery").`);
+      setTimeout(() => setSyncMsg(null), 8000);
+    } catch (err) {
+      console.error('Tạo version thất bại', err);
+      setVError('Tạo version thất bại — cần quyền "Quản lý nhãn".');
+    } finally {
+      setVBusy(false);
+    }
+  }
+
+  async function removeVersion(l: FeatureLabel) {
+    setConfirmDelVersion(null);
+    try {
+      await deleteFeatureLabel(l.id);
+      setSyncMsg(`Đã xoá version ${l.name}.`);
+    } catch (err) {
+      console.error('Xoá version thất bại', err);
+      setSyncMsg('Xoá version thất bại — cần quyền "Quản lý nhãn".');
+    } finally {
+      setTimeout(() => setSyncMsg(null), 6000);
     }
   }
 
@@ -137,10 +197,12 @@ export default function Timeline() {
     };
   }, [taskBars, labels, projectStartMs, features, selectedProjectId]);
 
-  const domain = useMemo(
-    () => (range ? { start: startOfDay(range.fromMs), end: startOfDay(range.toMs) } : projectDomain),
-    [range, projectDomain],
-  );
+  // Trục hiển thị theo TUẦN: neo hai mép khung vào Thứ 2 để mọi cột tuần tròn cạnh —
+  // khoảng chọn tay/preset chỉ quyết định tuần nào lọt vào khung.
+  const domain = useMemo(() => {
+    const raw = range ? { start: startOfDay(range.fromMs), end: startOfDay(range.toMs) } : projectDomain;
+    return { start: startOfWeek(raw.start), end: startOfWeek(raw.end) + 6 * DAY };
+  }, [range, projectDomain]);
 
   // Gộp theo feature. Task có hạn phải GIAO với khoảng đang xem; task chưa hạn luôn
   // được giữ (không vẽ được bar nhưng vẫn tính vào tổng của feature).
@@ -194,20 +256,27 @@ export default function Timeline() {
     [rows, labels, projectStartMs],
   );
 
-  const span = Math.max(DAY, domain.end - domain.start);
-  const totalDays = Math.round(span / DAY);
-  const step = totalDays > 180 ? 30 : totalDays > 90 ? 14 : totalDays > 30 ? 7 : totalDays > 14 ? 2 : 1;
+  const span = Math.max(DAY, domain.end + DAY - domain.start);
 
-  const ticks = useMemo(() => {
+  /** Các Thứ 2 trong khung — mỗi mốc là một CỘT tuần của trục. */
+  const weeks = useMemo(() => {
     const out: number[] = [];
-    for (let t = domain.start; t <= domain.end; t += step * DAY) out.push(t);
+    for (let t = domain.start; t <= domain.end; t += 7 * DAY) out.push(t);
     return out;
-  }, [domain, step]);
+  }, [domain]);
+  // Khung dài (cả năm ~52 tuần) thì nhãn chen nhau — thưa nhãn ra, còn LƯỚI vẫn theo tuần.
+  const labelEvery = Math.max(1, Math.ceil(weeks.length / 16));
 
   const pct = (ms: number) => ((ms - domain.start) / span) * 100;
   const clampPct = (v: number) => Math.max(0, Math.min(100, v));
   const todayPct = pct(startOfDay(Date.now()));
-  const scale: TimelineScale = { pct, clampPct, todayPct, label };
+  // Kẻ dọc ranh giới tuần cho MỌI hàng (gradient lặp theo đúng bề rộng một tuần) — nhìn
+  // vào là thấy bar đè lên tuần nào, không phải dò ngược lên trục.
+  const weekPct = ((7 * DAY) / span) * 100;
+  const grid = {
+    backgroundImage: `repeating-linear-gradient(to right, rgba(148, 163, 184, 0.13) 0 1px, transparent 1px ${weekPct}%)`,
+  } as const;
+  const scale: TimelineScale = { pct, clampPct, todayPct, label, grid };
 
   if (!selectedProjectId) {
     return <div className="glass empty">Hãy chọn một dự án trước.</div>;
@@ -226,6 +295,16 @@ export default function Timeline() {
           <p>Theo version — xổ một bản ra để xem feature, xổ feature để xem task.</p>
         </div>
         <div className="row" style={{ gap: '0.5rem' }}>
+          {can('label.manage') && (
+            <button
+              className="btn-sm"
+              onClick={() => { setVersionFormOpen((o) => !o); setVError(null); }}
+              title="Tạo version mới — feature pick version từ danh sách này"
+              aria-expanded={versionFormOpen}
+            >
+              ＋ Version
+            </button>
+          )}
           {isAdmin && (
             <button
               className="btn-sm"
@@ -243,6 +322,34 @@ export default function Timeline() {
         </div>
       </div>
 
+      {versionFormOpen && can('label.manage') && (
+        <div className="glass tl-vform">
+          <label className="field">
+            <span>Tên version</span>
+            <input
+              className="input"
+              placeholder="vd: 1.2.x"
+              value={vName}
+              maxLength={40}
+              onChange={(e) => setVName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void createVersion(); } }}
+            />
+          </label>
+          <label className="field">
+            <span>Ngày phát hành (tuỳ chọn)</span>
+            <DateInput value={vDate} onChange={setVDate} ariaLabel="Ngày phát hành version mới" />
+          </label>
+          <button className="btn-sm" onClick={() => void createVersion()} disabled={vBusy || !vName.trim()}>
+            {vBusy ? 'Đang tạo…' : 'Tạo version'}
+          </button>
+          <p className="muted tl-vform-hint">
+            Version tạo ở đây; feature pick version trong màn sửa feature (ô "Version delivery").
+            Chưa chốt ngày thì bar suy từ hạn task, chốt rồi thì bar chạy theo lịch.
+          </p>
+          {vError && <p className="error-text tl-vform-hint">{vError}</p>}
+        </div>
+      )}
+
       {syncMsg && <div className="callout-inline" style={{ marginBottom: '1rem' }}>{syncMsg}</div>}
 
       {versionRows.length === 0 ? (
@@ -252,13 +359,20 @@ export default function Timeline() {
       ) : (
         <div className="glass tl-wrap">
           <div className="tl-scroll">
-            {/* Axis */}
+            {/* Axis — mỗi cột một TUẦN: số thứ tự tuần (trong khung) + ngày Thứ 2 của tuần.
+                Nhãn đặt ở GIỮA cột (t + 3.5 ngày) cho đúng nghĩa "cột tuần" — mốc đầu tuần
+                đã có đường kẻ lưới lo. */}
             <div className="tl-axis">
               <div className="tl-row-label tl-axis-label muted">Version · Feature · Task</div>
-              <div className="tl-track tl-axis-track">
-                {ticks.map((t) => (
-                  <span key={t} className="tl-tick" style={{ left: `${pct(t)}%` }}>{label(t)}</span>
-                ))}
+              <div className="tl-track tl-axis-track weeks" style={grid}>
+                {weeks.map((t, i) =>
+                  i % labelEvery !== 0 ? null : (
+                    <span key={t} className="tl-tick tl-week-tick" style={{ left: `${pct(t + 3.5 * DAY)}%` }}>
+                      <b>{i + 1}</b>
+                      <em>{label(t)}</em>
+                    </span>
+                  ),
+                )}
                 {todayPct >= 0 && todayPct <= 100 && (
                   <span className="tl-today" style={{ left: `${todayPct}%` }} title="Hôm nay" />
                 )}
@@ -298,6 +412,9 @@ export default function Timeline() {
                           </span>
                         ) : (
                           <>
+                            {/* Khoảng thời gian của bản: [phát hành bản trước → phát hành
+                                bản này] (hoặc suy từ hạn task khi chưa chốt ngày). */}
+                            {v.hasDates && `${label(v.start)}–${label(v.end)} · `}
                             {isAdmin && v.label ? (
                               <button
                                 type="button"
@@ -311,11 +428,21 @@ export default function Timeline() {
                               v.releaseMs !== null && `🚩 ${label(v.releaseMs)} · `
                             )}
                             {v.rows.length} feature · {v.done}/{v.total}
+                            {can('label.manage') && v.label && (
+                              <button
+                                type="button"
+                                className="tl-ver-del"
+                                title={`Xoá version ${v.label.name}`}
+                                onClick={(e) => { e.stopPropagation(); setConfirmDelVersion(v.label); }}
+                              >
+                                🗑
+                              </button>
+                            )}
                           </>
                         )}
                       </span>
                     </div>
-                    <div className="tl-track">
+                    <div className="tl-track" style={grid}>
                       {todayPct >= 0 && todayPct <= 100 && (
                         <span className="tl-today faint" style={{ left: `${todayPct}%` }} />
                       )}
@@ -366,6 +493,17 @@ export default function Timeline() {
 
       {editing && (
         <TaskModal task={editing} defaultSprintId={editing.sprintId} onClose={() => setEditing(null)} />
+      )}
+
+      {confirmDelVersion && (
+        <ConfirmDialog
+          title="Xoá version?"
+          message={<>Version <strong>"{confirmDelVersion.name}"</strong> sẽ bị xoá.</>}
+          detail="Feature đang gắn version này sẽ về nhóm “Chưa gắn version”, và nhãn cũng biến mất khỏi bộ lọc + ô chọn version của feature. Không khôi phục được."
+          confirmLabel="Xoá version"
+          onConfirm={() => void removeVersion(confirmDelVersion)}
+          onCancel={() => setConfirmDelVersion(null)}
+        />
       )}
     </div>
   );

@@ -383,7 +383,7 @@ interface DetailProps {
 function FeatureDetail({
   feature, labels, versions, people, tasks, loading, refetchTasks, onBack, onEdit, editingFeature, onCloseEdit,
 }: DetailProps) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, can } = useAuth();
   const { members, features, selectedSprint, selectedSprintId } = useSprintContext();
   const { notifyDone } = useNotify();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -494,7 +494,7 @@ function FeatureDetail({
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : (
         <>
-          {isAdmin && (
+          {can('task.create') && (
             <CreateTaskCard variant="row" onClick={() => setCreatingTask(true)} label="Tạo task cho feature" />
           )}
 

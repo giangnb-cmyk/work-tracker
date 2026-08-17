@@ -63,7 +63,8 @@ Created/merged on first Google sign-in.
 > sách qua `DEFAULT_MEMBER_PERMS` (`types.ts`) để nút hiện đúng thứ server cho phép; sửa một
 > bên mà quên bên kia là nút bấm bị RLS chặn, hoặc quyền có thật mà nút bị giấu.
 >
-> `task.delete` · `task.edit_any` · `feature.create` · `feature.edit` · `feature.delete`
+> `task.create` (tạo task — `tasks_insert`, 0081; seed sẵn vào mọi role hiện có)
+> · `task.delete` · `task.edit_any` · `feature.create` · `feature.edit` · `feature.delete`
 > · `sprint.manage` (kèm mở màn Quản lý Sprint trên web) · `bug.edit_any` · `bug.delete`
 > · `label.manage` (nhãn bug + nhãn feature) · `doc.manage` (tài liệu dự án, 0075)
 > · `project.members` (thêm/gỡ thành viên dự án).
@@ -511,7 +512,8 @@ Danh mục link tài liệu dùng chung của MỘT dự án — migration `0066
 | `created_at` / `created_by` | timestamptz / uuid \| null | → `profiles.id` (`on delete set null`) |
 
 - **RLS**: `select` mọi user đã đăng nhập (như `bug_labels`); **`insert` MỞ cho mọi user**
-  (gương `tasks_insert` — thư viện chỉ hữu ích khi ai tìm được tài liệu cũng bỏ vào được),
+  (thư viện chỉ hữu ích khi ai tìm được tài liệu cũng bỏ vào được — `tasks_insert` trước
+  đây cũng mở vậy, từ 0081 thì theo quyền `task.create`),
   nhưng `with check (created_by = auth.uid())` nên không mạo danh người khác;
   `update`/`delete` = `is_admin()` HOẶC chính người đã thêm (như bug do mình báo).
   Realtime + `replica identity full`.

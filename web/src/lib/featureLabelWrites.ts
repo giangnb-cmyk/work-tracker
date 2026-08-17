@@ -9,6 +9,8 @@ export interface FeatureLabelInput {
   name: string;
   color: string;
   icon: string;
+  /** Mốc phát hành 'YYYY-MM-DD' — chỉ có nghĩa với nhãn VERSION (tạo từ Timeline). */
+  releaseDate?: string | null;
 }
 
 export async function createFeatureLabel(input: FeatureLabelInput, createdBy: string): Promise<string> {
@@ -20,6 +22,8 @@ export async function createFeatureLabel(input: FeatureLabelInput, createdBy: st
       color: input.color || '#6366f1',
       icon: input.icon || '',
       created_by: createdBy || null,
+      // Cột `date` — chỉ gửi phần ngày, nhét cả giờ vào là lệch múi giờ (xem updateFeatureLabel).
+      release_date: input.releaseDate ? input.releaseDate.slice(0, 10) : null,
     })
     .select('id')
     .single();

@@ -242,8 +242,9 @@ Luật viết hộp xác nhận:
 - **The bot uses the `service_role` key** — it **bypasses RLS**, so enforce every
   permission check in bot code. Keep it out of git (`.gitignore` → `bot/.env`) and off Vercel.
   Every skill that WRITES must gate on `skills/permissions.py` first: creating a task is open
-  to all (mirrors `tasks_insert`), **everything else is admin-only** — deliberately stricter
-  than RLS, which also lets a task's reporter/assignee edit it. Identity comes from
+  to all (web-side `tasks_insert` now requires the `task.create` perm — 0081 seeds it into
+  every role, so bot staying open matches practice), **everything else is admin-only** —
+  deliberately stricter than RLS, which also lets a task's reporter/assignee edit it. Identity comes from
   `BOT_SENDER_ID` (the real Discord author id, set by `bot.py`) matched **exactly** against
   `profiles.discord_id` — never from message text, and never fuzzy-matched on display name.
   An admin with no `discord_id` linked cannot use admin skills: that is fail-closed, by design.

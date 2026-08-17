@@ -3,7 +3,7 @@ import { useSprintContext } from '../contexts/SprintContext';
 import { useAuditLog } from '../hooks/useAuditLog';
 import { timeAgo } from '../lib/format';
 import Avatar from './Avatar';
-import { AUDIT_ACTION_META, MEMBER_PERMS, type AuditEntry } from '../types';
+import { AUDIT_ACTION_META, MEMBER_PERMS, type AuditEntry, type Project } from '../types';
 
 const PERM_LABEL: Record<string, string> = Object.fromEntries(MEMBER_PERMS.map((p) => [p.id, p.label]));
 const ROLE_LABEL: Record<string, string> = { admin: 'Admin', member: 'Thành viên' };
@@ -31,14 +31,14 @@ function permChanges(meta: Record<string, unknown>): { text: string; kind: 'add'
 }
 
 /** Gộp các trường tìm kiếm được của một dòng thành chuỗi thường để so khớp. */
-function haystack(e: AuditEntry): string {
+function haystack(e: AuditEntry, projectName: string): string {
   const memberName = typeof e.meta.member_name === 'string' ? e.meta.member_name : '';
-  return `${e.summary} ${e.actorName} ${memberName}`.toLowerCase();
+  return `${e.summary} ${e.actorName} ${memberName} ${projectName}`.toLowerCase();
 }
 
 /** Nhật ký hệ thống — ai xoá task, tạo feature, đổi quyền member (chỉ admin; chặn ở Sidebar + Layout). */
 export default function SystemLog() {
-  const { members } = useSprintContext();
+  const { members, projects } = useSprintContext();
   const { entries, loading } = useAuditLog();
   const [filter, setFilter] = useState<string | 'all'>('all');
   const [query, setQuery] = useState('');
@@ -50,12 +50,20 @@ export default function SystemLog() {
     return m;
   }, [members]);
 
+  // Dòng log thuộc dự án nào — task/feature là dữ liệu TRONG dự án, không nói tên thì
+  // "Xoá task: Map 1" không biết đường nào mà lần. member.perms không có project (hồ sơ
+  // là toàn cục) nên chip tự ẩn.
+  const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return entries.filter(
-      (e) => (filter === 'all' || e.action === filter) && (!q || haystack(e).includes(q)),
-    );
-  }, [entries, filter, query]);
+    return entries.filter((e) => {
+      if (filter !== 'all' && e.action !== filter) return false;
+      if (!q) return true;
+      const p = e.projectId ? projectById.get(e.projectId) : undefined;
+      return haystack(e, p?.name ?? '').includes(q);
+    });
+  }, [entries, filter, query, projectById]);
 
   if (loading) {
     return <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>;
@@ -104,7 +112,12 @@ export default function SystemLog() {
       ) : (
         <div className="log-list glass">
           {shown.map((e) => (
-            <LogRow key={e.id} entry={e} photo={e.actorId ? photoById.get(e.actorId) : undefined} />
+            <LogRow
+              key={e.id}
+              entry={e}
+              photo={e.actorId ? photoById.get(e.actorId) : undefined}
+              project={e.projectId ? projectById.get(e.projectId) : undefined}
+            />
           ))}
         </div>
       )}
@@ -112,7 +125,7 @@ export default function SystemLog() {
   );
 }
 
-function LogRow({ entry, photo }: { entry: AuditEntry; photo?: string }) {
+function LogRow({ entry, photo, project }: { entry: AuditEntry; photo?: string; project?: Project }) {
   const meta = AUDIT_ACTION_META[entry.action] ?? { label: entry.action, icon: '•', tone: 'warn' as const };
   const changes = entry.action === 'member.perms' ? permChanges(entry.meta) : [];
 
@@ -137,6 +150,16 @@ function LogRow({ entry, photo }: { entry: AuditEntry; photo?: string }) {
           </span>
           <span aria-hidden>·</span>
           <span>{timeAgo(entry.createdAt)}</span>
+          {/* Dòng có project_id nhưng dự án đã bị xoá → không tra được tên: đành ẩn,
+              còn hơn hiện một uuid vô nghĩa. */}
+          {project && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="log-project" title={`Dự án: ${project.name}`}>
+                {project.icon} {project.name}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>

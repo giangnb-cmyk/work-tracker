@@ -27,7 +27,7 @@ import {
   type FeatureKind,
 } from '../types';
 
-/** Màu gán tự động cho nhãn mới, xoay vòng theo số nhãn hiện có; version luôn xám. */
+/** Màu gán tự động cho nhãn nhóm mới, xoay vòng theo số nhãn hiện có. */
 const LABEL_COLORS = ['#6366f1', '#38bdf8', '#fbbf24', '#22c55e', '#f472b6', '#a78bfa', '#fb923c', '#10b981'];
 
 interface FeatureModalProps {
@@ -112,11 +112,15 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
       setError('Nhãn này đã có — bấm vào chip để gắn.');
       return;
     }
+    // Version tạo Ở TIMELINE (nút "＋ Version"), feature chỉ PICK: version là mốc lộ trình
+    // chung, tạo rải rác từ từng feature là mỗi người đẻ một bản trùng nhau lệch tên.
+    if (labelGroup(nm) === 'version') {
+      setError('Version giờ tạo ở tab Timeline (nút "＋ Version") — ở đây chỉ chọn version có sẵn.');
+      return;
+    }
     setError(null);
     try {
-      const color = labelGroup(nm) === 'version'
-        ? '#94a3b8'
-        : LABEL_COLORS[labels.length % LABEL_COLORS.length];
+      const color = LABEL_COLORS[labels.length % LABEL_COLORS.length];
       const id = await createFeatureLabel({ projectId, name: nm, color, icon: '' }, user?.uid ?? '');
       setLabelIds((ids) => [...ids, id]);
       setNewLabel('');
@@ -349,7 +353,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
               selectedIds={labelIds}
               onToggle={toggleLabel}
               placeholder="Chọn version…"
-              emptyHint="Chưa có version nào — thêm ở ô bên dưới (vd: 1.2.x)."
+              emptyHint="Chưa có version nào — tạo ở tab Timeline (nút ＋ Version)."
               disabled={saving}
             />
           </div>
@@ -359,7 +363,7 @@ export default function FeatureModal({ feature, projectId, onClose, onCreated }:
           <div className="feat-label-new">
             <input
               className="input"
-              placeholder="Thêm nhãn mới… (vd: Shop, 1.2.x)"
+              placeholder="Thêm nhãn nhóm mới… (vd: Shop — version tạo ở Timeline)"
               value={newLabel}
               maxLength={40}
               onChange={(e) => setNewLabel(e.target.value)}

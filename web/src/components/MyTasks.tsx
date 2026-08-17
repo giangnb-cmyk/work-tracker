@@ -26,7 +26,7 @@ const MODE_KEY = 'myTasksView';
 
 /** Task + bug của người đang đăng nhập — xem dạng danh sách hoặc dạng thẻ (gallery). */
 export default function MyTasks() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const { sprints, members, selectedSprintId, selectedProjectId, selectedProject } = useSprintContext();
   const { notifyDone } = useNotify();
   const { tasks, loading } = useMyTasks(user?.uid ?? '');
@@ -122,7 +122,7 @@ export default function MyTasks() {
 
       {mode === 'gallery' ? (
         <div className="task-list">
-          <CreateTaskCard onClick={() => setCreating(true)} label="Tạo task cho tôi" />
+          {can('task.create') && <CreateTaskCard onClick={() => setCreating(true)} label="Tạo task cho tôi" />}
           {ordered.map((t) => (
             <TaskRow
               key={t.id}
@@ -136,7 +136,9 @@ export default function MyTasks() {
         </div>
       ) : (
         <>
-          <CreateTaskCard variant="row" onClick={() => setCreating(true)} label="Tạo task cho tôi" />
+          {can('task.create') && (
+            <CreateTaskCard variant="row" onClick={() => setCreating(true)} label="Tạo task cho tôi" />
+          )}
           <div className="trow-list">
             {ordered.map((t) => (
               <TaskListRow

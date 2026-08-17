@@ -1165,6 +1165,22 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
   position: absolute; transform: translateX(-50%); top: 0;
   font-size: 0.66rem; color: var(--muted); font-family: var(--font-mono); white-space: nowrap;
 }
+/* Trục tuần: mỗi cột một tuần — số thứ tự tuần đậm, ngày Thứ 2 mờ bên dưới. */
+.tl-axis-track.weeks { height: 34px; }
+.tl-week-tick { text-align: center; line-height: 1.25; }
+.tl-week-tick b { display: block; font-size: 0.72rem; font-weight: 700; color: var(--text-secondary, #94a3b8); }
+.tl-week-tick em { display: block; font-style: normal; }
+
+/* Form tạo version tại Timeline. */
+.tl-vform { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; padding: 0.85rem 1rem; margin-bottom: 1rem; }
+.tl-vform .field { margin: 0; min-width: 180px; }
+.tl-vform-hint { flex-basis: 100%; font-size: 0.78rem; margin: 0; }
+
+/* Xoá version — chỉ hiện rõ khi rê vào hàng, đỡ thành rừng thùng rác. */
+.tl-ver-del { background: none; border: 0; cursor: pointer; padding: 0 0.15rem; margin-left: 0.3rem; opacity: 0; transition: opacity 0.15s ease; font-size: 0.8rem; }
+.tl-row:hover .tl-ver-del { opacity: 0.75; }
+.tl-ver-del:hover { opacity: 1; }
+
 .tl-today { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--red); border-radius: 2px; }
 .tl-today.faint { opacity: 0.25; top: 0; bottom: 0; }
 .tl-row { cursor: pointer; border-radius: 8px; }
@@ -2977,8 +2993,9 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .log-diff-item.diff-rm   { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
 .log-diff-item.diff-role { background: rgba(99, 102, 241, 0.16); color: #c7d2fe; }
 
-.log-meta { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.4rem; font-size: 0.75rem; }
+.log-meta { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.4rem; font-size: 0.75rem; flex-wrap: wrap; }
 .log-actor { display: inline-flex; align-items: center; gap: 0.4rem; }
+.log-project { white-space: nowrap; }
 
 /* ============================================================================
    Khu quản trị NGOÀI dự án (GlobalAdmin): sidebar trái CỐ ĐỊNH (luôn mở) + nội dung.

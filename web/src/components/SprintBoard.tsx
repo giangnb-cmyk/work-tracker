@@ -30,7 +30,7 @@ const GROUP_MODES: readonly GroupMode[] = ['dept', 'feature'];
 const GROUP_MODE_KEY = 'sprintBoardGroup';
 
 export default function SprintBoard() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, can } = useAuth();
   const { selectedSprintId, selectedSprint, selectedProjectId, members, sprints, features } =
     useSprintContext();
   const { notifyDone } = useNotify();
@@ -152,7 +152,8 @@ export default function SprintBoard() {
             />
           ) : (
           <>
-          {isAdmin && <CreateTaskCard variant="row" onClick={() => setCreating(true)} />}
+          {/* Tạo task theo quyền 'task.create' (0081) — không còn khoá cứng admin. */}
+          {can('task.create') && <CreateTaskCard variant="row" onClick={() => setCreating(true)} />}
 
           {groups.map((g) => (
             <section key={g.key} className="dept-group">

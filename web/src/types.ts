@@ -25,6 +25,7 @@ export type TaskSource = 'web' | 'discord';
  * + policy tương ứng, KHÔNG cần đổi schema.
  */
 export type MemberPerm =
+  | 'task.create'
   | 'task.delete'
   | 'task.edit_any'
   | 'feature.create'
@@ -49,6 +50,7 @@ export const DEFAULT_MEMBER_PERMS: MemberPerm[] = [
 ];
 
 export const MEMBER_PERMS: { id: MemberPerm; label: string; hint: string }[] = [
+  { id: 'task.create', label: 'Tạo task', hint: 'Tạo task mới (Bảng Sprint, Backlog, Task của tôi, trong feature)' },
   { id: 'task.delete', label: 'Xoá task', hint: 'Xoá được task bất kỳ (mặc định chỉ admin và người tạo task)' },
   { id: 'task.edit_any', label: 'Sửa mọi task', hint: 'Sửa task bất kỳ, không chỉ task mình tạo / được giao' },
   { id: 'feature.create', label: 'Tạo feature', hint: 'Tạo feature mới' },

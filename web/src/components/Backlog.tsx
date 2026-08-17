@@ -24,7 +24,7 @@ const MODE_KEY = 'backlogView';
  * by opening the task. Xem dạng danh sách hoặc thẻ (gallery).
  */
 export default function Backlog() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, can } = useAuth();
   const { members, selectedProjectId, selectedProject } = useSprintContext();
   const { notifyDone } = useNotify();
   const { tasks, loading } = useProjectTasks(selectedProjectId);
@@ -79,7 +79,7 @@ export default function Backlog() {
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : mode === 'gallery' ? (
         <div className="task-list">
-          {isAdmin && <CreateTaskCard onClick={() => setCreating(true)} label="Thêm vào backlog" />}
+          {can('task.create') && <CreateTaskCard onClick={() => setCreating(true)} label="Thêm vào backlog" />}
           {backlog.map((t) => (
             <TaskRow
               key={t.id}
@@ -90,11 +90,11 @@ export default function Backlog() {
               onQuickStatus={quickStatus}
             />
           ))}
-          {backlog.length === 0 && !isAdmin && <div className="glass empty">Backlog trống.</div>}
+          {backlog.length === 0 && !can('task.create') && <div className="glass empty">Backlog trống.</div>}
         </div>
       ) : (
         <>
-          {isAdmin && (
+          {can('task.create') && (
             <CreateTaskCard variant="row" onClick={() => setCreating(true)} label="Thêm vào backlog" />
           )}
           <div className="trow-list">

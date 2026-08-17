@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSprintContext } from '../../contexts/SprintContext';
 import { useProjectMembers } from '../../hooks/useProjectMembers';
+import { useSprints } from '../../hooks/useSprints';
 import { useSprintNotes } from '../../hooks/useMemberSprintNotes';
 import Avatar from '../Avatar';
 import MemberNoteModal from './MemberNoteModal';
@@ -10,16 +11,29 @@ import { NOTE_RATINGS, type TeamMember } from '../../types';
 /**
  * Chọn sprint → DANH SÁCH thành viên CỦA DỰ ÁN đang chọn; bấm một người → popup ghi NHẬT KÝ
  * (form luôn trống — mỗi lần lưu một dòng log, 0062; dòng preview hiện entry MỚI NHẤT).
- * Members/sprints lấy từ SprintContext (có sẵn ở GlobalAdmin, như CostAdmin) — KHÔNG mở lại
- * channel `profiles`/`sprints`. Lọc theo `project_members` qua useProjectMembers.
+ *
+ * Sprint PHẢI lấy theo `projectId` của picker khu quản trị (useSprints), KHÔNG lấy từ
+ * SprintContext: context theo dự án đang mở của APP — vào thẳng khu quản trị (chưa mở dự
+ * án nào) là danh sách sprint trống dù picker đã chỉ rõ dự án. Members vẫn từ context
+ * (profiles là toàn cục), lọc theo `project_members` qua useProjectMembers.
  */
 export default function SprintNotesPanel({ projectId }: { projectId: string | null }) {
   const { profile, isAdmin } = useAuth();
-  const { sprints, activeSprint, members } = useSprintContext();
-  const [sprintId, setSprintId] = useState(activeSprint?.id ?? sprints[0]?.id ?? '');
+  const { members } = useSprintContext();
+  const { sprints, activeSprint } = useSprints(profile?.uid ?? '', projectId);
+  const [sprintId, setSprintId] = useState('');
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const { memberships } = useProjectMembers(projectId);
   const { byMember } = useSprintNotes(sprintId || null, isAdmin);
+
+  // Sprint tải async theo dự án: đổi dự án là useLiveQuery reset sprints về [] rồi nạp
+  // list mới → effect này tự nhảy về sprint đang chạy (không có thì sprint mới nhất),
+  // còn lựa chọn cũ vẫn hợp lệ thì giữ nguyên.
+  useEffect(() => {
+    setSprintId((cur) =>
+      cur && sprints.some((s) => s.id === cur) ? cur : activeSprint?.id ?? sprints[0]?.id ?? '',
+    );
+  }, [sprints, activeSprint]);
 
   const projectMembers = useMemo(() => {
     const ids = new Set(memberships.map((m) => m.userId));
