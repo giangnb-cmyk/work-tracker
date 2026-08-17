@@ -357,6 +357,12 @@ export interface Project {
   icon: string; // emoji shown on the card
   color: string; // accent token/hex for the card
   description: string;
+  /**
+   * false = dự án TẠM DỪNG (migration `0076`): mọi việc chạy nền bỏ qua nó — nhắc task
+   * hằng ngày, báo cáo 10:30, weekly report, DM tuần, đồng bộ bug forum. Vẫn vào xem/sửa
+   * bình thường; đây là cờ tắt TỰ ĐỘNG, không phải khoá quyền truy cập.
+   */
+  isActive: boolean;
   /** Notion Projects DB page id — lets task syncs set the Notion "Project" relation. */
   notionProjectId: string | null;
   /**

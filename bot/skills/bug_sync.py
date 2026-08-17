@@ -163,13 +163,17 @@ def _forums_from_db() -> list[dict]:
     sb = get_client()
     rows = (
         sb.table(PROJECTS)
-        .select("id,bug_forum_channel_id,bug_notify_role")
+        .select("id,bug_forum_channel_id,bug_notify_role,is_active")
         .not_.is_("bug_forum_channel_id", "null")
         .execute()
         .data
     ) or []
     out = []
     for r in rows:
+        # Du an TAM DUNG (0076) khong dong bo bug — ke ca khi bam nut Sync tren web, vi
+        # nut do cung chi xep hang doi cho chinh vong nay rut.
+        if r.get("is_active") is False:
+            continue
         fid = str(r.get("bug_forum_channel_id") or "").strip()
         if not fid.isdigit():
             if fid:

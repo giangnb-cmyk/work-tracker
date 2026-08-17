@@ -26,6 +26,7 @@ except Exception:
 import discord
 from dotenv import load_dotenv
 
+import project_repo as prepo
 import task_repo as repo
 import web_link
 
@@ -59,6 +60,12 @@ def _mention_or_name(client, task, user_cache: dict) -> str:
 def build_reminder_message(client, now: datetime) -> str:
     """Ghep noi dung nhac (gom theo nguoi). Chuoi rong neu khong co gi de nhac."""
     overdue, due_today = repo.overdue_and_due_today(client, now)
+    # Du an TAM DUNG (0076) khong bi nhac: khong loc thi moi sang ca doi van bi doc ten mot
+    # dong task cua du an chang ai con lam.
+    inactive = prepo.inactive_project_ids(client)
+    if inactive:
+        overdue = [t for t in overdue if prepo.active_task(t, inactive)]
+        due_today = [t for t in due_today if prepo.active_task(t, inactive)]
     if not overdue and not due_today:
         return ""
 

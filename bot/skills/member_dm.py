@@ -35,6 +35,7 @@ import discord
 from dotenv import load_dotenv
 
 import permissions
+import project_repo as prepo
 import task_repo as repo
 import web_link
 from constants import STATUS_DONE
@@ -132,9 +133,12 @@ def build_message(name: str, done: int, pending_tasks: list, overdue: int,
 def _stats_by_member(client, now: datetime) -> dict:
     """{assigneeId -> {'done': n, 'pending': [task...], 'overdue': n}}."""
     since = week_start(now).isoformat()
+    # Du an TAM DUNG (0076) khong tinh vao diem tuan: DM "con 12 task ton dong" ma 9 cai
+    # thuoc du an da dong bang thi con sai hon la khong gui gi.
+    inactive = prepo.inactive_project_ids(client)
     done_tasks = [
         t for t in repo.tasks_by_ids(client, repo.done_task_ids_since(client, since))
-        if t.get("status") == STATUS_DONE and t.get("assigneeId")
+        if t.get("status") == STATUS_DONE and t.get("assigneeId") and prepo.active_task(t, inactive)
     ]
     stats: dict = {}
 
@@ -144,6 +148,8 @@ def _stats_by_member(client, now: datetime) -> dict:
     for t in done_tasks:
         _entry(t["assigneeId"])["done"] += 1
     for t in repo.open_assigned_tasks(client):
+        if not prepo.active_task(t, inactive):
+            continue
         entry = _entry(t["assigneeId"])
         entry["pending"].append(t)
         due = t.get("dueDate")

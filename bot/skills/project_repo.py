@@ -4,6 +4,7 @@ Giong task_repo.py: tra ve dict camelCase (+ '_id'), moi ham 1 viec, chay standa
 Ghi bang service_role (BO QUA RLS) -> quyen phai check o permissions.py truoc khi goi.
 """
 
+import logging
 import sys
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from supabase_client import get_client  # noqa: E402
 
 from constants import _fold  # noqa: E402
 from errors import ResolveError  # noqa: E402
+
+log = logging.getLogger("project_repo")
 
 PROJECTS = "projects"
 FEATURES = "features"
@@ -36,6 +39,9 @@ def _map_project(r: dict) -> dict:
         "icon": r.get("icon", "📁"),
         "color": r.get("color", "#6366f1"),
         "description": r.get("description", ""),
+        # False = du an TAM DUNG (migration 0076): moi viec chay nen bo qua no. Thieu cot
+        # (chua ap migration) -> True, giu hanh vi cu.
+        "isActive": r.get("is_active", True) is not False,
         "notionProjectId": r.get("notion_project_id"),
         # False = du an nay KHONG tao trang Notion khi tao task (migration 0070). Thieu cot
         # (chua ap migration) -> True, giu hanh vi cu.
@@ -130,6 +136,30 @@ def list_projects(client) -> list:
     """Moi project, sap theo ten."""
     rows = client.table(PROJECTS).select("*").order("name").execute().data
     return [_map_project(r) for r in rows or []]
+
+
+def inactive_project_ids(client) -> set:
+    """Id cac du an TAM DUNG (migration 0076).
+
+    Dung cho MOI viec chay nen (nhac task, weekly report, DM tuan, sync bug forum): loc o
+    tang JOB chu khong loc trong task_repo, vi lenh nguoi dung go tay (`@bot list task`)
+    van phai thay du an dang dung — tat tu dong khac han voi giau du lieu.
+
+    Doc hong -> tra ve rong (coi nhu khong du an nao dung): thieu du lieu thi cu chay nhu
+    cu, khong tu dung im lang ca he thong.
+    """
+    try:
+        rows = client.table(PROJECTS).select("id, is_active").execute().data or []
+    except Exception as e:
+        log.warning("Không đọc được trạng thái dự án: %s", e)
+        return set()
+    return {str(r["id"]) for r in rows if r.get("is_active") is False}
+
+
+def active_task(task, inactive_ids: set) -> bool:
+    """Task co thuoc du an DANG CHAY khong (task khong gan du an -> tinh la co)."""
+    pid = task.get("projectId")
+    return not pid or str(pid) not in inactive_ids
 
 
 def resolve_project(client, token: str):

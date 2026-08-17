@@ -352,8 +352,12 @@ Deno.serve(async (req: Request) => {
     // ---- FULL MODE: cron, mọi project có webhook ----
     const [sprintMap, projectsRaw, profilesRaw] = await Promise.all([
       activeSprintByProject(),
+      // is_active=is.true: dự án TẠM DỪNG (0076) không nhận báo cáo 10:30. Lọc ngay ở
+      // PostgREST chứ không lọc sau — đỡ kéo về rồi bỏ đi.
+      // CHỈ ở nhánh CRON. Chế độ TEST bên trên vẫn gửi được cho dự án đang dừng: đó là
+      // admin CHỦ ĐỘNG bấm "Gửi thử", nút bấm mà im ru mới là khó hiểu.
       pg<{ id: string; name: string; daily_report_webhook: string | null }>(
-        'projects?select=id,name,daily_report_webhook',
+        'projects?is_active=is.true&select=id,name,daily_report_webhook',
       ),
       pg<Profile>('profiles?select=id,display_name,discord_id'),
     ]);

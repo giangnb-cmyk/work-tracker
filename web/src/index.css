@@ -490,6 +490,24 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .st-row.done .st-box svg { stroke-dashoffset: 0; }
 .st-title { flex: 1; min-width: 0; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.18s ease, opacity 0.18s ease; }
 .st-row.done .st-title { color: var(--muted); text-decoration: line-through; opacity: 0.75; }
+/* ===== Dự án TẠM DỪNG (0076) — khu riêng ở màn chọn dự án =====
+   Thẻ xám đi + nhãn ⏸, KHÔNG mờ tới mức khó đọc: dự án dừng vẫn phải tra cứu được.
+   Dự án đang chạy giữ nguyên UI cũ, không đụng một dòng nào. */
+.project-group-head {
+  display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
+  margin: 2rem 0 0.9rem; padding-top: 1.2rem; border-top: 1px solid var(--border-soft);
+  font-weight: 600; color: var(--muted);
+}
+.project-group-note { font-size: 0.8rem; font-weight: 400; }
+.project-card-wrap.paused .project-card { filter: saturate(0.35); opacity: 0.82; }
+.project-card-wrap.paused .project-card:hover { filter: saturate(0.6); opacity: 1; }
+.project-card-wrap.paused .project-icon { filter: grayscale(1); }
+.project-paused-tag {
+  margin-left: 0.5rem; padding: 0.05rem 0.4rem; border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18); border: 1px solid var(--border-soft);
+  color: var(--muted); font-size: 0.68rem; font-weight: 600; white-space: nowrap;
+}
+
 /* ===== Timeline: mốc mong muốn (0071) + sửa mốc phát hành tại chỗ ===== */
 /* Cờ 🎯 trên hàng feature: một vạch dọc mảnh + đầu nhọn, đủ thấy mà không đè lên bar. */
 .tl-target {

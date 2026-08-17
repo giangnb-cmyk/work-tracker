@@ -175,6 +175,7 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `icon`            | string         | emoji shown on the project card                           |
 | `color`           | string         | accent token/hex for the card                             |
 | `description`     | string         | optional short description                                |
+| `isActive`        | boolean        | **`false` = dự án TẠM DỪNG** (migration `0076`) — mọi việc chạy nền bỏ qua nó (xem dưới). Vẫn xem/sửa bình thường trong app: đây là cờ tắt TỰ ĐỘNG, không phải khoá truy cập (khoá truy cập là `project_members`). Mặc định `true` |
 | `notionProjectId` | string \| null | Notion Projects-DB page id; drives the Notion relation    |
 | `notionSyncEnabled` | boolean      | `false` = tạo task trong dự án này **không** đẻ trang Notion, và nút "Tạo task trên Notion" ở task chi tiết cũng ẩn (migration `0070`). Áp dụng cho CẢ web (`createTask`) lẫn bot (`task_ops._sync_create`). Mặc định `true`. Độc lập với `notionProjectId`: tắt sync vẫn giữ liên kết để bật lại |
 | `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
@@ -184,6 +185,25 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `bugNotifyRole`   | string \| null | Tên hoặc id role Discord được ping khi bug báo từ web thành bài forum mới (migration `0069`). Rỗng = không ping |
 | `createdAt`       | Timestamp      | creation time                                             |
 | `createdBy`       | string         | uid of creator                                            |
+
+### Dự án TẠM DỪNG (`isActive = false`, migration `0076`)
+
+Đóng băng một dự án mà không xoá dữ liệu. Cờ này chỉ chặn **việc chạy tự động**; người dùng
+vẫn vào xem/sửa được, và màn chọn dự án đẩy nó xuống khu "⏸ Tạm dừng" (thẻ xám + nhãn).
+
+Ai phải tôn trọng cờ này — **lọc ở tầng JOB, không lọc trong `task_repo`**, vì lệnh gõ tay
+(`@bot list task`) vẫn phải thấy dự án đang dừng: tắt tự động khác hẳn giấu dữ liệu.
+
+| Việc chạy nền | Chỗ lọc |
+|---|---|
+| Nhắc task hằng ngày (trễ hạn / đến hạn) | `reminder.build_reminder_message` → `prepo.inactive_project_ids` |
+| DM điểm tuần cho member | `member_dm._stats_by_member` (cả task đã xong lẫn tồn đọng) |
+| Weekly report ghi Google Sheet | `weekly_report.run_all` — bỏ qua khi `isActive = false`; gõ tay `--project` vẫn chạy |
+| Đồng bộ bug ↔ forum Discord | `bug_sync._forums_from_db` — loại luôn khỏi danh sách, nên nút "Sync Discord" trên web cũng không có gì để rút |
+| Báo cáo task 10:30 | Edge Function `daily-report`, nhánh CRON: `projects?is_active=is.true`. Nhánh TEST ("Gửi thử") **vẫn gửi** — đó là admin chủ động bấm |
+
+> KHÔNG chặn thông báo do NGƯỜI kích hoạt (tạo task → báo Discord, tick xong task…): dự án
+> dừng thì đâu còn ai tạo task, mà chặn thì thành "bấm nút không thấy gì xảy ra".
 
 ### Thông báo Discord: MỘT KÊNH MỖI DỰ ÁN (`dailyReportWebhook`)
 

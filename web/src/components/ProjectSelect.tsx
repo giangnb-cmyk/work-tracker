@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { navigate } from '../lib/router';
@@ -18,6 +18,40 @@ export default function ProjectSelect() {
   const { projects, projectsLoading, selectProject } = useSprintContext();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
+
+  // Đang chạy lên trước, tạm dừng (0076) dồn xuống một khu riêng bên dưới — thứ tự trong
+  // mỗi nhóm giữ nguyên như hook trả về, không sắp lại.
+  const { active, paused } = useMemo(() => ({
+    active: projects.filter((p) => p.isActive),
+    paused: projects.filter((p) => !p.isActive),
+  }), [projects]);
+
+  /** Một thẻ dự án + nút bánh răng. Dùng chung cho cả hai nhóm để không lệch nhau một nhịp. */
+  const card = (p: Project) => (
+    <div key={p.id} className={`project-card-wrap${p.isActive ? '' : ' paused'}`}>
+      <button className="project-card glass" onClick={() => selectProject(p.id)}>
+        <span className="project-icon" style={{ background: `${p.color}22` }}>{p.icon}</span>
+        <span className="project-name">
+          {p.name}
+          {!p.isActive && <span className="project-paused-tag">⏸ Tạm dừng</span>}
+        </span>
+        <span className="project-meta">
+          {p.notionProjectId ? '🔗 Notion · ' : ''}{formatDate(p.createdAt)}
+        </span>
+      </button>
+      {/* Chỉ OWNER được sửa dự án (webhook, Notion, sheet…) — không mở cho admin thường. */}
+      {isOwner && (
+        <button
+          className="project-edit-btn"
+          title="Sửa dự án (webhook báo cáo, Notion, sheet…)"
+          aria-label={`Sửa dự án ${p.name}`}
+          onClick={(e) => { e.stopPropagation(); setEditing(p); }}
+        >
+          ⚙
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="project-select">
@@ -74,42 +108,38 @@ export default function ProjectSelect() {
         {projectsLoading ? (
           <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
         ) : (
-          <div className="project-grid">
-            {isAdmin && (
-              <button className="project-card project-card-new" onClick={() => setCreating(true)}>
-                <span className="project-new-plus">＋</span>
-                <span>Tạo dự án mới</span>
-              </button>
-            )}
-            {projects.map((p) => (
-              <div key={p.id} className="project-card-wrap">
-                <button className="project-card glass" onClick={() => selectProject(p.id)}>
-                  <span className="project-icon" style={{ background: `${p.color}22` }}>{p.icon}</span>
-                  <span className="project-name">{p.name}</span>
-                  <span className="project-meta">
-                    {p.notionProjectId ? '🔗 Notion · ' : ''}{formatDate(p.createdAt)}
-                  </span>
+          <>
+            <div className="project-grid">
+              {isAdmin && (
+                <button className="project-card project-card-new" onClick={() => setCreating(true)}>
+                  <span className="project-new-plus">＋</span>
+                  <span>Tạo dự án mới</span>
                 </button>
-                {/* Chỉ OWNER được sửa dự án (webhook, Notion, sheet…) — không mở cho admin thường. */}
-                {isOwner && (
-                  <button
-                    className="project-edit-btn"
-                    title="Sửa dự án (webhook báo cáo, Notion, sheet…)"
-                    aria-label={`Sửa dự án ${p.name}`}
-                    onClick={(e) => { e.stopPropagation(); setEditing(p); }}
-                  >
-                    ⚙
-                  </button>
-                )}
-              </div>
-            ))}
-            {projects.length === 0 && !isAdmin && (
-              // 0073: member chỉ thấy dự án mình có tên trong Thành viên dự án.
-              <div className="glass empty">
-                Bạn chưa được thêm vào dự án nào. Nhờ admin thêm bạn vào dự án nhé.
-              </div>
+              )}
+              {active.map(card)}
+              {projects.length === 0 && !isAdmin && (
+                // 0073: member chỉ thấy dự án mình có tên trong Thành viên dự án.
+                <div className="glass empty">
+                  Bạn chưa được thêm vào dự án nào. Nhờ admin thêm bạn vào dự án nhé.
+                </div>
+              )}
+            </div>
+
+            {/* Khu tạm dừng (0076) — chỉ hiện khi có, để đội nào không dùng thì màn hình y
+                như cũ. Vẫn bấm vào được: dừng chạy nền chứ không khoá cửa. */}
+            {paused.length > 0 && (
+              <>
+                <div className="project-group-head">
+                  <span>⏸ Tạm dừng</span>
+                  <span className="muted mono">{paused.length}</span>
+                  <span className="muted project-group-note">
+                    Không nhắc task, không báo cáo, không sync — dữ liệu vẫn còn nguyên.
+                  </span>
+                </div>
+                <div className="project-grid">{paused.map(card)}</div>
+              </>
             )}
-          </div>
+          </>
         )}
       </div>
 

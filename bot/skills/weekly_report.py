@@ -330,6 +330,10 @@ def run_all(tab: str = TAB, force: bool = False) -> list[str]:
     for project in prepo.list_projects(client):
         if not (project.get("weeklySheetId") or "").strip():
             continue
+        # Du an TAM DUNG (0076): bo qua im lang. Day la lan chay TU DONG sang thu 2; go tay
+        # `--project <ten>` thi van chay duoc, vi do la nguoi chu dong yeu cau.
+        if not project.get("isActive", True):
+            continue
         try:
             out += run(project["_id"], tab, dry_run=False, force=force)
         except (sg.SheetsError, ResolveError) as e:

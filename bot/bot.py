@@ -767,7 +767,9 @@ async def _process_sync_request(sb, req) -> tuple[str, str]:
     status, result = "done", ""
     try:
         if not cfg:
-            raise RuntimeError("chưa cấu hình forum cho project này")
+            # Hai lý do cùng dẫn tới đây, nói cả hai ra: thiếu forum, hoặc dự án đã tạm
+            # dừng (0076 — _forums_from_db lọc sẵn dự án dừng nên nó biến mất khỏi danh sách).
+            raise RuntimeError("dự án này chưa cấu hình forum bug, hoặc đang tạm dừng")
         r = await bug_sync.sync_forum(client, sb, cfg["project_id"], int(cfg["forum_channel_id"]))
         result = f"tạo {r['created']}, cập nhật {r['updated']} (tổng {r['total']})"
     except Exception as e:

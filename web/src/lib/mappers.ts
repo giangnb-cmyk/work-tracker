@@ -84,8 +84,9 @@ export function rowToProject(r: Row): Project {
     icon: r.icon ?? '📁',
     color: r.color ?? '#6366f1',
     description: r.description ?? '',
+    // ?? true: thiếu cột (migration chưa áp) thì giữ hành vi cũ — đang chạy, có sync.
+    isActive: r.is_active ?? true,
     notionProjectId: r.notion_project_id ?? null,
-    // ?? true để chịu được lúc migration 0070 chưa áp — thiếu cột thì giữ hành vi cũ (có sync).
     notionSyncEnabled: r.notion_sync_enabled ?? true,
     weeklySheetId: r.weekly_sheet_id ?? null,
     releaseSheetId: r.release_sheet_id ?? null,

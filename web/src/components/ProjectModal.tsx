@@ -35,6 +35,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
   const [costSheetInput, setCostSheetInput] = useState(project?.costSheetId ?? '');
   const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
+  const [isActive, setIsActive] = useState(project?.isActive ?? true);
   const [notionSyncEnabled, setNotionSyncEnabled] = useState(project?.notionSyncEnabled ?? true);
   const [bugForumInput, setBugForumInput] = useState(project?.bugForumChannelId ?? '');
   const [bugNotifyRole, setBugNotifyRole] = useState(project?.bugNotifyRole ?? '');
@@ -138,6 +139,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       color: project?.color ?? '#6366f1',
       description,
       notionProjectId: notionProjectId || null,
+      isActive,
       notionSyncEnabled,
       weeklySheetId: sheetId,
       dailyReportWebhook: dailyWebhook.trim() || null,
@@ -191,6 +193,27 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           <span>Mô tả</span>
           <textarea className="textarea" value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
+
+        {/* Đứng TRÊN mọi cấu hình khác vì nó chi phối tất cả: tắt cái này thì webhook,
+            sheet, forum bên dưới đều thành vô nghĩa cho tới khi bật lại. */}
+        <div className="field">
+          <Switch
+            checked={isActive}
+            onChange={setIsActive}
+            label={isActive ? 'Đang chạy' : 'Tạm dừng'}
+            ariaLabel="Bật/tắt dự án"
+          />
+        </div>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {isActive ? (
+            <>✅ Dự án chạy bình thường: nhắc task hằng ngày, báo cáo 10:30, weekly report,
+              DM tuần và đồng bộ bug forum đều tính dự án này.</>
+          ) : (
+            <>⏸️ <strong>Tạm dừng</strong> — mọi việc chạy nền bỏ qua dự án này: không nhắc task,
+              không báo cáo 10:30, không weekly report, không DM tuần, không sync bug forum.
+              Dữ liệu <strong>giữ nguyên</strong> và vẫn vào xem/sửa bình thường.</>
+          )}
+        </p>
 
         <label className="field">
           <span>Liên kết Notion project</span>
