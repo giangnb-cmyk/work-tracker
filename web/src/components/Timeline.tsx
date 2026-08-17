@@ -20,6 +20,12 @@ import type { Feature, FeatureLabel, Task } from '../types';
 
 const DAY = 86_400_000;
 
+/**
+ * Tắt TẠM nút "🔄 Sync lịch" (yêu cầu 2026-08-17) — lịch phát hành giờ đặt tay ngay trên
+ * Timeline nên sheet release ít dùng. Bật lại: đổi cờ này, mọi thứ phía sau còn nguyên.
+ */
+const SHOW_RELEASE_SYNC = false;
+
 function label(ms: number): string {
   return new Date(ms).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
@@ -328,7 +334,7 @@ export default function Timeline() {
               🏷️ Versions{versionLabels.length > 0 ? ` (${versionLabels.length})` : ''}
             </button>
           )}
-          {isAdmin && (
+          {SHOW_RELEASE_SYNC && isAdmin && (
             <button
               className="btn-sm"
               onClick={syncRelease}
