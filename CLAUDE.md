@@ -207,6 +207,33 @@ bot-work-tracker/
 
 ---
 
+## Xác nhận thao tác NHẠY CẢM (bắt buộc)
+
+**Thao tác nhạy cảm PHẢI có popup xác nhận trước khi chạy.** Dùng `ConfirmDialog`
+(`web/src/components/ConfirmDialog.tsx`) — KHÔNG dùng `window.confirm` (hộp trắng của
+trình duyệt, lạc khỏi theme và không nói được hệ quả).
+
+Nhạy cảm = một trong bốn nhóm sau:
+
+| Nhóm | Ví dụ |
+|---|---|
+| **Không hoàn tác được** | xoá task / feature / dự án / tài liệu / nhãn |
+| **Ảnh hưởng người khác** | tạm dừng dự án, đổi vai trò & quyền, đổi webhook/forum đích, tắt sync Notion |
+| **Bắn ra ngoài** | tin Discord, tạo trang Notion, ghi Google Sheet, gửi mail |
+| **Ghi hàng loạt** | nhân bản feature kèm task, import, xuất chi phí |
+
+Luật viết hộp xác nhận:
+- `message` = nói rõ **cái gì sắp xảy ra**, kèm TÊN đối tượng. `detail` = hệ quả người dùng
+  **không đoán được** (vd: "trang Notion đã liên kết cũng vào Trash", "dừng luôn báo cáo 10:30").
+- Hỏi **SAU khi đã kiểm tra hợp lệ**, đừng bắt xác nhận xong mới báo "link sheet sai".
+- Chỉ hỏi khi giá trị **THỰC SỰ đổi** (`next !== saved`) — hỏi mỗi lần bấm Lưu là nhiễu,
+  và nhiễu thì người ta bấm Đồng ý theo phản xạ, tức là mất luôn tác dụng.
+- Hành động nguy hiểm nhận cờ `confirmed`, và nút phải gọi qua arrow
+  (`onClick={() => void handleSave()}`): truyền thẳng `onClick={handleSave}` là React nhét
+  `MouseEvent` vào tham số đầu — truthy, nhảy cóc qua bước hỏi.
+
+---
+
 ## Supabase-Specific Rules
 
 - **Client config is public by design** — `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`

@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
 import SearchableSelect from './SearchableSelect';
 import Switch from './Switch';
+import ConfirmDialog from './ConfirmDialog';
 import type { Project } from '../types';
 
 interface ProjectModalProps {
@@ -36,6 +37,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   const [costSheetInput, setCostSheetInput] = useState(project?.costSheetId ?? '');
   const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
   const [isActive, setIsActive] = useState(project?.isActive ?? true);
+  const [confirmActive, setConfirmActive] = useState(false);
   const [notionSyncEnabled, setNotionSyncEnabled] = useState(project?.notionSyncEnabled ?? true);
   const [bugForumInput, setBugForumInput] = useState(project?.bugForumChannelId ?? '');
   const [bugNotifyRole, setBugNotifyRole] = useState(project?.bugNotifyRole ?? '');
@@ -110,7 +112,12 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
     };
   }, []);
 
-  async function handleSave() {
+  /**
+   * @param confirmed true = người dùng đã qua hộp xác nhận. Mặc định false, và ô Lưu PHẢI
+   *   gọi qua arrow (`() => handleSave()`): truyền thẳng `onClick={handleSave}` là React
+   *   nhét MouseEvent vào đây, truthy -> nhảy cóc qua bước hỏi.
+   */
+  async function handleSave(confirmed = false) {
     if (!name.trim()) {
       setError('Cần nhập tên project.');
       return;
@@ -131,13 +138,23 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       setError('Kênh forum bug không hợp lệ. Dán link kênh Discord, hoặc id kênh (17–20 chữ số).');
       return;
     }
+    // Bật/tắt dự án đụng tới cả đội (tắt = ngừng nhắc task, ngừng báo cáo, ngừng sync) và
+    // không nhìn thấy hậu quả ngay — đúng loại phải hỏi lại. Hỏi SAU khi đã kiểm tra hợp
+    // lệ, để không bắt xác nhận xong mới báo "link sheet sai".
+    if (isEdit && project && isActive !== project.isActive && !confirmed) {
+      setConfirmActive(true);
+      return;
+    }
     setSaving(true);
     setError(null);
+    // MỘT payload cho cả tạo lẫn sửa. Trước đây là hai object literal riêng, và đúng cái
+    // bẫy đó đã sập: thêm trường mới vào cái trên, quên cái dưới -> bấm Lưu không báo lỗi
+    // gì nhưng giá trị không bao giờ tới DB (isActive + notionSyncEnabled đều dính).
     const input: ProjectInput = {
-      name,
+      name: name.trim(),
       icon,
       color: project?.color ?? '#6366f1',
-      description,
+      description: description.trim(),
       notionProjectId: notionProjectId || null,
       isActive,
       notionSyncEnabled,
@@ -151,17 +168,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
     };
     try {
       if (isEdit && project) {
-        await updateProject(project.id, {
-          name: name.trim(),
-          icon,
-          description: description.trim(),
-          notionProjectId: notionProjectId || null,
-          weeklySheetId: sheetId,
-          dailyReportWebhook: dailyWebhook.trim() || null,
-          costSheetId,
-          bugForumChannelId: bugForumId,
-          bugNotifyRole: bugNotifyRole.trim() || null,
-        });
+        await updateProject(project.id, input);
       } else {
         await createProject(input, user?.uid ?? '');
       }
@@ -407,11 +414,30 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
 
         <div className="modal-actions">
           <button className="btn-sm" onClick={onClose} disabled={saving}>Huỷ</button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving}>
+          <button className="btn-primary" onClick={() => void handleSave()} disabled={saving}>
             {saving ? 'Đang lưu…' : isEdit ? 'Lưu' : 'Tạo'}
           </button>
         </div>
       </div>
+
+      {confirmActive && project && (
+        <ConfirmDialog
+          title={isActive ? 'Bật lại dự án?' : 'Tạm dừng dự án?'}
+          message={
+            isActive
+              ? <>Dự án <strong>“{project.name}”</strong> sẽ chạy lại bình thường.</>
+              : <>Dự án <strong>“{project.name}”</strong> sẽ dừng mọi việc chạy tự động.</>
+          }
+          detail={
+            isActive
+              ? 'Từ sáng mai: nhắc task hằng ngày, báo cáo 10:30, weekly report, DM tuần và đồng bộ bug forum tính lại dự án này.'
+              : 'Dừng: nhắc task hằng ngày, báo cáo 10:30, weekly report, DM điểm tuần, đồng bộ bug ↔ forum Discord. Dữ liệu giữ nguyên và vẫn vào xem/sửa được — bật lại lúc nào cũng được.'
+          }
+          confirmLabel={isActive ? 'Bật lại' : 'Tạm dừng'}
+          onConfirm={() => handleSave(true)}
+          onCancel={() => setConfirmActive(false)}
+        />
+      )}
     </div>
   );
 }
