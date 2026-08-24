@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
+import { useRoles } from '../hooks/useRoles';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
+import { memberRoleResolver } from '../lib/memberRole';
 import { sortFeatureLabels } from '../lib/featureLabelSort';
 import { becameDone, moveTask, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
@@ -391,10 +393,8 @@ function FeatureDetail({
   const [picking, setPicking] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
 
-  const jobRoleOf = useMemo(() => {
-    const map = new Map(members.map((m) => [m.uid, m.jobRole]));
-    return (uid: string | null) => (uid ? map.get(uid) : undefined);
-  }, [members]);
+  const { roles } = useRoles();
+  const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
 
   // Cùng thứ tự với Bảng Sprint: chưa xong lên trước, rồi tới thứ tự thủ công.
   const featureTasks = useMemo(
@@ -538,7 +538,7 @@ function FeatureDetail({
               <TaskListRow
                 key={t.id}
                 task={t}
-                assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+                assigneeRole={roleOf(t.assigneeId)}
                 canChangeStatus={canChangeStatus(t)}
                 onOpen={setEditingTask}
                 onQuickStatus={quickStatus}

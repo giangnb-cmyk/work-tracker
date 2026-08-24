@@ -11,3 +11,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/**
+ * Nhãn build (ngày build giờ VN + commit SHA ngắn) — Vite `define` nhét vào lúc build,
+ * xem vite.config.ts. Hiện dưới tên tài khoản ở Sidebar để biết đang chạy bản nào.
+ */
+declare const __APP_VERSION__: string;

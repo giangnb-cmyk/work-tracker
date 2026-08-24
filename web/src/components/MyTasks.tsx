@@ -5,7 +5,9 @@ import { useMyTasks } from '../hooks/useMyTasks';
 import { useMySubtasks } from '../hooks/useMySubtasks';
 import { useMyBugs } from '../hooks/useMyBugs';
 import { useBugLabels } from '../hooks/useBugLabels';
+import { useRoles } from '../hooks/useRoles';
 import { useStoredView } from '../hooks/useStoredView';
+import { memberRoleResolver } from '../lib/memberRole';
 import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import TaskRow from './TaskRow';
@@ -39,10 +41,8 @@ export default function MyTasks() {
   const [mode, selectMode] = useStoredView<ViewMode>(MODE_KEY, VIEW_MODES, 'list');
   const [showDoneBugs, setShowDoneBugs] = useState(false);
 
-  const jobRoleOf = useMemo(() => {
-    const map = new Map(members.map((m) => [m.uid, m.jobRole]));
-    return (uid: string | null) => (uid ? map.get(uid) : undefined);
-  }, [members]);
+  const { roles } = useRoles();
+  const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
 
   const sprintName = useMemo(() => {
     const map = new Map(sprints.map((s) => [s.id, s.name]));
@@ -127,7 +127,7 @@ export default function MyTasks() {
             <TaskRow
               key={t.id}
               task={t}
-              assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+              assigneeRole={roleOf(t.assigneeId)}
               canChangeStatus
               onOpen={setEditing}
               onQuickStatus={quickStatus}
@@ -144,7 +144,7 @@ export default function MyTasks() {
               <TaskListRow
                 key={t.id}
                 task={t}
-                assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+                assigneeRole={roleOf(t.assigneeId)}
                 canChangeStatus
                 onOpen={setEditing}
                 onQuickStatus={quickStatus}

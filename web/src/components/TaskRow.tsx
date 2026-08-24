@@ -14,21 +14,20 @@ import {
   PaperclipIcon,
 } from './icons';
 import {
-  JOB_ROLE_ICON,
-  JOB_ROLE_LABEL,
   PRIORITY_LABEL,
   STATUS_LABEL,
   type Attachment,
-  type JobRole,
   type Task,
   type TaskPriority,
   type TaskStatus,
 } from '../types';
+import type { MemberRoleInfo } from '../lib/memberRole';
 import type { Timestamp } from '../lib/time';
 
 interface TaskRowProps {
   task: Task;
-  assigneeJobRole?: JobRole;
+  /** Chuyên môn người nhận (role động trước, enum cũ sau — xem lib/memberRole). */
+  assigneeRole?: MemberRoleInfo;
   canChangeStatus: boolean;
   onOpen: (task: Task) => void;
   onQuickStatus: (task: Task, status: TaskStatus) => void;
@@ -95,7 +94,7 @@ function DocTile({ doc }: { doc: Doc }) {
 /** Rich task card matching the reference design. */
 export default function TaskRow({
   task,
-  assigneeJobRole,
+  assigneeRole,
   canChangeStatus,
   onOpen,
   onQuickStatus,
@@ -140,8 +139,8 @@ export default function TaskRow({
     <div className={`tcard glass${done ? ' done' : ''}`} onClick={() => onOpen(task)}>
       {/* Header: role icon · title · priority pill · menu */}
       <div className="tcard-head">
-        <span className="tcard-icon" title={assigneeJobRole ? JOB_ROLE_LABEL[assigneeJobRole] : ''}>
-          {assigneeJobRole ? JOB_ROLE_ICON[assigneeJobRole] : '📌'}
+        <span className="tcard-icon" title={assigneeRole?.label ?? ''}>
+          {assigneeRole?.icon ?? '📌'}
         </span>
         <h3 className="tcard-title">{task.title}</h3>
         {/* Cờ đã gắn feature + đã tạo Notion — cùng TaskFlags với dòng list. */}

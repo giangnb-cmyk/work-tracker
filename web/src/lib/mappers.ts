@@ -92,6 +92,7 @@ export function rowToProject(r: Row): Project {
     weeklySheetId: r.weekly_sheet_id ?? null,
     releaseSheetId: r.release_sheet_id ?? null,
     costSheetId: r.cost_sheet_id ?? null,
+    notifyWebhook: r.notify_webhook ?? null,
     dailyReportWebhook: r.daily_report_webhook ?? null,
     bugForumChannelId: r.bug_forum_channel_id ?? null,
     bugNotifyRole: r.bug_notify_role ?? null,

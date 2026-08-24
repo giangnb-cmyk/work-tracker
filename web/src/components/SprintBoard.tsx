@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useTasks } from '../hooks/useTasks';
+import { useRoles } from '../hooks/useRoles';
 import { useSprintHistory } from '../hooks/useSprintHistory';
-import { becameDone, moveTask } from '../lib/taskWrites';
+import { memberRoleResolver } from '../lib/memberRole';
+import { becameDone, claimTask, moveTask } from '../lib/taskWrites';
+import { reportError } from '../lib/errorBus';
 import { useNotify } from '../contexts/NotifyContext';
 import { groupTasksByDept, groupTasksByFeature } from '../lib/taskGrouping';
 import { useStoredView } from '../hooks/useStoredView';
@@ -30,7 +33,7 @@ const GROUP_MODES: readonly GroupMode[] = ['dept', 'feature'];
 const GROUP_MODE_KEY = 'sprintBoardGroup';
 
 export default function SprintBoard() {
-  const { user, isAdmin, can } = useAuth();
+  const { user, profile, isAdmin, can } = useAuth();
   const { selectedSprintId, selectedSprint, selectedProjectId, members, sprints, features } =
     useSprintContext();
   const { notifyDone } = useNotify();
@@ -54,11 +57,9 @@ export default function SprintBoard() {
     const byId = new Map(sprints.map((s) => [s.id, s.name]));
     return (id: string | null) => (id ? byId.get(id) ?? 'sprint khác' : 'Backlog');
   }, [sprints]);
-  // uid → jobRole, để gắn icon chuyên môn lên từng dòng.
-  const jobRoleOf = useMemo(() => {
-    const map = new Map(members.map((m) => [m.uid, m.jobRole]));
-    return (uid: string | null) => (uid ? map.get(uid) : undefined);
-  }, [members]);
+  // uid → chuyên môn (role động trước, enum cũ sau) — icon từng dòng + gom nhóm bộ phận.
+  const { roles } = useRoles();
+  const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
 
   const projectTasks = useMemo(
     () => tasks.filter((t) => t.projectId === selectedProjectId),
@@ -77,7 +78,7 @@ export default function SprintBoard() {
     );
   }, [projectTasks, query, tokens, meId]);
   // Chia nhóm SAU khi lọc: nhóm nào lọc hết task thì tự biến mất, khỏi để lại mục rỗng.
-  const groups = useMemo(() => groupTasksByDept(shown, members), [shown, members]);
+  const groups = useMemo(() => groupTasksByDept(shown, members, roles), [shown, members, roles]);
   const featureGroups = useMemo(
     () => groupTasksByFeature(shown, projectFeatures),
     [shown, projectFeatures],
@@ -92,6 +93,23 @@ export default function SprintBoard() {
     const justFinished = becameDone(task.status, status);
     void moveTask(task, status, task.order);
     if (justFinished) notifyDone({ ...task, status }, selectedSprint?.name);
+  }
+
+  // Nút "Nhận task" trên dòng chưa giao. Không hỏi confirm: mục đích là pick nhanh, và
+  // nhận nhầm thì gỡ lại được trong chi tiết task. Thua cuộc đua (người khác nhận trước)
+  // thì báo qua errorBus; dòng tự cập nhật theo realtime nên không cần refetch tay.
+  function pickTask(task: Task) {
+    if (!profile) return;
+    void claimTask(task, profile)
+      .then((res) => {
+        if (res.ok) return;
+        const msg =
+          res.reason === 'taken'
+            ? `Task “${task.title}” vừa được ${res.assigneeName || 'người khác'} nhận trước rồi.`
+            : `Task “${task.title}” không còn tồn tại.`;
+        reportError('Nhận task', new Error(msg), 'Danh sách sẽ tự cập nhật theo dữ liệu mới nhất.');
+      })
+      .catch((err) => reportError('Nhận task', err, 'Chưa gán được — thử lại giúp mình.'));
   }
 
   return (
@@ -144,11 +162,12 @@ export default function SprintBoard() {
               sprintId={selectedSprintId}
               projectId={selectedProjectId}
               filtering={filtering}
-              jobRoleOf={jobRoleOf}
+              roleOf={roleOf}
               canChangeStatus={canChangeStatus}
               onOpen={setEditing}
               onQuickStatus={quickStatus}
               onMoveSprint={selectedSprintId ? setMoving : undefined}
+              onClaim={pickTask}
             />
           ) : (
           <>
@@ -167,11 +186,12 @@ export default function SprintBoard() {
                   <TaskListRow
                     key={t.id}
                     task={t}
-                    assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+                    assigneeRole={roleOf(t.assigneeId)}
                     canChangeStatus={canChangeStatus(t)}
                     onOpen={setEditing}
                     onQuickStatus={quickStatus}
                     onMoveSprint={selectedSprintId && canChangeStatus(t) ? setMoving : undefined}
+                    onClaim={pickTask}
                   />
                 ))}
               </div>

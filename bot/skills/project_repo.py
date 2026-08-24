@@ -48,9 +48,11 @@ def _map_project(r: dict) -> dict:
         "notionSyncEnabled": r.get("notion_sync_enabled", True) is not False,
         # Google Sheet cho weekly report (migration 0022). Rong = project chua bat.
         "weeklySheetId": r.get("weekly_sheet_id"),
-        # Webhook Discord RIENG cua du an: moi thong bao cua du an nay di vao kenh do. Rong
-        # = khong bao gi (CO Y khong lui ve webhook chung — xem _notify_created).
-        "discordWebhook": r.get("daily_report_webhook"),
+        # Webhook Discord KENH TASK cua du an (notify_webhook, 0084): thong bao task moi/
+        # xong di vao day. Fallback daily_report_webhook cho hang cu chua "chua" (truoc 0084
+        # cot do la webhook chung). Rong ca hai = khong bao gi (CO Y khong lui ve webhook
+        # chung cua bot — xem _notify_created).
+        "discordWebhook": r.get("notify_webhook") or r.get("daily_report_webhook"),
     }
 
 

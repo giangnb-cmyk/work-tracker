@@ -6,23 +6,19 @@ import { PRIO_COLOR } from '../lib/taskColors';
 import { MoreVerticalIcon } from './icons';
 import TaskFlags from './task/TaskFlags';
 import { useClickOutside } from '../hooks/useClickOutside';
-import {
-  JOB_ROLE_ICON,
-  JOB_ROLE_LABEL,
-  PRIORITY_LABEL,
-  STATUS_LABEL,
-  type JobRole,
-  type Task,
-  type TaskStatus,
-} from '../types';
+import type { MemberRoleInfo } from '../lib/memberRole';
+import { PRIORITY_LABEL, STATUS_LABEL, type Task, type TaskStatus } from '../types';
 
 interface TaskListRowProps {
   task: Task;
-  assigneeJobRole?: JobRole;
+  /** Chuyên môn người nhận (role động trước, enum cũ sau — xem lib/memberRole). */
+  assigneeRole?: MemberRoleInfo;
   canChangeStatus: boolean;
   onOpen: (task: Task) => void;
   onQuickStatus: (task: Task, status: TaskStatus) => void;
   onMoveSprint?: (task: Task) => void;
+  /** Có truyền thì task CHƯA GIAO hiện nút "Nhận task" thay chip người nhận — ai rảnh tự pick. */
+  onClaim?: (task: Task) => void;
   /** Ẩn cột người nhận ở màn chỉ có task của chính mình. */
   showAssignee?: boolean;
   /** Project có liên kết Notion không — không truyền thì TaskFlags suy từ project đang chọn. */
@@ -42,11 +38,12 @@ function fmtDay(task: Task): string {
  */
 export default function TaskListRow({
   task,
-  assigneeJobRole,
+  assigneeRole,
   canChangeStatus,
   onOpen,
   onQuickStatus,
   onMoveSprint,
+  onClaim,
   showAssignee = true,
   notionEnabled,
 }: TaskListRowProps) {
@@ -86,8 +83,8 @@ export default function TaskListRow({
           </svg>
         </button>
 
-        <span className="trow-icon" title={assigneeJobRole ? JOB_ROLE_LABEL[assigneeJobRole] : ''}>
-          {assigneeJobRole ? JOB_ROLE_ICON[assigneeJobRole] : '📌'}
+        <span className="trow-icon" title={assigneeRole?.label ?? ''}>
+          {assigneeRole?.icon ?? '📌'}
         </span>
 
         <span className="trow-title">
@@ -113,12 +110,22 @@ export default function TaskListRow({
           {PRIORITY_LABEL[task.priority]}
         </span>
 
-        {showAssignee && (
-          <span className="trow-who">
-            <MemberAvatar uid={task.assigneeId} name={task.assigneeName || '?'} size="sm" />
-            <span className="trow-who-name">{task.assigneeName || 'Chưa giao'}</span>
-          </span>
-        )}
+        {showAssignee &&
+          (onClaim && !task.assigneeId && !done ? (
+            <button
+              className="trow-who trow-claim"
+              onClick={(e) => { e.stopPropagation(); onClaim(task); }}
+              title="Task chưa giao — bấm để tự nhận về mình"
+            >
+              <span className="trow-claim-plus" aria-hidden>+</span>
+              Nhận task
+            </button>
+          ) : (
+            <span className="trow-who">
+              <MemberAvatar uid={task.assigneeId} name={task.assigneeName || '?'} size="sm" />
+              <span className="trow-who-name">{task.assigneeName || 'Chưa giao'}</span>
+            </span>
+          ))}
 
         <span className={`trow-due mono${overdue ? ' overdue' : ''}`}>{fmtDay(task)}</span>
 

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import TaskListRow from './TaskListRow';
 import QuickAddTaskRow from './task/QuickAddTaskRow';
 import { NO_FEATURE_KEY, type FeatureTaskGroup } from '../lib/taskGrouping';
-import type { JobRole, Task, TaskStatus } from '../types';
+import type { MemberRoleInfo } from '../lib/memberRole';
+import type { Task, TaskStatus } from '../types';
 
 interface Props {
   groups: FeatureTaskGroup[];
@@ -10,11 +11,13 @@ interface Props {
   projectId: string | null;
   /** Đang lọc: mọi mục xổ sẵn, và câu báo rỗng phải nói "không khớp" chứ không phải "chưa có". */
   filtering: boolean;
-  jobRoleOf: (uid: string | null) => JobRole | undefined;
+  roleOf: (uid: string | null) => MemberRoleInfo | undefined;
   canChangeStatus: (t: Task) => boolean;
   onOpen: (t: Task) => void;
   onQuickStatus: (t: Task, s: TaskStatus) => void;
   onMoveSprint?: (t: Task) => void;
+  /** Chuyển tiếp xuống TaskListRow: task chưa giao hiện nút "Nhận task". */
+  onClaim?: (t: Task) => void;
 }
 
 /**
@@ -29,11 +32,12 @@ export default function SprintFeatureList({
   sprintId,
   projectId,
   filtering,
-  jobRoleOf,
+  roleOf,
   canChangeStatus,
   onOpen,
   onQuickStatus,
   onMoveSprint,
+  onClaim,
 }: Props) {
   const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
 
@@ -95,11 +99,12 @@ export default function SprintFeatureList({
                     <TaskListRow
                       key={t.id}
                       task={t}
-                      assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+                      assigneeRole={roleOf(t.assigneeId)}
                       canChangeStatus={canChangeStatus(t)}
                       onOpen={onOpen}
                       onQuickStatus={onQuickStatus}
                       onMoveSprint={onMoveSprint && canChangeStatus(t) ? onMoveSprint : undefined}
+                      onClaim={onClaim}
                     />
                   ))}
                 </div>

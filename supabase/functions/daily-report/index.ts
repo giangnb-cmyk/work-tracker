@@ -1,5 +1,6 @@
 // POST /functions/v1/daily-report — báo cáo task hằng ngày vào webhook Discord của TỪNG
-// project (projects.daily_report_webhook), tag người theo discord_id.
+// project (projects.daily_report_webhook — kênh RIÊNG cho báo cáo; rỗng thì dùng
+// projects.notify_webhook, kênh task chung — 0084), tag người theo discord_id.
 //
 // Hai chế độ:
 //  • CRON (body rỗng): gọi bởi pg_cron 10:30 VN (migration 0048), quét MỌI project có webhook.
@@ -321,12 +322,14 @@ Deno.serve(async (req: Request) => {
       if (!uid || !(await isAdmin(uid))) {
         return json({ ok: false, error: 'forbidden', message: 'Chỉ admin mới gửi thử được.' }, 403);
       }
-      const prjs = await pg<{ id: string; name: string; daily_report_webhook: string | null }>(
-        `projects?id=eq.${testProjectId}&select=id,name,daily_report_webhook`,
+      const prjs = await pg<{ id: string; name: string; daily_report_webhook: string | null; notify_webhook: string | null }>(
+        `projects?id=eq.${testProjectId}&select=id,name,daily_report_webhook,notify_webhook`,
       );
       if (prjs.length === 0) return json({ ok: false, error: 'project_not_found' }, 404);
       const prj = prjs[0];
-      const webhook = testWebhookIn || (prj.daily_report_webhook ?? '').trim();
+      // 0084: daily_report_webhook = kênh RIÊNG cho báo cáo; rỗng thì rơi về kênh task chung.
+      const webhook =
+        testWebhookIn || (prj.daily_report_webhook ?? '').trim() || (prj.notify_webhook ?? '').trim();
       if (!webhook) return json({ ok: false, error: 'no_webhook', message: 'Chưa có webhook để gửi thử.' }, 400);
 
       const [sprintMap, profilesRaw] = await Promise.all([
@@ -356,13 +359,17 @@ Deno.serve(async (req: Request) => {
       // PostgREST chứ không lọc sau — đỡ kéo về rồi bỏ đi.
       // CHỈ ở nhánh CRON. Chế độ TEST bên trên vẫn gửi được cho dự án đang dừng: đó là
       // admin CHỦ ĐỘNG bấm "Gửi thử", nút bấm mà im ru mới là khó hiểu.
-      pg<{ id: string; name: string; daily_report_webhook: string | null }>(
-        'projects?is_active=is.true&select=id,name,daily_report_webhook',
+      pg<{ id: string; name: string; daily_report_webhook: string | null; notify_webhook: string | null }>(
+        'projects?is_active=is.true&select=id,name,daily_report_webhook,notify_webhook',
       ),
       pg<Profile>('profiles?select=id,display_name,discord_id'),
     ]);
 
-    const projects = projectsRaw.filter((p) => (p.daily_report_webhook ?? '').trim());
+    // 0084: báo cáo đi vào webhook RIÊNG (daily_report_webhook) nếu có, không thì vào kênh
+    // task chung (notify_webhook). Cả hai rỗng = dự án không nhận báo cáo.
+    const reportHookOf = (p: { daily_report_webhook: string | null; notify_webhook: string | null }) =>
+      (p.daily_report_webhook ?? '').trim() || (p.notify_webhook ?? '').trim();
+    const projects = projectsRaw.filter((p) => reportHookOf(p));
     const profiles = new Map(profilesRaw.map((p) => [p.id, p]));
 
     if (projects.length === 0) {
@@ -395,7 +402,7 @@ Deno.serve(async (req: Request) => {
         prj.name, sprintMap.get(prj.id)?.name ?? null, doneByPrj.get(prj.id) ?? [], openByPrj.get(prj.id) ?? [],
         profiles, yLabel, tLabel, todayNum, false,
       );
-      const sent = await postWebhook((prj.daily_report_webhook as string).trim(), msg);
+      const sent = await postWebhook(reportHookOf(prj), msg);
       results.push({ project: prj.name, sent });
     }
 

@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
+import { useRoles } from '../hooks/useRoles';
 import { useStoredView } from '../hooks/useStoredView';
+import { memberRoleResolver } from '../lib/memberRole';
 import { becameDone, moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import TaskRow from './TaskRow';
@@ -32,10 +34,8 @@ export default function Backlog() {
   const [creating, setCreating] = useState(false);
   const [mode, selectMode] = useStoredView<ViewMode>(MODE_KEY, VIEW_MODES, 'list');
 
-  const jobRoleOf = useMemo(() => {
-    const map = new Map(members.map((m) => [m.uid, m.jobRole]));
-    return (uid: string | null) => (uid ? map.get(uid) : undefined);
-  }, [members]);
+  const { roles } = useRoles();
+  const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
 
   const backlog = useMemo(
     () => tasks.filter((t) => !t.sprintId && !t.assigneeId),
@@ -84,7 +84,7 @@ export default function Backlog() {
             <TaskRow
               key={t.id}
               task={t}
-              assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+              assigneeRole={roleOf(t.assigneeId)}
               canChangeStatus={canChangeStatus(t)}
               onOpen={setEditing}
               onQuickStatus={quickStatus}
@@ -102,7 +102,7 @@ export default function Backlog() {
               <TaskListRow
                 key={t.id}
                 task={t}
-                assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+                assigneeRole={roleOf(t.assigneeId)}
                 canChangeStatus={canChangeStatus(t)}
                 onOpen={setEditing}
                 onQuickStatus={quickStatus}

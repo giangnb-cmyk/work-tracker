@@ -189,7 +189,8 @@ set the Notion **Project** relation. Doc id is auto-generated. Admin-managed.
 | `notionSyncEnabled` | boolean      | `false` = tạo task trong dự án này **không** đẻ trang Notion, và nút "Tạo task trên Notion" ở task chi tiết cũng ẩn (migration `0070`). Áp dụng cho CẢ web (`createTask`) lẫn bot (`task_ops._sync_create`). Mặc định `true`. Độc lập với `notionProjectId`: tắt sync vẫn giữ liên kết để bật lại |
 | `weeklySheetId`   | string \| null | Google Spreadsheet **id** cho weekly report (migration `0022`) |
 | `releaseSheetId`  | string \| null | Google Spreadsheet **id** chứa lịch phát hành, tab `Timeline` (migration `0033`). KHÁC `weeklySheetId` — hai sheet khác nhau, xem `release_sync_requests` |
-| `dailyReportWebhook` | string \| null | **Webhook Discord của dự án** — MỌI thông báo của project này đi vào đúng kênh đó: task mới, task xong, xong subtask, tài liệu mới (web, qua `/api/notify-discord`), task mới do bot tạo (`task_ops`), và báo cáo task 10:30 (Edge Function `daily-report`, đọc bằng service_role). Migration `0047`. Rỗng = **không gửi thông báo nào** |
+| `notifyWebhook` | string \| null | **Webhook Discord KÊNH TASK của dự án** (migration `0084`) — thông báo của project này đi vào kênh đó: task mới, task xong, xong subtask, tài liệu mới (web, qua `/api/notify-discord`), task mới do bot tạo (`task_ops`), và cả báo cáo 10:30 **nếu** `dailyReportWebhook` trống. Rỗng = **không gửi thông báo nào** |
+| `dailyReportWebhook` | string \| null | **Webhook RIÊNG cho báo cáo task 10:30** (Edge Function `daily-report`). Rỗng = báo cáo gửi chung vào `notifyWebhook`. LỊCH SỬ: trước `0084` cột này (từ `0047`) là webhook chung của dự án — `0084` copy giá trị sang `notifyWebhook`, và web UI tự "chữa": hai cột trùng nhau thì lần Lưu kế tiếp ghi lại `null` (các reader vẫn fallback cột cũ cho hàng chưa chữa) |
 | `bugForumChannelId` | string \| null | ID kênh **Forum Discord** đồng bộ bug hai chiều (migration `0069`). **Chuỗi**, không phải number — snowflake 19 chữ số vượt `Number.MAX_SAFE_INTEGER`. Rỗng = dự án không sync bug |
 | `bugNotifyRole`   | string \| null | Tên hoặc id role Discord được ping khi bug báo từ web thành bài forum mới (migration `0069`). Rỗng = không ping |
 | `createdAt`       | Timestamp      | creation time                                             |
@@ -214,18 +215,25 @@ Ai phải tôn trọng cờ này — **lọc ở tầng JOB, không lọc trong 
 > KHÔNG chặn thông báo do NGƯỜI kích hoạt (tạo task → báo Discord, tick xong task…): dự án
 > dừng thì đâu còn ai tạo task, mà chặn thì thành "bấm nút không thấy gì xảy ra".
 
-### Thông báo Discord: MỘT KÊNH MỖI DỰ ÁN (`dailyReportWebhook`)
+### Thông báo Discord: MỘT KÊNH MỖI DỰ ÁN (`notifyWebhook` + `dailyReportWebhook`)
 
 Webhook nằm ở **hàng project**, không phải biến môi trường. Trước 08/2026 cả app dùng chung
 đúng một `DISCORD_WEBHOOK_URL` trên Vercel/bot, nên tạo task ở dự án MỚI vẫn bắn thông báo
 vào kênh của dự án CŨ (lỗi thật: task của *SM7 - Farm Route* rơi vào `#merge-task` của
 *M1 - Tasty Merge*).
 
+Từ `0084` tách HAI kênh: `notifyWebhook` = kênh task (mọi thông báo do người kích hoạt),
+`dailyReportWebhook` = kênh riêng cho báo cáo 10:30, trống thì báo cáo đi chung kênh task.
+
 - **Web** → `web/api/notify-discord.ts`: mọi payload mang `projectId`; server tra
-  `projects.daily_report_webhook` bằng **anon key + token của chính người gọi** (RLS vẫn có
-  hiệu lực — tuyệt đối không đưa service-role key lên Vercel), rồi post vào đó.
+  `projects.notify_webhook` (fallback `daily_report_webhook` cho hàng chưa "chữa") bằng
+  **anon key + token của chính người gọi** (RLS vẫn có hiệu lực — tuyệt đối không đưa
+  service-role key lên Vercel), rồi post vào đó.
 - **Bot** → `task_ops._notify_created` lấy `project['discordWebhook']` (map trong
-  `project_repo`) và truyền vào `webhook_notify.post(url=…)`.
+  `project_repo` = `notify_webhook or daily_report_webhook`) và truyền vào
+  `webhook_notify.post(url=…)`.
+- **Báo cáo 10:30** → Edge Function `daily-report`: `daily_report_webhook` trước,
+  trống thì `notify_webhook`. Nút "Gửi thử" trong popup Dự án cũng nhắm đúng đích đó.
 - Dự án **chưa cấu hình webhook = im lặng**, cố ý: `DISCORD_WEBHOOK_URL` chỉ còn là dự
   phòng cho payload không kèm `projectId`. Lùi về nó khi biết dự án chính là tái lập lỗi cũ.
 - Client **không bao giờ** gửi URL webhook lên server: ai đăng nhập cũng sai được server
@@ -616,6 +624,17 @@ subtasks; if a task has no subtasks, progress falls back to a status stage (`tod
 > Advisor than "signed-in users can execute SECURITY DEFINER" là **chủ đích**, đừng "sửa".
 > Đường này không đẩy checklist sang Notion (chỉ `updateTask` làm) — Notion khớp lại ở lần
 > lưu task kế tiếp từ màn chi tiết.
+>
+> **RPC `claim_task(p_task_id)`** (migration `0083`) — nút **"Nhận task"** ở Bảng Sprint:
+> tự gán task **chưa giao** cho chính người gọi. Cùng học thuyết `0064`: không nới
+> `tasks_update` (member thường chẳng là reporter/assignee của task trống nên ghi thẳng bị
+> RLS chặn), thay bằng hàm hẹp `SECURITY DEFINER` + `grant execute` cho `authenticated` —
+> cổng nằm trong thân hàm: chỉ set `assignee_id = auth.uid()` (+ `assignee_name` từ
+> `profiles.display_name`) **khi `assignee_id` đang null**. UPDATE điều kiện là atomic nên
+> hai người bấm cùng lúc thì người sau thua cuộc đua và nhận về
+> `{ok:false, reason:'taken', assigneeName}` (khoá jsonb camelCase có chủ đích — kết quả đi
+> thẳng vào UI, không qua `mappers.ts`). Web gọi qua `claimTask()` trong
+> `web/src/lib/taskWrites.ts`; đường này CÓ đẩy assignee sang Notion (fire-and-forget).
 
 ### Người nhận khi bot tạo task (`assigneeId`)
 

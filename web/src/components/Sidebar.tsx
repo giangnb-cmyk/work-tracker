@@ -133,6 +133,10 @@ export default function Sidebar({ active, onSelect }: SidebarProps) {
             <div className="muted" style={{ fontSize: '0.7rem' }}>
               {isOwner ? 'Owner' : isAdmin ? 'Admin' : 'Thành viên'}
             </div>
+            {/* Nhãn build (vite.config.ts) — nhìn là biết đang chạy bản deploy nào. */}
+            <div className="muted" style={{ fontSize: '0.62rem', opacity: 0.75 }} title="Phiên bản đang chạy (ngày build · commit)">
+              v{__APP_VERSION__}
+            </div>
           </div>
         </button>
         {/* Ẩn hẳn khi ĐANG xem thử: sidebar phải giống y hệt cái vai được mô phỏng nhìn

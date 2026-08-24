@@ -839,8 +839,12 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .msub-parent-title { font-weight: 600; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msub-parent-meta { font-size: 0.75rem; margin-left: auto; flex-shrink: 0; }
 .msub-items { list-style: none; margin: 0.35rem 0 0; padding: 0; display: flex; flex-direction: column; }
-.msub-item { display: flex; align-items: center; padding: 0.35rem 0.1rem; border-radius: 8px; }
+.msub-item { display: flex; align-items: center; padding: 0.35rem 0.25rem; border-radius: 8px; }
 .msub-item:hover { background: rgba(255, 255, 255, 0.04); }
+/* Ở mục "Subtask của tôi" label .st-check bọc CẢ ô tick lẫn tên (khác modal — xem chú thích
+   trên .st-check), mà .st-check gốc không có gap nên ô tick dính sát chữ. Nới đúng phạm vi
+   msub (gap khớp .st-row của modal), và cho label ăn hết hàng để bấm đâu cũng tick được. */
+.msub-item .st-check { flex: 1; min-width: 0; gap: 0.5rem; }
 .msub-item.done .st-box { background: var(--primary); border-color: var(--primary); }
 .msub-item.done .st-box svg { stroke-dashoffset: 0; }
 .msub-item.done .st-title { color: var(--muted); text-decoration: line-through; opacity: 0.75; }
@@ -983,6 +987,25 @@ label.field > span { display: block; font-size: 0.8rem; color: var(--muted); mar
 .trow-prio { flex-shrink: 0; }
 .trow-who { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; width: 160px; }
 .trow-who-name { font-size: 0.85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Nút "Nhận task" — thế chỗ chip người nhận khi task CHƯA GIAO: lời mời bấm chứ không phải
+   thông báo trống. Giữ nguyên khổ 160px của .trow-who để các cột không xô lệch. */
+.trow-claim {
+  justify-content: center;
+  border: 1px dashed rgba(99, 102, 241, 0.5);
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.08);
+  color: #a5b4fc;
+  font-size: 0.8rem; font-weight: 600; font-family: inherit;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.trow-claim:hover {
+  border-color: var(--primary); border-style: solid;
+  background: rgba(99, 102, 241, 0.22);
+  color: var(--text);
+}
+.trow-claim-plus { font-weight: 700; line-height: 1; }
 .trow-due { flex-shrink: 0; width: 64px; font-size: 0.8rem; color: var(--muted); text-align: right; }
 .trow-due.overdue { color: var(--red); }
 .trow-prog { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; width: 110px; }

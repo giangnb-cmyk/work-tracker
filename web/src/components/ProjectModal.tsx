@@ -36,7 +36,18 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
   // đúng cái mình vừa dán thay vì thấy nó biến thành một chuỗi lạ.
   const [sheetInput, setSheetInput] = useState(project?.weeklySheetId ?? '');
   const [costSheetInput, setCostSheetInput] = useState(project?.costSheetId ?? '');
-  const [dailyWebhook, setDailyWebhook] = useState(project?.dailyReportWebhook ?? '');
+  // 0084: kênh task (notify_webhook) tách khỏi webhook báo cáo 10:30 (daily_report_webhook).
+  // Hàng cũ chưa "chữa" (backfill 0084 copy hai cột bằng nhau; hàng do UI cũ ghi thì chỉ có
+  // cột daily): giá trị kênh chung đang nằm ở cột daily → hiện vào ô kênh task, còn ô báo
+  // cáo riêng chỉ hiện khi THẬT SỰ khác kênh task — trùng nhau mà hiện cả hai thì đổi kênh
+  // task xong báo cáo vẫn ghim kênh cũ, rất khó hiểu.
+  const savedNotify = project?.notifyWebhook ?? '';
+  const savedDaily = project?.dailyReportWebhook ?? '';
+  const initialTaskHook = savedNotify || savedDaily;
+  const [taskWebhook, setTaskWebhook] = useState(initialTaskHook);
+  const [reportWebhook, setReportWebhook] = useState(
+    savedDaily && savedDaily !== initialTaskHook ? savedDaily : '',
+  );
   const [isActive, setIsActive] = useState(project?.isActive ?? true);
   const [confirmActive, setConfirmActive] = useState(false);
   const [notionSyncEnabled, setNotionSyncEnabled] = useState(project?.notionSyncEnabled ?? true);
@@ -62,9 +73,13 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
 
   // Kiểm tra nhẹ: webhook Discord luôn chứa '/api/webhooks/'. Rỗng = tắt (không gửi).
   const isWebhookUrl = (v: string) => v.includes('/api/webhooks/');
-  const webhookInvalid = dailyWebhook.trim().length > 0 && !isWebhookUrl(dailyWebhook);
+  const webhookInvalid = taskWebhook.trim().length > 0 && !isWebhookUrl(taskWebhook);
+  const reportWebhookInvalid = reportWebhook.trim().length > 0 && !isWebhookUrl(reportWebhook);
   const usingTestHook = testWebhook.trim().length > 0;
-  const testTarget = usingTestHook ? testWebhook.trim() : dailyWebhook.trim();
+  // Gửi thử nhắm vào đúng nơi bản 10:30 thật sẽ đến: webhook báo cáo riêng, không có thì kênh task.
+  const testTarget = usingTestHook
+    ? testWebhook.trim()
+    : reportWebhook.trim() || taskWebhook.trim();
   const testTargetInvalid = testTarget.length > 0 && !isWebhookUrl(testTarget);
   const canTest = isEdit && testTarget.length > 0 && !testTargetInvalid;
 
@@ -78,7 +93,11 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
     }
     setTesting(true);
     setTestMsg(null);
-    const where = usingTestHook ? 'webhook thử' : 'webhook chính';
+    const where = usingTestHook
+      ? 'webhook thử'
+      : reportWebhook.trim()
+        ? 'webhook báo cáo riêng'
+        : 'webhook kênh task';
     try {
       const { data, error } = await supabase.functions.invoke('daily-report', {
         body: { projectId: project.id, webhook: testTarget },
@@ -135,6 +154,10 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       setError('Webhook Discord không hợp lệ. Dán link dạng https://discord.com/api/webhooks/…');
       return;
     }
+    if (reportWebhookInvalid) {
+      setError('Webhook báo cáo 10:30 không hợp lệ. Dán link dạng https://discord.com/api/webhooks/…');
+      return;
+    }
     if (bugForumInvalid) {
       setError('Kênh forum bug không hợp lệ. Dán link kênh Discord, hoặc id kênh (17–20 chữ số).');
       return;
@@ -160,7 +183,13 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
       isActive,
       notionSyncEnabled,
       weeklySheetId: sheetId,
-      dailyReportWebhook: dailyWebhook.trim() || null,
+      notifyWebhook: taskWebhook.trim() || null,
+      // Trùng kênh task thì lưu null ("đi chung") — hàng backfill 0084 tự "chữa" ở lần lưu
+      // này, khỏi để báo cáo ghim vào một URL cũ khi sau này đổi kênh task.
+      dailyReportWebhook:
+        reportWebhook.trim() && reportWebhook.trim() !== taskWebhook.trim()
+          ? reportWebhook.trim()
+          : null,
       costSheetId,
       bugForumChannelId: bugForumId,
       // Xoá forum thì xoá luôn role: ô role bị khoá lúc đó, để lại giá trị cũ là dữ liệu mồ
@@ -305,20 +334,44 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
           <span>Webhook Discord — kênh task của dự án</span>
           <input
             className="input"
-            value={dailyWebhook}
-            onChange={(e) => setDailyWebhook(e.target.value)}
+            value={taskWebhook}
+            onChange={(e) => setTaskWebhook(e.target.value)}
             placeholder="https://discord.com/api/webhooks/…"
           />
         </label>
         <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
           {webhookInvalid ? (
             <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
-          ) : dailyWebhook.trim() ? (
-            <>✅ MỌI thông báo của dự án này đi vào kênh đó: task mới, task xong, xong subtask,
-              tài liệu mới, và báo cáo task 10:30 hằng ngày.</>
+          ) : taskWebhook.trim() ? (
+            <>✅ Thông báo task của dự án đi vào kênh đó: task mới, task xong, xong subtask,
+              tài liệu mới. Báo cáo 10:30 cũng vào đây <strong>nếu không</strong> đặt kênh
+              riêng bên dưới.</>
           ) : (
             <span className="error-text">⚠ Chưa có webhook — dự án này sẽ KHÔNG nhận được thông báo nào
               trên Discord. Kênh Discord → ⚙ Chỉnh sửa kênh → Tích hợp → Webhook → Sao chép URL.</span>
+          )}
+        </p>
+
+        {/* 0084: kênh RIÊNG cho báo cáo 10:30 — đội muốn báo cáo dồn về một kênh tổng,
+            còn thông báo task ở kênh làm việc của dự án. */}
+        <label className="field">
+          <span>Webhook Discord — riêng cho báo cáo task 10:30</span>
+          <input
+            className="input"
+            value={reportWebhook}
+            onChange={(e) => setReportWebhook(e.target.value)}
+            placeholder="Bỏ trống = báo cáo gửi vào kênh task ở trên"
+          />
+        </label>
+        <p className="muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
+          {reportWebhookInvalid ? (
+            <span className="error-text">⚠ Link webhook không đúng dạng (phải chứa /api/webhooks/).</span>
+          ) : reportWebhook.trim() ? (
+            <>✅ Báo cáo task 10:30 hằng ngày đi vào kênh riêng này. Các thông báo khác
+              (task mới, task xong…) vẫn vào kênh task ở trên.</>
+          ) : (
+            <>💡 Bỏ trống = báo cáo 10:30 gửi chung vào kênh task. Điền khi muốn tách báo cáo
+              sang kênh khác (vd kênh tổng hợp của quản lý).</>
           )}
         </p>
 
@@ -331,7 +384,7 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
               style={{ flex: 1 }}
               value={testWebhook}
               onChange={(e) => setTestWebhook(e.target.value)}
-              placeholder="Webhook để thử — bỏ trống thì gửi vào webhook chính ở trên"
+              placeholder="Webhook để thử — bỏ trống thì gửi vào nơi bản 10:30 thật sẽ đến"
               disabled={!isEdit}
             />
             <button
@@ -360,7 +413,11 @@ export default function ProjectModal({ project, onClose }: ProjectModalProps) {
                 Ô này <strong>không được lưu</strong> — dán webhook kênh nháp để xem thử mà không
                 đụng webhook chính. Báo cáo gửi ngay lúc bấm, nội dung y hệt bản 10:30 nhưng mang
                 nhãn <strong>🧪 TEST</strong>.
-                {usingTestHook ? ' Đang nhắm: webhook thử.' : ' Đang nhắm: webhook chính ở trên.'}
+                {usingTestHook
+                  ? ' Đang nhắm: webhook thử.'
+                  : reportWebhook.trim()
+                    ? ' Đang nhắm: webhook báo cáo riêng ở trên.'
+                    : ' Đang nhắm: webhook kênh task ở trên (chưa đặt kênh báo cáo riêng).'}
               </>
             )}
           </p>

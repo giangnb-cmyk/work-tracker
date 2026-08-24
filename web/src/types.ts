@@ -400,8 +400,14 @@ export interface Project {
    */
   releaseSheetId: string | null;
   /**
-   * Webhook Discord cho báo cáo task hằng ngày (10:30) — job daily-report ngoài đọc
-   * qua Supabase và gửi report của project này vào đây. Rỗng = project không gửi.
+   * Webhook Discord KÊNH TASK của dự án (0084): task mới, task xong, xong subtask, tài
+   * liệu mới — và cả báo cáo 10:30 nếu không đặt {@link dailyReportWebhook} riêng.
+   * Rỗng = dự án không nhận thông báo nào.
+   */
+  notifyWebhook: string | null;
+  /**
+   * Webhook RIÊNG cho báo cáo task 10:30 hằng ngày. Rỗng = báo cáo gửi chung vào
+   * {@link notifyWebhook}. (Trước 0084 cột này là webhook chung của dự án.)
    */
   dailyReportWebhook: string | null;
   /**

@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
+import { useRoles } from '../hooks/useRoles';
 import { becameDone, moveTask } from '../lib/taskWrites';
+import { memberRoleResolver } from '../lib/memberRole';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDate } from '../lib/format';
 import TaskRow from './TaskRow';
@@ -88,10 +90,8 @@ function ProjectDetail({ project, onBack, onEdit, editingProject, onCloseEdit }:
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [creatingTask, setCreatingTask] = useState(false);
 
-  const jobRoleOf = useMemo(() => {
-    const map = new Map(members.map((m) => [m.uid, m.jobRole]));
-    return (uid: string | null) => (uid ? map.get(uid) : undefined);
-  }, [members]);
+  const { roles } = useRoles();
+  const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
 
   const canChangeStatus = (t: Task) =>
     isAdmin || t.assigneeId === user?.uid || t.reporterId === user?.uid;
@@ -127,7 +127,7 @@ function ProjectDetail({ project, onBack, onEdit, editingProject, onCloseEdit }:
             <TaskRow
               key={t.id}
               task={t}
-              assigneeJobRole={jobRoleOf(t.assigneeId) ?? undefined}
+              assigneeRole={roleOf(t.assigneeId)}
               canChangeStatus={canChangeStatus(t)}
               onOpen={setEditingTask}
               onQuickStatus={quickStatus}

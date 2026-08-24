@@ -2,21 +2,12 @@
 // Tách khỏi lib/sprint.ts vì file đó đã vượt giới hạn ~200 dòng.
 
 import { STATUS_ORDER } from './sprint';
-import {
-  JOB_ROLES,
-  JOB_ROLE_ICON,
-  JOB_ROLE_LABEL,
-  type Feature,
-  type JobRole,
-  type Task,
-  type TeamMember,
-} from '../types';
-
-/** Bộ phận, hoặc 'unassigned' cho task chưa giao / người nhận chưa chọn chuyên môn. */
-export type DeptBucket = JobRole | 'unassigned';
+import { deptOrder, memberRoleResolver } from './memberRole';
+import type { Feature, Task, TeamMember, TeamRole } from '../types';
 
 export interface DeptTaskGroup {
-  key: DeptBucket;
+  /** Khoá của memberRole (`role:<id>` | JobRole cũ) hoặc 'unassigned'. */
+  key: string;
   icon: string;
   label: string;
   tasks: Task[];
@@ -38,30 +29,35 @@ export function sortTasksByProgress(tasks: Task[]): Task[] {
 /**
  * Gom task thành các mục theo bộ phận, đã sắp sẵn — thay cho việc bắt người dùng tự lọc.
  *
- * Thứ tự mục bám theo JOB_ROLES để vị trí các bộ phận CỐ ĐỊNH giữa các sprint (sắp theo
- * số lượng thì mục sẽ nhảy chỗ mỗi lần đổi sprint, rất khó dùng). 'Chưa giao' luôn cuối.
- * Chỉ trả về mục có task.
+ * Bộ phận = chuyên môn của NGƯỜI NHẬN theo `memberRoleResolver`: role động (0072) trước,
+ * enum jobRole cũ cho ai chưa chọn — role admin mới tạo thành mục riêng đúng tên/icon
+ * thay vì bị ép về enum cũ qua legacy_job_role. Thứ tự mục theo `deptOrder` để vị trí
+ * CỐ ĐỊNH giữa các sprint; 'Chưa giao' luôn cuối. Chỉ trả về mục có task.
  */
-export function groupTasksByDept(tasks: Task[], members: TeamMember[]): DeptTaskGroup[] {
-  const roleByUid = new Map(members.map((m) => [m.uid, m.jobRole]));
-  const buckets = new Map<DeptBucket, Task[]>();
+export function groupTasksByDept(
+  tasks: Task[],
+  members: TeamMember[],
+  roles: TeamRole[],
+): DeptTaskGroup[] {
+  const roleOf = memberRoleResolver(members, roles);
+  const buckets = new Map<string, Task[]>();
 
   for (const task of tasks) {
-    const key: DeptBucket = (task.assigneeId && roleByUid.get(task.assigneeId)) || 'unassigned';
+    const key = (task.assigneeId && roleOf(task.assigneeId)?.key) || 'unassigned';
     const list = buckets.get(key);
     if (list) list.push(task);
     else buckets.set(key, [task]);
   }
 
-  const order: DeptBucket[] = [...JOB_ROLES.map((r) => r.id), 'unassigned'];
+  const order = [...deptOrder(roles), { key: 'unassigned', icon: '📥', label: 'Chưa giao' }];
   return order
-    .filter((key) => (buckets.get(key)?.length ?? 0) > 0)
-    .map((key) => {
-      const list = [...(buckets.get(key) as Task[])].sort(byProgressThenOrder);
+    .filter((d) => (buckets.get(d.key)?.length ?? 0) > 0)
+    .map((d) => {
+      const list = [...(buckets.get(d.key) as Task[])].sort(byProgressThenOrder);
       return {
-        key,
-        icon: key === 'unassigned' ? '📥' : JOB_ROLE_ICON[key],
-        label: key === 'unassigned' ? 'Chưa giao' : JOB_ROLE_LABEL[key],
+        key: d.key,
+        icon: d.icon,
+        label: d.label,
         tasks: list,
         done: list.filter((t) => t.status === 'done').length,
       };

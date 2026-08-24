@@ -9,7 +9,7 @@ import { archiveNotionPage, createNotionPage, updateNotionPage } from './notionS
 import { taskPatchToRow } from './mappers';
 import { endOfWorkWeek, sundayOfWeek } from './format';
 import { Timestamp } from './time';
-import type { NewTaskInput, Sprint, Task, TaskStatus } from '../types';
+import type { NewTaskInput, Sprint, Task, TaskStatus, TeamMember } from '../types';
 
 export interface CreateOpts {
   reporterId: string;
@@ -178,6 +178,34 @@ export async function moveTask(task: Task, status: TaskStatus, order: number): P
     .eq('id', task.id);
   if (error) throw error;
   if (task.notionPageId) void safeNotionUpdate(task.notionPageId, { ...task, status, ...doneEnd });
+}
+
+/** Kết quả nút "Nhận task" (RPC `claim_task`, 0083). Khoá camelCase build sẵn từ SQL. */
+export interface ClaimTaskResult {
+  ok: boolean;
+  /** `taken` = có người nhận trước (kèm tên); `not_found` = task đã bị xoá. */
+  reason?: 'taken' | 'not_found';
+  assigneeName?: string;
+}
+
+/**
+ * Tự nhận task CHƯA GIAO về mình (nút "Nhận task" ở Bảng Sprint). Đi qua RPC thay vì
+ * UPDATE thẳng vì hai lẽ: member thường không qua được RLS `tasks_update` với task trống
+ * (họ chẳng là reporter lẫn assignee), và UPDATE điều kiện phía server chặn hai người
+ * nhận cùng lúc — người sau được báo "đã có người nhận" chứ không lặng lẽ ghi đè.
+ */
+export async function claimTask(task: Task, me: TeamMember): Promise<ClaimTaskResult> {
+  const { data, error } = await supabase.rpc('claim_task', { p_task_id: task.id });
+  if (error) throw error;
+  const res = (data ?? { ok: false }) as ClaimTaskResult;
+  if (res.ok && task.notionPageId) {
+    void safeNotionUpdate(
+      task.notionPageId,
+      { ...task, assigneeId: me.uid, assigneeName: me.displayName },
+      me.notionUserId ?? null,
+    );
+  }
+  return res;
 }
 
 /**

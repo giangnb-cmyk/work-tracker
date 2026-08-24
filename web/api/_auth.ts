@@ -29,7 +29,9 @@ function supabaseAuthClient(): SupabaseClient | null {
 }
 
 /**
- * Webhook Discord của MỘT dự án (`projects.daily_report_webhook`).
+ * Webhook Discord KÊNH TASK của MỘT dự án (`projects.notify_webhook`, 0084 — trước đó
+ * dùng chung `daily_report_webhook`; cột cũ giờ là kênh riêng của báo cáo 10:30, KHÔNG
+ * dùng cho thông báo task nữa, chỉ còn là fallback cho hàng do UI cũ ghi chưa "chữa").
  *
  * Đọc bằng ANON KEY + CHÍNH token của người gọi, nên RLS vẫn có hiệu lực (policy SELECT của
  * `projects` mở cho `authenticated`). Không dùng service-role: CLAUDE.md cấm đưa key đó lên
@@ -51,14 +53,18 @@ export async function projectWebhook(projectId: string, authHeader: string): Pro
   });
   const { data, error } = await scoped
     .from('projects')
-    .select('daily_report_webhook')
+    .select('notify_webhook, daily_report_webhook')
     .eq('id', projectId)
     .maybeSingle();
   if (error) {
     console.warn('Không đọc được webhook của dự án %s: %s', projectId, error.message);
     return null;
   }
-  return (data?.daily_report_webhook as string | null) || null;
+  return (
+    (data?.notify_webhook as string | null) ||
+    (data?.daily_report_webhook as string | null) ||
+    null
+  );
 }
 
 export interface Caller {

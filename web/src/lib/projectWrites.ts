@@ -15,6 +15,9 @@ export interface ProjectInput {
   /** Tạo task có đẩy sang Notion không (0070). Bỏ trống = bật, giữ hành vi cũ. */
   notionSyncEnabled?: boolean;
   weeklySheetId: string | null;
+  /** Kênh task của dự án (0084) — mọi thông báo, và cả báo cáo 10:30 khi không đặt riêng. */
+  notifyWebhook?: string | null;
+  /** Webhook RIÊNG cho báo cáo 10:30. Rỗng = báo cáo đi chung `notifyWebhook`. */
   dailyReportWebhook?: string | null;
   /** Sheet nhận bảng CHI PHÍ (file riêng, có lương — 0060). */
   costSheetId?: string | null;
@@ -67,6 +70,7 @@ export async function createProject(input: ProjectInput, createdBy: string): Pro
       is_active: input.isActive ?? true,
       notion_sync_enabled: input.notionSyncEnabled ?? true,
       weekly_sheet_id: input.weeklySheetId,
+      notify_webhook: input.notifyWebhook ?? null,
       daily_report_webhook: input.dailyReportWebhook ?? null,
       cost_sheet_id: input.costSheetId ?? null,
       bug_forum_channel_id: input.bugForumChannelId ?? null,
@@ -89,6 +93,7 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
   if (patch.isActive !== undefined) row.is_active = patch.isActive;
   if (patch.notionSyncEnabled !== undefined) row.notion_sync_enabled = patch.notionSyncEnabled;
   if (patch.weeklySheetId !== undefined) row.weekly_sheet_id = patch.weeklySheetId;
+  if (patch.notifyWebhook !== undefined) row.notify_webhook = patch.notifyWebhook;
   if (patch.dailyReportWebhook !== undefined) row.daily_report_webhook = patch.dailyReportWebhook;
   if (patch.costSheetId !== undefined) row.cost_sheet_id = patch.costSheetId;
   if (patch.bugForumChannelId !== undefined) row.bug_forum_channel_id = patch.bugForumChannelId;
