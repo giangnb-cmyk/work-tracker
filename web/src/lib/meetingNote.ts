@@ -43,25 +43,37 @@ function taskLines(tasks: Task[], scope: NoteScope, linkFor?: TaskLinkBuilder): 
   return out;
 }
 
+/** Phần đầu note: tên sprint + target (goal) của nó — target rỗng thì chỉ có tên. */
+export interface NoteHeader {
+  title: string;
+  /** `Sprint.goal` — "Target sprint" đội nhập ở Quản lý Sprint. */
+  goal?: string;
+}
+
 /**
  * Note họp CẢ SPRINT dạng Markdown mà cả Discord lẫn Notion đều render được:
  *
  *   ## Sprint 3
+ *   > Target: Ra mắt tính năng X
  *   ### 🎨 2D Artist
  *   - [Tách npc 4, 5, 6, 7 v3](https://…/tasks/<id>?p=<proj>)
  *     - Phác thảo
  *     - ~~Tô màu~~
  *
+ * Target sprint nằm ngay dưới tên (blockquote — Discord lẫn Notion đều render): cả buổi
+ * họp xoay quanh nó, để người đọc note khỏi phải mở app tra lại.
  * Cố ý KHÔNG dùng bảng: Discord không render bảng (xem FORMAT_HINT của bot).
  * Bộ phận nào không còn task nào sau khi lọc thì bỏ hẳn mục, không để tiêu đề trống.
  */
 export function buildMeetingNote(
-  title: string,
+  header: NoteHeader,
   groups: DeptTaskGroup[],
   scope: NoteScope = 'all',
   linkFor?: TaskLinkBuilder,
 ): string {
-  const lines: string[] = [`## ${title}`, ''];
+  const head = [`## ${header.title}`];
+  if (header.goal?.trim()) head.push(`> Target: ${header.goal.trim()}`);
+  const lines: string[] = [...head, ''];
 
   for (const group of groups) {
     const tasks = scopedTasks(group, scope);
@@ -69,8 +81,8 @@ export function buildMeetingNote(
     lines.push(`### ${group.icon} ${group.label}`, ...taskLines(tasks, scope, linkFor), '');
   }
 
-  // Chỉ có tiêu đề = không có việc nào lọt bộ lọc.
-  if (lines.length <= 2) return `## ${title}\n\n_Không có task nào._`;
+  // Chỉ có phần đầu = không có việc nào lọt bộ lọc.
+  if (lines.length <= head.length + 1) return [...head, '', '_Không có task nào._'].join('\n');
   return lines.join('\n').trimEnd();
 }
 

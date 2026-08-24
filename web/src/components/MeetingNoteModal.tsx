@@ -6,6 +6,8 @@ import type { Task } from '../types';
 
 interface MeetingNoteModalProps {
   title: string;
+  /** Target sprint (`Sprint.goal`) — hiện ngay dưới tên sprint trong note. Rỗng = bỏ dòng. */
+  goal?: string;
   groups: DeptTaskGroup[];
   onClose: () => void;
 }
@@ -32,12 +34,16 @@ const taskLinkFor = (t: Task): string =>
  * Copy TỪNG BỘ PHẬN vì note cả sprint dễ vượt trần 2000 ký tự của 1 tin Discord — mỗi bộ
  * phận dán làm 1 tin riêng, kèm sẵn số ký tự để biết khúc nào còn vượt.
  */
-export default function MeetingNoteModal({ title, groups, onClose }: MeetingNoteModalProps) {
+export default function MeetingNoteModal({ title, goal, groups, onClose }: MeetingNoteModalProps) {
   const [scope, setScope] = useState<NoteScope>('open');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const text = useMemo(() => buildMeetingNote(title, groups, scope, taskLinkFor), [title, groups, scope]);
+  // Target chỉ nằm ở note tổng — khúc theo bộ phận giữ gọn để né trần 2000 ký tự.
+  const text = useMemo(
+    () => buildMeetingNote({ title, goal }, groups, scope, taskLinkFor),
+    [title, goal, groups, scope],
+  );
   const depts = useMemo(() => buildDeptNotes(title, groups, scope, taskLinkFor), [title, groups, scope]);
 
   async function copy(payload: string, key: string) {

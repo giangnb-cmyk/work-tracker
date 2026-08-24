@@ -242,6 +242,7 @@ export default function SprintBoard() {
       {noteOpen && (
         <MeetingNoteModal
           title={selectedSprint?.name ?? 'Backlog'}
+          goal={selectedSprint?.goal}
           groups={groups}
           onClose={() => setNoteOpen(false)}
         />
