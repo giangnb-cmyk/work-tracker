@@ -6,7 +6,7 @@ import { useRoles } from '../hooks/useRoles';
 import { useFeatureLabels } from '../hooks/useFeatureLabels';
 import { memberRoleResolver } from '../lib/memberRole';
 import { sortFeatureLabels } from '../lib/featureLabelSort';
-import { becameDone, moveTask, updateTask } from '../lib/taskWrites';
+import { moveTask, updateTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import { sortTasksByProgress } from '../lib/taskGrouping';
 import TaskListRow from './TaskListRow';
@@ -449,9 +449,10 @@ function FeatureDetail({
 
   function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
-    const justFinished = becameDone(task.status, status);
-    void moveTask(task, status, task.order);
-    if (justFinished) notifyDone({ ...task, status });
+    // Chỉ báo khi DB xác nhận CHÍNH lần ghi này hoàn thành task (chống bấm đúp bắn 2 tin).
+    void moveTask(task, status, task.order).then((justFinished) => {
+      if (justFinished) notifyDone({ ...task, status });
+    });
   }
 
   return (

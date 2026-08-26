@@ -8,7 +8,7 @@ import { useBugLabels } from '../hooks/useBugLabels';
 import { useRoles } from '../hooks/useRoles';
 import { useStoredView } from '../hooks/useStoredView';
 import { memberRoleResolver } from '../lib/memberRole';
-import { becameDone, moveTask } from '../lib/taskWrites';
+import { moveTask } from '../lib/taskWrites';
 import { useNotify } from '../contexts/NotifyContext';
 import TaskRow from './TaskRow';
 import TaskListRow from './TaskListRow';
@@ -92,9 +92,10 @@ export default function MyTasks() {
 
   function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
-    const justFinished = becameDone(task.status, status);
-    void moveTask(task, status, task.order);
-    if (justFinished) notifyDone({ ...task, status }, sprintName(task.sprintId));
+    // Chỉ báo khi DB xác nhận CHÍNH lần ghi này hoàn thành task (chống bấm đúp bắn 2 tin).
+    void moveTask(task, status, task.order).then((justFinished) => {
+      if (justFinished) notifyDone({ ...task, status }, sprintName(task.sprintId));
+    });
   }
 
   if (loading) {

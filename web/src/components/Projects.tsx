@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useProjectTasks } from '../hooks/useProjectTasks';
 import { useRoles } from '../hooks/useRoles';
-import { becameDone, moveTask } from '../lib/taskWrites';
+import { moveTask } from '../lib/taskWrites';
 import { memberRoleResolver } from '../lib/memberRole';
 import { useNotify } from '../contexts/NotifyContext';
 import { formatDate } from '../lib/format';
@@ -98,9 +98,10 @@ function ProjectDetail({ project, onBack, onEdit, editingProject, onCloseEdit }:
 
   function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
-    const justFinished = becameDone(task.status, status);
-    void moveTask(task, status, task.order);
-    if (justFinished) notifyDone({ ...task, status });
+    // Chỉ báo khi DB xác nhận CHÍNH lần ghi này hoàn thành task (chống bấm đúp bắn 2 tin).
+    void moveTask(task, status, task.order).then((justFinished) => {
+      if (justFinished) notifyDone({ ...task, status });
+    });
   }
 
   return (

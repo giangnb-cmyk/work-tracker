@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useFeatureAssignees } from '../hooks/useFeatureAssignees';
 import { usePasteAttachment } from '../hooks/usePasteAttachment';
-import { becameDone, createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
+import { createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
 import { copyTitle, duplicateTask } from '../lib/duplicateWrites';
 import { notifySubtaskDone } from '../lib/discordNotify';
 import { useNotify } from '../contexts/NotifyContext';
@@ -219,14 +219,15 @@ export default function TaskModal({
       dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
       attachments, subtasks, watcherIds, watcherNames,
     };
-    const justFinished = becameDone(base.status, status);
     // Subtask VỪA chuyển sang done ở lượt lưu này. Phải diff chứ không bắt từng cú bấm:
     // autosave gom 700ms nên tick liền mấy cái là về cùng một lượt. `=== false` (không phải
     // falsy) để subtask MỚI thêm vào mà đã tick sẵn không bị tính là "vừa xong".
     const wasDone = new Map((base.subtasks ?? []).map((s) => [s.id, s.done]));
     const newlyDoneSubs = subtasks.filter((s) => s.done && wasDone.get(s.id) === false).map((s) => s.title);
     try {
-      await updateTask(base, patch, assignee?.notionUserId ?? null, notionProjectId);
+      // justFinished do DB chốt, không so status phía client: autosave đang bay mà bấm đóng
+      // modal là persist() chạy hai lần với cùng ảnh chụp cũ → hai tin Discord trùng.
+      const justFinished = await updateTask(base, patch, assignee?.notionUserId ?? null, notionProjectId);
       const merged = { ...base, ...patch } as Task;
       savedTaskRef.current = merged;
       lastSavedRef.current = snapshot();

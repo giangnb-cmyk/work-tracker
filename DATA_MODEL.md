@@ -239,6 +239,15 @@ Từ `0084` tách HAI kênh: `notifyWebhook` = kênh task (mọi thông báo do 
 - Client **không bao giờ** gửi URL webhook lên server: ai đăng nhập cũng sai được server
   bắn tin vào một webhook Discord bất kỳ.
 
+> **Chống bắn TRÙNG tin "task hoàn thành".** Ai được báo là do **DB chốt**, không phải so
+> `task.status` phía client: `moveTask`/`updateTask` gắn điều kiện `.neq('status','done')`
+> ngay trong câu UPDATE và trả về `justFinished` = lần ghi này có thật sự đổi hàng không.
+> Lý do: `task` mà UI cầm là ảnh chụp — bấm đúp ô tick, hay autosave 700ms còn đang bay mà
+> người dùng đóng modal (persist() chạy lần hai với cùng ảnh chụp), đều khiến client thấy
+> "vừa xong" hai lần và Discord ăn 2 tin (đã bị báo). Điều kiện nằm trong câu UPDATE nên
+> atomic — chặn cả trường hợp hai tab cùng tick. Nhánh thua cuộc ở `updateTask` vẫn ghi
+> lại patch (không có `neq`) để các field khác của lượt lưu đó không mất, chỉ bỏ thông báo.
+
 ### Weekly report (`weeklySheetId`)
 
 Bot điền báo cáo tuần vào **một Google Sheet riêng cho mỗi project** — đặt ở đây chứ không

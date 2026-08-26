@@ -146,18 +146,43 @@ async function defaultSprintDue(sprintId: string, now: Date): Promise<Date> {
   return anchor ? sundayOfWeek(new Date(anchor)) : endOfWorkWeek(now);
 }
 
+/**
+ * Lưu task. Trả về TRUE nếu CHÍNH lần ghi này đưa task sang done trong DB — chỗ gọi dựa
+ * vào đó mới bắn thông báo hoàn thành, thay vì so `task.status` phía client.
+ *
+ * Vì sao phải hỏi DB: `task` truyền vào là ảnh chụp lúc mở form. Autosave (700ms) đang bay
+ * mà người dùng bấm đóng modal là persist() chạy lần hai với ĐÚNG ảnh chụp cũ đó → cả hai
+ * lần đều thấy "vừa xong" và Discord ăn 2 tin trùng (đã bị báo). Điều kiện `neq done` nằm
+ * ngay trong câu UPDATE nên nó atomic: chỉ một lần ghi thắng, kể cả từ hai tab.
+ */
 export async function updateTask(
   task: Task,
   patch: Partial<Task>,
   assigneeNotionUserId?: string | null,
   notionProjectId?: string | null,
-): Promise<void> {
+): Promise<boolean> {
   // On completion, the work window's end snaps to the actual done day.
-  const finalPatch = becameDone(task.status, patch.status)
-    ? { ...patch, dueDate: Timestamp.now() }
-    : patch;
-  const { error } = await supabase.from('tasks').update(taskPatchToRow(finalPatch)).eq('id', task.id);
-  if (error) throw error;
+  const finishing = becameDone(task.status, patch.status);
+  const finalPatch = finishing ? { ...patch, dueDate: Timestamp.now() } : patch;
+  const row = taskPatchToRow(finalPatch);
+
+  let justFinished = false;
+  if (finishing) {
+    const { data, error } = await supabase
+      .from('tasks').update(row).eq('id', task.id).neq('status', 'done').select('id');
+    if (error) throw error;
+    justFinished = (data?.length ?? 0) > 0;
+    // Thua cuộc đua: task đã done từ lần ghi trước. Vẫn phải lưu các field khác của lượt
+    // này (tên, mô tả, checklist…) — chỉ bỏ phần thông báo. Câu thứ hai chỉ chạy ở nhánh
+    // hiếm này nên không thêm chi phí cho đường thường.
+    if (!justFinished) {
+      const { error: retryErr } = await supabase.from('tasks').update(row).eq('id', task.id);
+      if (retryErr) throw retryErr;
+    }
+  } else {
+    const { error } = await supabase.from('tasks').update(row).eq('id', task.id);
+    if (error) throw error;
+  }
 
   const merged = { ...task, ...finalPatch };
   // subtask VỪA đổi ở lần lưu này -> mới đồng bộ lại checklist Notion (tránh ghi lại vô ích
@@ -167,17 +192,31 @@ export async function updateTask(
     void safeNotionUpdate(task.notionPageId, merged, assigneeNotionUserId, notionProjectId, subtasksChanged);
   }
   // Completion notifications are dispatched by the UI (NotifyContext), not here.
+  return justFinished;
 }
 
-export async function moveTask(task: Task, status: TaskStatus, order: number): Promise<void> {
-  const finished = becameDone(task.status, status);
-  const doneEnd = finished ? { dueDate: Timestamp.now() } : {};
-  const { error } = await supabase
-    .from('tasks')
-    .update(taskPatchToRow({ status, order, ...doneEnd }))
-    .eq('id', task.id);
+/**
+ * Đổi trạng thái nhanh (tick ô, kéo Kanban). Trả về TRUE nếu CHÍNH lần ghi này đưa task
+ * từ chưa-done sang done TRONG DB — chỗ gọi dựa vào đó mới bắn thông báo hoàn thành.
+ *
+ * Điều kiện `neq status done` nằm Ở CÂU UPDATE (atomic) chứ không so prop phía client:
+ * bấm đúp ô tick, hoặc bấm lần hai trong lúc realtime chưa đuổi kịp, thì prop còn cũ →
+ * so phía client thấy "vừa xong" cả hai lần và Discord nhận 2 tin trùng (đã bị báo).
+ * Lần ghi khớp 0 hàng nghĩa là lần bấm trước đã done rồi — khỏi ghi lại, khỏi báo lại.
+ */
+export async function moveTask(task: Task, status: TaskStatus, order: number): Promise<boolean> {
+  const finishing = becameDone(task.status, status);
+  const doneEnd = finishing ? { dueDate: Timestamp.now() } : {};
+  let q = supabase.from('tasks').update(taskPatchToRow({ status, order, ...doneEnd })).eq('id', task.id);
+  if (finishing) q = q.neq('status', 'done');
+  const { data, error } = await q.select('id');
   if (error) throw error;
-  if (task.notionPageId) void safeNotionUpdate(task.notionPageId, { ...task, status, ...doneEnd });
+  const justFinished = finishing && (data?.length ?? 0) > 0;
+  // Thua cuộc đua done (0 hàng) thì người thắng đã sync Notion — đừng ghi đè lần nữa.
+  if (task.notionPageId && (!finishing || justFinished)) {
+    void safeNotionUpdate(task.notionPageId, { ...task, status, ...doneEnd });
+  }
+  return justFinished;
 }
 
 /** Kết quả nút "Nhận task" (RPC `claim_task`, 0083). Khoá camelCase build sẵn từ SQL. */

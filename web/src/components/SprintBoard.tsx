@@ -5,7 +5,7 @@ import { useTasks } from '../hooks/useTasks';
 import { useRoles } from '../hooks/useRoles';
 import { useSprintHistory } from '../hooks/useSprintHistory';
 import { memberRoleResolver } from '../lib/memberRole';
-import { becameDone, claimTask, moveTask } from '../lib/taskWrites';
+import { claimTask, moveTask } from '../lib/taskWrites';
 import { reportError } from '../lib/errorBus';
 import { useNotify } from '../contexts/NotifyContext';
 import { groupTasksByDept, groupTasksByFeature } from '../lib/taskGrouping';
@@ -90,9 +90,10 @@ export default function SprintBoard() {
 
   function quickStatus(task: Task, status: TaskStatus) {
     if (status === task.status) return;
-    const justFinished = becameDone(task.status, status);
-    void moveTask(task, status, task.order);
-    if (justFinished) notifyDone({ ...task, status }, selectedSprint?.name);
+    // Chỉ báo khi DB xác nhận CHÍNH lần ghi này hoàn thành task (chống bấm đúp bắn 2 tin).
+    void moveTask(task, status, task.order).then((justFinished) => {
+      if (justFinished) notifyDone({ ...task, status }, selectedSprint?.name);
+    });
   }
 
   // Nút "Nhận task" trên dòng chưa giao. Không hỏi confirm: mục đích là pick nhanh, và
