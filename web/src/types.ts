@@ -759,3 +759,48 @@ export const NOTE_SECTIONS: { key: 'overview' | 'highlights' | 'concerns'; label
   { key: 'highlights', label: 'Nổi bật', icon: '⭐' },
   { key: 'concerns', label: 'Lưu ý', icon: '⚠️' },
 ];
+
+/* ===========================================================================
+   Gantt tốc độ (tab Gantt) — bảng velocity_charts + holidays, migration 0085.
+   Ngày dạng 'YYYY-MM-DD' (date-only): tính theo NGÀY CÔNG, không cần giờ, và
+   tránh lệch múi giờ khi Timestamp làm tròn về UTC (như phần Chi phí).
+   =========================================================================== */
+
+/**
+ * Một dòng công việc theo dõi tốc độ: khối lượng × khoảng thời gian × người tham gia.
+ * Web tự tính "mỗi ngày công cần làm bao nhiêu" từ đây — xem lib/velocity.ts.
+ */
+export interface VelocityChart {
+  id: string;
+  projectId: string;
+  name: string;
+  /** Đơn vị khối lượng hiện cạnh con số: "model", "map", "màn"… */
+  unit: string;
+  startDate: string; // 'YYYY-MM-DD'
+  endDate: string; // 'YYYY-MM-DD', >= startDate (DB check)
+  totalQty: number;
+  doneQty: number;
+  /**
+   * Tốc độ hiện tại NGƯỜI DÙNG nhập (đơn vị / ngày công). `null` = để web tự đo bằng
+   * đã làm ÷ số ngày công đã qua (xem `computePlan`).
+   */
+  velocity: number | null;
+  /** Người tham gia (→ profiles.id). Không FK: người rời nhóm vẫn giữ lịch sử. */
+  memberIds: string[];
+  note: string;
+  sortOrder: number;
+  createdAt?: Timestamp;
+  createdBy: string | null;
+}
+
+/** Dữ liệu form thêm/sửa một chart (id/dự án/người tạo do chỗ gọi + DB lo). */
+export type VelocityChartInput = Pick<
+  VelocityChart,
+  'name' | 'unit' | 'startDate' | 'endDate' | 'totalQty' | 'doneQty' | 'velocity' | 'memberIds' | 'note'
+>;
+
+/** Ngày lễ toàn công ty (bảng `holidays`) — KHÔNG tính là ngày công, cùng với T7/CN. */
+export interface Holiday {
+  day: string; // 'YYYY-MM-DD' — khoá chính
+  name: string;
+}

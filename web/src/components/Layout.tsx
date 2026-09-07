@@ -16,6 +16,7 @@ const Features = lazyView(() => import('./Features'));
 const Backlog = lazyView(() => import('./Backlog'));
 const Bugs = lazyView(() => import('./Bugs'));
 const Timeline = lazyView(() => import('./Timeline'));
+const Gantt = lazyView(() => import('./Gantt'));
 const DocLibrary = lazyView(() => import('./DocLibrary'));
 // Dashboard là view MẶC ĐỊNH sau khi vào dự án — kích tải chunk (kéo theo chunk
 // Chart.js) ngay từ lúc boot, song song với các lượt gọi auth, thay vì nối đuôi
@@ -76,6 +77,7 @@ export default function Layout() {
             {activeView === 'backlog' && <Backlog />}
             {activeView === 'bugs' && <Bugs />}
             {activeView === 'timeline' && <Timeline />}
+            {activeView === 'gantt' && <Gantt />}
             {activeView === 'docs' && <DocLibrary />}
             {activeView === 'dashboard' && <Dashboard />}
             {activeView === 'performance' && <Performance />}

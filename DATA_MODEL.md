@@ -570,6 +570,40 @@ task/feature ("hay dùng" = hay gắn nhất).
 
 ---
 
+## `velocity_charts` & `holidays` (tab Gantt tốc độ — migration `0085`)
+
+Theo dõi **tốc độ** một dòng công việc: "Model 3D — 120 model, 01/09 → 30/09, 3 người 3D".
+Web tính mỗi **ngày công** phải làm bao nhiêu để kịp deadline, so với tốc độ hiện tại,
+và suy ngày dự kiến xong. Mọi phép tính là THUẦN phía web (`lib/workdays.ts`,
+`lib/velocity.ts`); DB chỉ giữ dữ liệu nhập. Ngày để `date` / chuỗi `'YYYY-MM-DD'`.
+
+| Field (`velocity_charts`) | Type | Notes |
+|---|---|---|
+| `id` | uuid | |
+| `projectId` | uuid → projects | cascade — chart thuộc MỘT dự án |
+| `name` | string | tên dòng công việc (1–120) |
+| `unit` | string | đơn vị khối lượng hiện cạnh số: "model", "map", "màn"… mặc định `việc` |
+| `startDate` / `endDate` | date | `end >= start` (check DB) |
+| `totalQty` / `doneQty` | numeric | khối lượng tổng / đã làm — numeric vì có "nửa model" |
+| `velocity` | numeric \| null | tốc độ hiện tại NGƯỜI DÙNG nhập (đơn vị/ngày công). `null` = web tự đo = `doneQty ÷ ngày công đã qua` |
+| `memberIds` | uuid[] | người tham gia — không FK (người rời nhóm vẫn giữ lịch sử); web tra roster để hiện avatar + đếm theo role động |
+| `note`, `sortOrder`, `createdAt`, `createdBy` | | |
+
+**Ngày công** = T2–T6 **trừ** các ngày trong `holidays` (`day date pk`, `name`). Bảng lễ
+DÙNG CHUNG cả công ty (nghỉ lễ là nghỉ cả đội), không theo dự án. T7/CN tự bỏ, không khai.
+
+**Cách tính** (`computePlan`): ngày công đã qua = `[start, hôm qua]`; còn lại = `[hôm nay, end]`
+(hôm nay vẫn còn làm được). `cần/ngày = (tổng − đã làm) ÷ ngày công còn lại`;
+`nhịp kế hoạch = tổng ÷ ngày công cả kỳ`; `đáng ra tới hôm nay = nhịp kế hoạch × đã qua`
+(vạch sky trên bar); `dự kiến xong` = ngày công thứ `ceil(còn lại ÷ tốc độ hiện tại)` tính từ
+hôm nay. Trạng thái: `done` / `not_started` / `overdue` / `no_data` (chưa có tốc độ) /
+`on_track` (tốc độ ≥ 99,9% mức cần) / `behind`.
+
+**RLS**: đọc theo luật thấy dự án (`is_admin() or is_project_member`); thêm = người trong dự
+án, `created_by` ép đúng người gọi; sửa/xoá = admin **hoặc** người tạo **hoặc**
+`has_perm('sprint.manage')` (người điều phối sprint cũng canh tốc độ). `holidays`: đọc mọi
+người đăng nhập; ghi = admin hoặc `sprint.manage`. Cả hai bảng có realtime.
+
 ## `tasks/{taskId}`
 
 A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the **backlog**.

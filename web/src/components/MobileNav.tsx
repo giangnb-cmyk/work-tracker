@@ -24,6 +24,7 @@ const MORE: NavDef[] = [
   { id: 'features', label: 'Features', icon: '🧩' },
   { id: 'backlog', label: 'Backlog', icon: '📥' },
   { id: 'timeline', label: 'Timeline', icon: '📆' },
+  { id: 'gantt', label: 'Gantt', icon: '⏱️' },
   { id: 'members', label: 'Thành viên', icon: '👥' },
 ];
 

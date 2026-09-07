@@ -3710,3 +3710,129 @@ body.kb-open .mnav { display: none; }
   /* Thẻ task: lưới thông tin 2 cột chật ở ~330px — hạ cỡ icon ô cho thoáng. */
   .tcard-grid { column-gap: 0.5rem; }
 }
+
+/* ===== Tab Gantt tốc độ (components/Gantt.tsx, gantt/*) =====
+   Ba cột thẳng hàng giữa đầu trục và từng dòng: thông tin · trục thời gian · số liệu.
+   Trục là % theo lib/ganttAxis nên co giãn theo bề rộng, không cần scroll ngang. */
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+.gantt { display: flex; flex-direction: column; gap: 0.6rem; }
+.gantt-head, .gantt-row {
+  display: grid; grid-template-columns: 280px minmax(200px, 1fr) 300px; gap: 1rem; align-items: center;
+}
+.gantt-head { padding: 0 1rem; }
+.gantt-row {
+  padding: 0.8rem 1rem; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--border-soft); transition: border-color 0.15s ease, background 0.15s ease;
+}
+.gantt-row:hover { border-color: rgba(99, 102, 241, 0.45); background: rgba(99, 102, 241, 0.08); }
+.gantt-row:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.gantt-info { min-width: 0; }
+.gantt-name { font-weight: 600; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-dates { font-size: 0.76rem; margin-top: 0.15rem; }
+.gantt-people { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.45rem; flex-wrap: wrap; }
+.gantt-avatars { display: inline-flex; align-items: center; }
+.gantt-avatar { display: inline-flex; margin-left: -6px; border: 2px solid var(--bg); border-radius: 50%; }
+.gantt-avatar:first-child { margin-left: 0; }
+.gantt-avatar-more {
+  display: inline-flex; align-items: center; justify-content: center; margin-left: -6px;
+  width: 26px; height: 26px; border-radius: 50%; font-size: 0.7rem; color: var(--muted);
+  background: rgba(255, 255, 255, 0.08); border: 2px solid var(--bg);
+}
+.gantt-roles { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; }
+.gantt-role-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; color: var(--muted);
+  padding: 0.12rem 0.45rem; border-radius: 999px; background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-soft); white-space: nowrap;
+}
+.gantt-role-chip b { color: var(--text); }
+
+/* Trục + bar */
+.gantt-track { position: relative; height: 34px; min-width: 0; }
+.gantt-axis { height: 26px; }
+.gantt-month {
+  position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding-left: 0.4rem;
+  font-size: 0.72rem; color: var(--muted); border-left: 1px solid var(--border);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box;
+}
+.gantt-month-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-soft); }
+.gantt-bar {
+  position: absolute; top: 6px; height: 22px; border-radius: 6px;
+  background: rgba(99, 102, 241, 0.22); border: 1px solid rgba(99, 102, 241, 0.45);
+  overflow: hidden; box-sizing: border-box;
+}
+.gantt-bar-done { position: absolute; left: 0; top: 0; bottom: 0; background: var(--primary); opacity: 0.85; }
+.gantt-st-behind .gantt-bar-done, .gantt-st-overdue .gantt-bar-done { background: var(--red); }
+.gantt-st-done .gantt-bar-done { background: var(--green); }
+.gantt-bar-expect {
+  position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--sky);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6);
+}
+.gantt-bar-label {
+  position: absolute; right: 6px; top: 0; bottom: 0; display: flex; align-items: center;
+  font-size: 0.7rem; color: var(--text); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.gantt-today { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--gold); opacity: 0.9; }
+.gantt-today-label { top: 0; bottom: 0; overflow: visible; }
+.gantt-today-label > span {
+  position: absolute; top: 0; left: 4px; font-size: 0.68rem; color: var(--gold); white-space: nowrap;
+}
+
+/* Số liệu bên phải */
+.gantt-metrics { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.gantt-qty { font-size: 0.95rem; }
+.gantt-qty b { font-weight: 700; }
+.gantt-qty .muted { font-size: 0.8rem; margin-left: 0.15rem; }
+.gantt-speed { display: flex; gap: 0.9rem; font-size: 0.78rem; color: var(--muted); flex-wrap: wrap; }
+.gantt-speed b { color: var(--text); }
+.gantt-foot { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.gantt-badge { font-size: 0.72rem; }
+.gantt-badge-on_track { background: rgba(34, 197, 94, 0.16); color: #86efac; }
+.gantt-badge-done { background: rgba(34, 197, 94, 0.22); color: #bbf7d0; }
+.gantt-badge-behind { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
+.gantt-badge-overdue { background: rgba(239, 68, 68, 0.28); color: #fecaca; }
+.gantt-badge-not_started { background: rgba(148, 163, 184, 0.16); color: var(--muted); }
+.gantt-badge-no_data { background: rgba(251, 191, 36, 0.16); color: #fde68a; }
+
+.gantt-legend { display: flex; gap: 1.2rem; font-size: 0.74rem; margin: 0.4rem 0 0 1rem; flex-wrap: wrap; }
+.gantt-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.gantt-lg { display: inline-block; width: 14px; height: 8px; border-radius: 2px; }
+.gantt-lg-done { background: var(--primary); }
+.gantt-lg-expect { width: 2px; height: 12px; background: var(--sky); }
+.gantt-lg-today { width: 2px; height: 12px; background: var(--gold); }
+
+/* Khung xem trước trong modal */
+.gantt-preview { padding: 0.75rem 0.9rem; border-radius: 10px; margin-bottom: 0.9rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.gantt-preview-row { display: grid; grid-template-columns: 120px auto 1fr; gap: 0.6rem; align-items: baseline; font-size: 0.84rem; }
+.gantt-preview-row > span:first-child { color: var(--muted); }
+.gantt-preview-row > b { font-size: 1rem; }
+.gantt-preview-row .muted { font-size: 0.78rem; }
+.gantt-preview-key > b { color: #c7d2fe; }
+
+/* Modal ngày lễ */
+.holiday-add { display: grid; grid-template-columns: 170px 1fr auto; gap: 0.5rem; margin-bottom: 0.9rem; }
+.holiday-head { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; margin: 0.4rem 0 0.3rem; }
+.holiday-list { list-style: none; margin: 0 0 0.6rem; padding: 0; display: flex; flex-direction: column; }
+.holiday-item {
+  display: grid; grid-template-columns: 96px 28px 1fr auto; gap: 0.6rem; align-items: center;
+  padding: 0.45rem 0.5rem; border-radius: 8px; font-size: 0.86rem;
+}
+.holiday-item + .holiday-item { border-top: 1px solid var(--border-soft); }
+.holiday-item:hover { background: rgba(255, 255, 255, 0.04); }
+.holiday-wd { font-size: 0.74rem; }
+.holiday-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.holiday-past summary { cursor: pointer; font-size: 0.8rem; margin: 0.4rem 0; }
+
+@media (max-width: 1100px) {
+  .gantt-head, .gantt-row { grid-template-columns: 220px minmax(160px, 1fr) 240px; gap: 0.75rem; }
+}
+@media (max-width: 820px) {
+  .gantt-head { display: none; }
+  .gantt-row {
+    grid-template-columns: 1fr; grid-template-areas: 'info' 'track' 'metrics'; gap: 0.6rem;
+  }
+  .gantt-info { grid-area: info; }
+  .gantt-track { grid-area: track; }
+  .gantt-metrics { grid-area: metrics; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .holiday-add { grid-template-columns: 1fr; }
+}

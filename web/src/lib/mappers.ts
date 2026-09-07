@@ -22,12 +22,15 @@ import type {
   MemberSprintNote,
   Feature,
   FeatureLabel,
+  Holiday,
   Project,
   ProjectDoc,
   Sprint,
   Subtask,
   Task,
   TaskSprintEntry,
+  VelocityChart,
+  VelocityChartInput,
   TeamMember,
   TeamRole,
 } from '../types';
@@ -454,4 +457,50 @@ export function taskPatchToRow(patch: Partial<Task>): Row {
     else if (map[k]) row[map[k]] = v;
   }
   return row;
+}
+
+/* ---- Gantt tốc độ (velocity_charts + holidays, migration 0085) ---- */
+
+/** numeric của PostgREST về dạng CHUỖI — ép số ở đây một lần, UI khỏi Number() rải rác. */
+function num(v: unknown, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+export function rowToVelocityChart(r: Row): VelocityChart {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    name: r.name ?? '',
+    unit: r.unit ?? 'việc',
+    startDate: r.start_date,
+    endDate: r.end_date,
+    totalQty: num(r.total_qty),
+    doneQty: num(r.done_qty),
+    velocity: r.velocity === null || r.velocity === undefined ? null : num(r.velocity),
+    memberIds: r.member_ids ?? [],
+    note: r.note ?? '',
+    sortOrder: r.sort_order ?? 0,
+    createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
+    createdBy: r.created_by ?? null,
+  };
+}
+
+/** Form → row. Không mang id/project_id/created_by — chỗ gọi gắn (RLS ép created_by). */
+export function velocityChartInputToRow(input: VelocityChartInput): Row {
+  return {
+    name: input.name.trim(),
+    unit: input.unit.trim() || 'việc',
+    start_date: input.startDate,
+    end_date: input.endDate,
+    total_qty: input.totalQty,
+    done_qty: input.doneQty,
+    velocity: input.velocity,
+    member_ids: input.memberIds,
+    note: input.note.trim(),
+  };
+}
+
+export function rowToHoliday(r: Row): Holiday {
+  return { day: r.day, name: r.name ?? '' };
 }
