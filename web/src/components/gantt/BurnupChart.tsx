@@ -28,14 +28,14 @@ interface Props {
   today: string;
 }
 
-// Màu theo design system: tiến độ thật = indigo, nhịp cần = gold, mốc = sky, deadline = red.
+// Palette theo design system: tiến độ = indigo sáng, nhịp cần = gold, mốc = sky, deadline = red.
 const ACTUAL = '#818cf8';
 const REQUIRED = '#fbbf24';
-const OFF_BAND = 'rgba(56, 189, 248, 0.10)';
+const OFF_BAND = 'rgba(56, 189, 248, 0.12)';
 const AIM_LINE = '#38bdf8';
 const DEADLINE_LINE = '#ef4444';
 const TEXT = '#f8fafc';
-const LABEL_BG = 'rgba(15, 23, 42, 0.85)';
+const LABEL_BG = 'rgba(15, 23, 42, 0.88)';
 
 /** "24/8" — ngắn cho trục x và nhãn điểm. */
 function shortDay(iso: string): string {
@@ -55,26 +55,33 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 /**
- * Đồ thị burn-up của một chart: x = từng ngày, y = khối lượng đã xong.
- *   • đường liền indigo — tiến độ thật (chấm ở ngày có ghi nhật ký), rồi đứt mờ = dự kiến
- *     nếu giữ tốc độ hiện tại;
- *   • đường đứt vàng — nhịp cần để kịp mốc; phẳng qua ngày nghỉ;
- *   • nền sky nhạt — kỳ nghỉ có lễ; vạch chấm sky — mốc cần xong; vạch gạch-chấm đỏ — deadline.
- * Dải/vạch vẽ bằng plugin canvas vì Chart.js không có "annotation" sẵn (không thêm dependency).
- * Chú giải là MỘT dòng HTML dưới đồ thị (tắt legend của Chart.js) để đường, dải và vạch cùng
- * một chỗ, cùng một cỡ chữ — hai legend chồng nhau là thứ làm khó đọc nhất.
+ * Burn-up của một chart, dựng theo đúng bản đội đang dùng (matplotlib):
+ *   • title tên chart ở giữa; legend đóng khung ở góc trên trái TRONG vùng vẽ;
+ *   • MỘT đường liền "tiến độ hiện tại": tiến độ thật tới hôm nay (chấm ở ngày có dữ liệu,
+ *     nhãn "12 tại 24/8"), nối tiếp bằng dự kiến nếu giữ tốc độ hiện tại;
+ *   • đường đứt vàng "cần để xong <mốc>": phẳng ở mức đã làm, tăng đều tới mốc, phẳng qua nghỉ;
+ *   • nền sky nhạt = kỳ nghỉ có lễ; vạch chấm = mốc cần xong; vạch gạch-chấm đỏ = deadline;
+ *   • trục x "Ngày" nhãn 4 ngày một, trục y "<đơn vị> đã xong".
+ * Dải/vạch vẽ bằng plugin canvas (Chart.js không có annotation sẵn, không thêm dependency);
+ * legend là HTML đặt tuyệt đối để đóng khung và gom đủ cả dải/vạch — legend gốc của Chart.js
+ * chỉ biết dataset.
  */
 export default function BurnupChart({ chart, plan, entries, holidaySet, today }: Props) {
   const series = useMemo(() => buildBurnup(chart, plan, entries, holidaySet, today), [chart, plan, entries, holidaySet, today]);
   const n = series.days.length;
-  // ~9 nhãn trục x là đọc thoải mái; chart dài thì thưa nhãn ra, không xoay chữ.
-  const tickStep = Math.max(1, Math.ceil(n / 9));
+  // Như bản gốc: 4 ngày một nhãn; chart quá dài thì thưa hơn cho đủ chỗ.
+  const tickStep = n <= 44 ? 4 : Math.ceil(n / 11);
+
+  // Một đường: thật tới hôm nay, dự kiến sau đó.
+  const progress = useMemo(() => {
+    const t = series.todayIdx;
+    return series.days.map((_, i) => (t === null || i <= t ? series.actual[i] : series.projected[i]));
+  }, [series]);
   const pointRadius = useMemo(() => {
     const set = new Set(series.loggedIdx);
     if (series.todayIdx !== null) set.add(series.todayIdx);
-    return series.days.map((_, i) => (set.has(i) ? 3 : 0));
+    return series.days.map((_, i) => (set.has(i) ? 3.5 : 0));
   }, [series]);
-  const hasProjection = series.projected.some((v) => v !== null);
 
   const overlay = useMemo<Plugin<'line'>>(
     () => ({
@@ -106,8 +113,7 @@ export default function BurnupChart({ chart, plan, entries, holidaySet, today }:
         ctx.restore();
       },
       afterDatasetsDraw(c) {
-        // Nhãn "12 tại 24/8" cạnh điểm hôm nay — con số người ta hỏi nhiều nhất. Có nền tối
-        // để không lẫn vào đường đang đi qua điểm; nằm trên điểm, hết chỗ thì xuống dưới.
+        // "12 tại 24/8" cạnh điểm hôm nay, nền tối để không lẫn vào đường; hết chỗ thì xuống dưới.
         if (series.todayIdx === null) return;
         const el = c.getDatasetMeta(0).data[series.todayIdx];
         if (!el) return;
@@ -117,8 +123,8 @@ export default function BurnupChart({ chart, plan, entries, holidaySet, today }:
         ctx.font = `600 11px ${appFontFamily()}`;
         const w = ctx.measureText(text).width + 12;
         const h = 20;
-        let bx = Math.min(Math.max(el.x - w / 2, chartArea.left), chartArea.right - w);
-        let by = el.y - h - 8;
+        const bx = Math.min(Math.max(el.x + 8, chartArea.left), chartArea.right - w);
+        let by = el.y - h - 6;
         if (by < chartArea.top) by = el.y + 8;
         ctx.fillStyle = LABEL_BG;
         roundRect(ctx, bx, by, w, h, 6);
@@ -139,15 +145,27 @@ export default function BurnupChart({ chart, plan, entries, holidaySet, today }:
   const deadlineLabel = formatIsoDate(chart.endDate).slice(0, 5);
   return (
     <div>
+      <div className="burnup-title">{chart.name}</div>
       <div className="burnup-wrap">
+        {/* Legend đóng khung góc trên trái, trong vùng vẽ — như bản matplotlib của đội. */}
+        <div className="burnup-legend-box" aria-label="Chú giải">
+          <span><i className="gantt-lg burnup-lg-line" /> Tiến độ hiện tại (~{fmtQty(plan.currentVelocity)} {chart.unit}/ngày)</span>
+          <span>
+            <i className="gantt-lg burnup-lg-req" /> Tiến độ cần để xong {aimLabel}
+            {' '}(~{plan.requiredPerDay === null ? '∞' : fmtQty(plan.requiredPerDay)}/ngày)
+          </span>
+          {series.offRuns.length > 0 && <span><i className="gantt-lg burnup-lg-off" /> Nghỉ lễ</span>}
+          {series.aimIdx !== null && <span><i className="gantt-lg burnup-lg-aim" /> Mốc cần xong: {aimLabel}</span>}
+          <span><i className="gantt-lg burnup-lg-deadline" /> Deadline: {deadlineLabel}</span>
+        </div>
         <Line
           plugins={[overlay]}
           data={{
             labels: series.days,
             datasets: [
               {
-                label: 'Thật',
-                data: series.actual,
+                label: 'Tiến độ',
+                data: progress,
                 borderColor: ACTUAL,
                 backgroundColor: ACTUAL,
                 borderWidth: 2,
@@ -157,17 +175,7 @@ export default function BurnupChart({ chart, plan, entries, holidaySet, today }:
                 tension: 0,
               },
               {
-                label: 'Dự kiến',
-                data: series.projected,
-                borderColor: ACTUAL,
-                borderDash: [4, 4],
-                borderWidth: 1.5,
-                pointRadius: 0,
-                spanGaps: true,
-                tension: 0,
-              },
-              {
-                label: 'Cần',
+                label: `Cần để xong ${aimLabel}`,
                 data: series.required,
                 borderColor: REQUIRED,
                 borderDash: [8, 4],
@@ -183,6 +191,7 @@ export default function BurnupChart({ chart, plan, entries, holidaySet, today }:
             maintainAspectRatio: false,
             animation: false,
             interaction: { mode: 'index', intersect: false },
+            layout: { padding: { top: 6, right: 8 } },
             plugins: {
               legend: { display: false },
               tooltip: {
@@ -196,16 +205,17 @@ export default function BurnupChart({ chart, plan, entries, holidaySet, today }:
             scales: {
               x: {
                 grid: { display: false },
+                title: { display: true, text: 'Ngày', color: CHART_MUTED },
                 ticks: {
                   color: CHART_MUTED,
                   autoSkip: false,
                   maxRotation: 0,
-                  callback: (_v, i) => (i % tickStep === 0 || i === n - 1 ? shortDay(series.days[i]) : ''),
+                  callback: (_v, i) => (i % tickStep === 0 ? shortDay(series.days[i]) : ''),
                 },
               },
               y: {
                 beginAtZero: true,
-                suggestedMax: chart.totalQty > 0 ? chart.totalQty * 1.05 : undefined,
+                suggestedMax: chart.totalQty > 0 ? chart.totalQty * 1.06 : undefined,
                 ticks: { color: CHART_MUTED },
                 grid: { color: CHART_GRID },
                 title: { display: true, text: `${chart.unit} đã xong`, color: CHART_MUTED },
@@ -214,14 +224,6 @@ export default function BurnupChart({ chart, plan, entries, holidaySet, today }:
           }}
         />
       </div>
-      <p className="gantt-legend burnup-legend">
-        <span><i className="gantt-lg burnup-lg-line" /> Thật <b>~{fmtQty(plan.measuredVelocity)}/ngày</b></span>
-        {hasProjection && <span><i className="gantt-lg burnup-lg-proj" /> Dự kiến <b>~{fmtQty(plan.currentVelocity)}/ngày</b></span>}
-        <span><i className="gantt-lg burnup-lg-req" /> Cần <b>~{plan.requiredPerDay === null ? '∞' : fmtQty(plan.requiredPerDay)}/ngày</b> tới {aimLabel}</span>
-        {series.offRuns.length > 0 && <span><i className="gantt-lg burnup-lg-off" /> Kỳ nghỉ có lễ</span>}
-        {series.aimIdx !== null && <span><i className="gantt-lg burnup-lg-aim" /> Mốc {aimLabel}</span>}
-        <span><i className="gantt-lg burnup-lg-deadline" /> Deadline {deadlineLabel}</span>
-      </p>
     </div>
   );
 }

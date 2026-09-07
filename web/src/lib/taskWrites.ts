@@ -7,7 +7,8 @@ import { reportError } from './errorBus';
 import { notifyTaskCreated } from './discordNotify';
 import { archiveNotionPage, createNotionPage, updateNotionPage } from './notionSync';
 import { taskPatchToRow } from './mappers';
-import { endOfWorkWeek, sundayOfWeek } from './format';
+import { endOfWorkWeek } from './format';
+import { defaultDueForSprint } from './sprintDue';
 import { Timestamp } from './time';
 import type { NewTaskInput, Sprint, Task, TaskStatus, TeamMember } from '../types';
 
@@ -44,7 +45,7 @@ export function descWithLongTitle(title: string, description: string): string {
 
 export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise<string> {
   // Auto due window: starts today. Hạn chót: người tạo chọn thì tôn trọng; không chọn mà
-  // task VÀO SPRINT thì mặc định CUỐI SPRINT (chủ nhật tuần sprint — xem defaultSprintDue);
+  // task VÀO SPRINT thì mặc định = NGÀY KẾT THÚC sprint (xem defaultSprintDue / lib/sprintDue);
   // còn task BACKLOG (không sprint) thì ĐỂ TRỐNG — backlog là chỗ đậu chưa hẹn ngày, tự
   // điền hạn là ra một đống task "trễ" ảo.
   const now = new Date();
@@ -125,8 +126,8 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
 }
 
 /**
- * Hạn mặc định khi tạo task VÀO SPRINT mà không chọn ngày: CHỦ NHẬT của tuần sprint
- * (sprint = 1 tuần Mon→Sun; cùng luật với TaskModal, moveTaskToSprint và bot _due_window).
+ * Hạn mặc định khi tạo task VÀO SPRINT mà không chọn ngày: NGÀY KẾT THÚC sprint (cuối
+ * ngày) — luật ở lib/sprintDue, cùng với TaskModal, moveTaskToSprint và bot _due_window.
  * Tra ngày sprint ngay tại đây để MỌI đường tạo task (TaskModal, QuickAddTaskRow…) chung
  * một luật — `endOfWorkWeek(now)` cũ neo vào tuần HIỆN TẠI, tạo task cho sprint tuần khác
  * là hạn rơi sai tuần. Sprint không tra được / không có ngày thì lùi về cuối tuần làm việc.
@@ -142,8 +143,11 @@ async function defaultSprintDue(sprintId: string, now: Date): Promise<Date> {
     console.warn('Không tra được ngày sprint để đặt hạn mặc định, dùng cuối tuần hiện tại:', error.message);
     return endOfWorkWeek(now);
   }
-  const anchor = data?.start_date ?? data?.end_date;
-  return anchor ? sundayOfWeek(new Date(anchor)) : endOfWorkWeek(now);
+  const due = defaultDueForSprint(
+    data?.start_date ? new Date(data.start_date) : null,
+    data?.end_date ? new Date(data.end_date) : null,
+  );
+  return due ?? endOfWorkWeek(now);
 }
 
 /**
@@ -252,21 +256,20 @@ export async function claimTask(task: Task, me: TeamMember): Promise<ClaimTaskRe
  * trigger `tasks_log_sprint` (migration 0015) tự ghi vào `task_sprints`, nhờ đó đếm được
  * task này đã trễ mấy sprint.
  *
- * Hạn chót DỜI theo sprint đích: = chủ nhật của tuần sprint mới (cùng luật tạo task, xem
- * `sundayOfWeek` + TaskModal) — task gánh sang tuần sau thì hạn cũng phải là tuần sau, chứ
- * không giữ hạn của tuần đã qua. Tính từ ngày BẮT ĐẦU sprint để luôn ra chủ nhật kể cả khi
- * end_date lỡ đặt lệch; sprint đích không có ngày nào thì giữ nguyên hạn cũ.
+ * Hạn chót DỜI theo sprint đích: = ngày kết thúc sprint mới (cùng luật tạo task, xem
+ * lib/sprintDue + TaskModal) — task gánh sang sprint sau thì hạn cũng phải là của sprint
+ * sau, chứ không giữ hạn đã qua. Sprint đích không có ngày nào thì giữ nguyên hạn cũ.
  *
  * KHÔNG dời hạn task đã `done`: dueDate của task done là NGÀY HOÀN THÀNH THẬT (updateTask/
- * moveTask ghi vào), báo cáo hiệu suất đọc nó — ghi đè thành chủ nhật tương lai là hỏng số.
+ * moveTask ghi vào), báo cáo hiệu suất đọc nó — ghi đè thành hạn tương lai là hỏng số.
  * Cũng không đụng `status` (task vẫn dở dang).
  */
 export async function moveTaskToSprint(task: Task, sprint: Sprint): Promise<void> {
   if (sprint.id === task.sprintId) return;
-  const anchor = sprint.startDate?.toDate() ?? sprint.endDate?.toDate() ?? null;
+  const due = defaultDueForSprint(sprint.startDate?.toDate(), sprint.endDate?.toDate());
   const patch: Record<string, unknown> = { sprint_id: sprint.id };
-  if (anchor && task.status !== 'done') {
-    patch.due_date = Timestamp.fromDate(sundayOfWeek(anchor)).toISOString();
+  if (due && task.status !== 'done') {
+    patch.due_date = Timestamp.fromDate(due).toISOString();
   }
   const { error } = await supabase.from('tasks').update(patch).eq('id', task.id);
   if (error) throw error;

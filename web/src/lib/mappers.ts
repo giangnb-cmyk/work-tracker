@@ -482,6 +482,10 @@ export function rowToVelocityChart(r: Row): VelocityChart {
     velocity: r.velocity === null || r.velocity === undefined ? null : num(r.velocity),
     memberIds: r.member_ids ?? [],
     note: r.note ?? '',
+    linkKind: r.link_kind ?? 'manual',
+    featureId: r.feature_id ?? null,
+    taskIds: r.task_ids ?? [],
+    countBy: r.count_by ?? 'tasks',
     sortOrder: r.sort_order ?? 0,
     createdAt: Timestamp.fromISO(r.created_at) ?? undefined,
     createdBy: r.created_by ?? null,
@@ -501,6 +505,10 @@ export function velocityChartInputToRow(input: VelocityChartInput): Row {
     velocity: input.velocity,
     member_ids: input.memberIds,
     note: input.note.trim(),
+    link_kind: input.linkKind,
+    feature_id: input.linkKind === 'feature' ? input.featureId : null,
+    task_ids: input.linkKind === 'tasks' ? input.taskIds : [],
+    count_by: input.countBy,
   };
 }
 

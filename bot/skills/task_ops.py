@@ -35,8 +35,10 @@ from constants import (
     STATUS_TODO,
     STATUS_DONE,
     PRIORITY_MEDIUM,
+    end_of_day,
     end_of_work_week,
     sunday_of_week,
+    team_tz,
     normalize_priority,
     normalize_status,
     parse_ymd,
@@ -84,21 +86,29 @@ def _resolve_sprint(client, token: str, project_id=None):
 
 
 def _due_window(sprint, due_arg: str):
-    """Tra ve (dueStart, dueDate) cho task moi.
+    """Tra ve (dueStart, dueDate, nguon) cho task moi.
 
-    Thu tu uu tien: --due nguoi dung dua > CHU NHAT cua tuan sprint > cuoi tuan lam viec.
-    Sprint la mot tuan -> han = chu nhat, tinh tu NGAY BAT DAU sprint (thu 2) nen dung ca
-    khi end_date sprint dat lech. Giong web (TaskModal + sundayOfWeek).
-    dueStart = bay gio, giong createTask ben web -> Timeline ve duoc thanh Gantt.
+    Thu tu uu tien: --due nguoi dung dua > NGAY KET THUC sprint (cuoi ngay) > chu nhat cua
+    tuan bat dau (sprint khong co end_date) > cuoi tuan lam viec. Cung luat voi web
+    (lib/sprintDue.ts: TaskModal, createTask, moveTaskToSprint).
+
+    Ngay lich lay theo GIO TEAM (team_tz) roi moi ep ve cuoi ngay. Lay theo UTC la sai:
+    sprint cron bat dau 06/09 17:00Z = thu 2 07/09 VN, nhung UTC thay la chu nhat 06/09 nen
+    luat cu tra han 06/09 — ngay DAU sprint (da bi bao). dueStart = bay gio, giong createTask
+    ben web -> Timeline ve duoc thanh Gantt.
     """
     now = datetime.now(timezone.utc)
     explicit = _parse_due(due_arg)
     if explicit:
         return now, explicit, "bạn đặt"
-    anchor = (sprint or {}).get("startDate") or (sprint or {}).get("endDate")
-    if anchor:
-        return now, sunday_of_week(repo._as_datetime(anchor)), "chủ nhật của sprint"
-    return now, end_of_work_week(now), "cuối tuần"
+    tz = team_tz()
+    end = (sprint or {}).get("endDate")
+    if end:
+        return now, end_of_day(repo._as_datetime(end).astimezone(tz)), "cuối sprint"
+    start = (sprint or {}).get("startDate")
+    if start:
+        return now, sunday_of_week(repo._as_datetime(start).astimezone(tz)), "chủ nhật của sprint"
+    return now, end_of_work_week(now.astimezone(tz)), "cuối tuần"
 
 
 def _parse_due(due: str):

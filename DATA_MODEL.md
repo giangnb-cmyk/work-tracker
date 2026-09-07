@@ -588,6 +588,10 @@ và suy ngày dự kiến xong. Mọi phép tính là THUẦN phía web (`lib/wo
 | `totalQty` / `doneQty` | numeric | khối lượng tổng / đã làm — numeric vì có "nửa model" |
 | `velocity` | numeric \| null | tốc độ hiện tại NGƯỜI DÙNG nhập (đơn vị/ngày công). `null` = web tự đo = `doneQty ÷ ngày công đã qua` |
 | `memberIds` | uuid[] | người tham gia — không FK (người rời nhóm vẫn giữ lịch sử); web tra roster để hiện avatar + đếm theo role động |
+| `linkKind` | `manual` \| `feature` \| `tasks` | **Nguồn tiến độ** (migration `0087`). `manual` = nhập tay + nhật ký. `feature` = mọi task có `tasks.feature_id = featureId`. `tasks` = danh sách `taskIds`. Khi link, web **dẫn xuất** `doneQty` (task `done` trong phạm vi) và đường "thật" (gom theo ngày xong = `tasks.dueDate` của task done) — `lib/velocityLink.ts`; giá trị `done_qty` trong DB chỉ là bản chụp lúc lưu form, không phải nguồn sự thật |
+| `featureId` | uuid \| null | FK → features, `on delete set null` (feature xoá → chart về "phạm vi trống", người dùng thấy để chỉnh) |
+| `taskIds` | uuid[] | không FK (như `memberIds`): task xoá tự rơi khỏi phạm vi |
+| `countBy` | `tasks` \| `points` | mỗi task = 1 đơn vị, hoặc cộng story points. Khi link, `totalQty > 0` = khối lượng KẾ HOẠCH (feature còn thêm task dần); `= 0` → tổng = khối lượng task trong phạm vi |
 | `note`, `sortOrder`, `createdAt`, `createdBy` | | |
 
 **Ngày công** = T2–T6 **trừ** các ngày trong `holidays` (`day date pk`, `name`). Bảng lễ
@@ -639,7 +643,7 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | `points`       | number            | story points (0 if unestimated)                         |
 | `tags`         | string[]          | free tags                                               |
 | `dueStart`     | Timestamp \| null | work-window start (creation day)                        |
-| `dueDate`      | Timestamp \| null | work-window end / deadline; reset to done-day on finish |
+| `dueDate`      | Timestamp \| null | work-window end / deadline; reset to done-day on finish. **Mặc định khi tạo / chuyển vào sprint mà không chọn ngày = `sprint.end_date` (cuối ngày)** — một luật cho web (`lib/sprintDue.ts`: TaskModal, createTask, moveTaskToSprint) và bot (`task_ops._due_window`). Sprint không có `end_date` mới lùi về chủ nhật của tuần bắt đầu; task Backlog (không sprint) để trống. Luật cũ "chủ nhật tuần chứa start_date" bỏ vì vỡ khi sprint bắt đầu từ CN (hạn rơi vào ngày ĐẦU sprint) hoặc kết thúc lệch |
 | `order`        | number            | sort order within its status column (lower = higher)    |
 | `createdAt`    | Timestamp         | creation time                                           |
 | `updatedAt`    | Timestamp         | last modification                                       |

@@ -3845,7 +3845,6 @@ body.kb-open .mnav { display: none; }
   border: 1px solid rgba(99, 102, 241, 0.25);
 }
 .gantt-detail-chart { min-width: 0; }
-.burnup-wrap { height: 300px; position: relative; }
 
 /* Nhật ký tiến độ */
 .plog { display: flex; flex-direction: column; min-width: 0; font-size: 0.82rem; }
@@ -3911,4 +3910,54 @@ body.kb-open .mnav { display: none; }
   .gantt-metrics { grid-area: metrics; }
   .grid-3 { grid-template-columns: 1fr; }
   .holiday-add { grid-template-columns: 1fr; }
+}
+
+/* ===== Gantt: burn-up theo bản matplotlib của đội + chart link task (0087) ===== */
+.burnup-title { text-align: center; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.35rem; }
+.burnup-wrap { height: 320px; position: relative; }
+/* Legend đóng khung góc trên trái TRONG vùng vẽ (bên phải nhãn trục y ~56px). */
+.burnup-legend-box {
+  position: absolute; top: 10px; left: 62px; z-index: 1;
+  display: flex; flex-direction: column; gap: 0.28rem;
+  padding: 0.5rem 0.65rem; border-radius: 8px;
+  background: rgba(15, 23, 42, 0.86); border: 1px solid var(--border);
+  font-size: 0.74rem; color: var(--muted); pointer-events: none;
+}
+.burnup-legend-box span { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+.burnup-legend-box .gantt-lg { flex: 0 0 auto; }
+.burnup-lg-line { width: 22px; height: 0; border-top: 2px solid #818cf8; }
+.burnup-lg-req { width: 22px; height: 0; border-top: 2px dashed var(--gold); }
+.burnup-lg-off { width: 16px; height: 10px; background: rgba(56, 189, 248, 0.28); }
+.burnup-lg-aim { width: 0; height: 12px; border-left: 2px dotted var(--sky); }
+.burnup-lg-deadline { width: 0; height: 12px; border-left: 2px dashed var(--red); }
+
+.gantt-dates-link { margin-top: 0.15rem; font-size: 0.74rem; color: var(--sky); }
+.gantt-dates-link::before { content: '↻ '; }
+
+/* Danh sách task trong phạm vi (chart link) — cùng khuôn với nhật ký tay. */
+.plog-item.ltask { grid-template-columns: 52px minmax(0, 1fr) auto 0; }
+.ltask-title {
+  min-width: 0; padding: 0; text-align: left; background: none; border: none; color: var(--text);
+  font: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ltask-title:hover { color: var(--sky); }
+.ltask.done .ltask-title { color: var(--muted); text-decoration: line-through; }
+
+/* Chọn nhiều task trong form chart. */
+.tpick { border: 1px solid var(--border); border-radius: 10px; padding: 0.55rem; }
+.tpick-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
+.tpick-head .input { flex: 1; padding: 0.4rem 0.6rem; font-size: 0.82rem; }
+.tpick-head .gantt-meta { white-space: nowrap; }
+.tpick-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.tpick-item {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 0.5rem; align-items: center;
+  padding: 0.3rem 0.4rem; border-radius: 6px; font-size: 0.82rem; cursor: pointer;
+}
+.tpick-item:hover { background: rgba(255, 255, 255, 0.04); }
+.tpick-item.on { background: rgba(99, 102, 241, 0.1); }
+.tpick-item input { accent-color: var(--primary); margin: 0; }
+.tpick-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .burnup-legend-box { position: static; margin-bottom: 0.4rem; }
 }

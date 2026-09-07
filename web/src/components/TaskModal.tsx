@@ -8,7 +8,8 @@ import { createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask
 import { copyTitle, duplicateTask } from '../lib/duplicateWrites';
 import { notifySubtaskDone } from '../lib/discordNotify';
 import { useNotify } from '../contexts/NotifyContext';
-import { formatDateRange, sundayOfWeek, timeAgo, toInputDate } from '../lib/format';
+import { formatDateRange, timeAgo, toInputDate } from '../lib/format';
+import { defaultDueForSprint } from '../lib/sprintDue';
 import AttachmentsField from './task/AttachmentsField';
 import SubtasksField from './task/SubtasksField';
 import WatchersField from './task/WatchersField';
@@ -86,20 +87,18 @@ export default function TaskModal({
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? defaultAssigneeId ?? null);
   const [points, setPoints] = useState<number>(task?.points ?? 0);
-  // Tạo mới: hạn chót mặc định = CHỦ NHẬT của tuần sprint đang chọn (sprint = 1 tuần
-  // Mon→Sun). Tính từ ngày BẮT ĐẦU sprint để luôn ra chủ nhật, kể cả khi end_date của
-  // sprint lỡ đặt lệch sang thứ 2 tuần sau. Cùng luật với bot (task_ops._due_window).
-  // Người tạo vẫn đổi tay được trước khi bấm Tạo.
+  // Tạo mới: hạn chót mặc định = NGÀY KẾT THÚC sprint đang chọn (xem lib/sprintDue — một
+  // luật cho cả web lẫn bot). Người tạo vẫn đổi tay được trước khi bấm Tạo.
   const [due, setDue] = useState<string>(() => {
     if (task) return toInputDate(task.dueDate);
     const sprint = sprints.find((s) => s.id === defaultSprintId);
-    const anchor = sprint?.startDate?.toDate() ?? sprint?.endDate?.toDate();
-    return anchor ? toInputDate(Timestamp.fromDate(sundayOfWeek(anchor))) : '';
+    const d = defaultDueForSprint(sprint?.startDate?.toDate(), sprint?.endDate?.toDate());
+    return d ? toInputDate(Timestamp.fromDate(d)) : '';
   });
   // Hạn chót BÁM THEO sprint: đổi sprint (từ Backlog vào hay sang sprint khác, ở cả tạo
-  // lẫn sửa) là hạn tự nhảy về chủ nhật tuần sprint MỚI — task gánh sang tuần nào thì hạn
-  // tuần đó, không giữ hạn của tuần đã qua (cùng luật moveTaskToSprint). Task done giữ
-  // nguyên: dueDate của nó là NGÀY HOÀN THÀNH THẬT. Hạn nhảy xong vẫn sửa tay được.
+  // lẫn sửa) là hạn tự nhảy về ngày kết thúc sprint MỚI — task gánh sang sprint nào thì hạn
+  // sprint đó, không giữ hạn đã qua (cùng luật moveTaskToSprint). Task done giữ nguyên:
+  // dueDate của nó là NGÀY HOÀN THÀNH THẬT. Hạn nhảy xong vẫn sửa tay được.
   const prevSprintRef = useRef(task?.sprintId ?? defaultSprintId);
   useEffect(() => {
     if (prevSprintRef.current === sprintId) return;
@@ -112,8 +111,8 @@ export default function TaskModal({
       return;
     }
     const sprint = sprints.find((s) => s.id === sprintId);
-    const anchor = sprint?.startDate?.toDate() ?? sprint?.endDate?.toDate();
-    if (anchor) setDue(toInputDate(Timestamp.fromDate(sundayOfWeek(anchor))));
+    const d = defaultDueForSprint(sprint?.startDate?.toDate(), sprint?.endDate?.toDate());
+    if (d) setDue(toInputDate(Timestamp.fromDate(d)));
   }, [sprintId, status, sprints, isEdit]);
   const [attachments, setAttachments] = useState<Attachment[]>(task?.attachments ?? []);
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? []);

@@ -15,6 +15,8 @@ interface Props {
   /** Người tham gia đã tra ra từ roster (uid không còn trong roster thì đã bị lọc). */
   participants: TeamMember[];
   roleOf: (uid: string | null) => MemberRoleInfo | undefined;
+  /** Nhãn nguồn tiến độ khi chart link task (lib/velocityLink.linkLabel); null = nhập tay. */
+  linkLabel?: string | null;
   /** Dòng đang xổ panel đồ thị + nhật ký. */
   expanded: boolean;
   onToggle: (chart: VelocityChart) => void;
@@ -48,7 +50,7 @@ function roleCounts(participants: TeamMember[], roleOf: Props['roleOf']) {
  * Cột số liệu cố ý chỉ có MỘT thang: con số chính đậm, ba stat cùng khuôn nhãn-trên-số-dưới,
  * một dòng phụ. Phân cấp bằng weight + màu, không bằng nhiều cỡ chữ.
  */
-export default function GanttRow({ chart, plan, axis, participants, roleOf, expanded, onToggle, onEdit }: Props) {
+export default function GanttRow({ chart, plan, axis, participants, roleOf, linkLabel, expanded, onToggle, onEdit }: Props) {
   const roles = useMemo(() => roleCounts(participants, roleOf), [participants, roleOf]);
 
   // Bar phủ trọn ngày cuối: mốc kết thúc = đầu ngày kế tiếp.
@@ -82,6 +84,7 @@ export default function GanttRow({ chart, plan, axis, participants, roleOf, expa
           {chart.targetDate && <span className="gantt-dates-aim">mốc {dm(chart.targetDate)}</span>}
           <span className="gantt-dates-wd">{plan.totalWorkdays} ngày công</span>
         </div>
+        {linkLabel && <div className="gantt-dates-link">{linkLabel}</div>}
         <div className="gantt-people">
           {participants.length === 0 ? (
             <span className="gantt-meta">Chưa chọn thành viên</span>

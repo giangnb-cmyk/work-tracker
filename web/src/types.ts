@@ -794,15 +794,29 @@ export interface VelocityChart {
   /** Người tham gia (→ profiles.id). Không FK: người rời nhóm vẫn giữ lịch sử. */
   memberIds: string[];
   note: string;
+  /**
+   * Nguồn tiến độ (migration 0087): `manual` = nhập tay + nhật ký; `feature` = mọi task của
+   * `featureId`; `tasks` = danh sách `taskIds`. Khi link, `doneQty` và đường "thật" được
+   * web dẫn xuất từ task done (xem lib/velocityLink.ts) — giá trị lưu trong DB chỉ là bản chụp.
+   */
+  linkKind: VelocityLinkKind;
+  featureId: string | null;
+  taskIds: string[];
+  /** Cách đếm khi link: mỗi task = 1 đơn vị, hoặc cộng story points. */
+  countBy: VelocityCountBy;
   sortOrder: number;
   createdAt?: Timestamp;
   createdBy: string | null;
 }
 
+export type VelocityLinkKind = 'manual' | 'feature' | 'tasks';
+export type VelocityCountBy = 'tasks' | 'points';
+
 /** Dữ liệu form thêm/sửa một chart (id/dự án/người tạo do chỗ gọi + DB lo). */
 export type VelocityChartInput = Pick<
   VelocityChart,
   | 'name' | 'unit' | 'startDate' | 'endDate' | 'targetDate' | 'totalQty' | 'doneQty' | 'velocity' | 'memberIds' | 'note'
+  | 'linkKind' | 'featureId' | 'taskIds' | 'countBy'
 >;
 
 /** Ngày lễ toàn công ty (bảng `holidays`) — KHÔNG tính là ngày công, cùng với T7/CN. */

@@ -175,3 +175,39 @@ def sunday_of_week(d):
 
     diff = 7 - d.isoweekday()  # T2->6, CN->0
     return (d + timedelta(days=diff)).replace(hour=23, minute=59, second=59, microsecond=0)
+
+
+def end_of_day(d):
+    """Cuoi ngay (23:59:59) cua chinh ngay `d`, giu nguyen tzinfo. Pure.
+
+    Giong endOfDay() ben web (lib/sprintDue.ts): han mac dinh cua task = NGAY KET THUC
+    sprint, ep ve cuoi ngay de moi kieu gio luu trong end_date (16:59:59Z hay 00:00Z) ra
+    cung mot han. Goi voi datetime DA doi sang gio team (xem team_tz) — lay ngay lich theo
+    UTC la lech sang ngay truoc/sau.
+    """
+    return d.replace(hour=23, minute=59, second=59, microsecond=0)
+
+
+def team_tz():
+    """Mui gio cua team — settings.json `bug_sync_tz`, mac dinh Asia/Ho_Chi_Minh.
+
+    Dung cho moi phep 'lay ngay lich' (han mac dinh, cuoi tuan): sprint/han luu timestamptz
+    nen ngay UTC va ngay VN lech nhau quanh nua dem. Thieu tzdata (Windows) -> UTC+7 co dinh
+    (VN khong co DST), khong lui ve UTC vi lui the la sai ngay.
+    """
+    import json
+    from datetime import timedelta, timezone
+    from pathlib import Path
+
+    name = "Asia/Ho_Chi_Minh"
+    try:
+        settings = json.loads((Path(__file__).resolve().parent.parent / "settings.json").read_text(encoding="utf-8"))
+        name = settings.get("bug_sync_tz") or name
+    except Exception:
+        pass
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(name)
+    except Exception:
+        return timezone(timedelta(hours=7))

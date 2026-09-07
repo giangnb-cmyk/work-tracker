@@ -1,12 +1,23 @@
 import { useMemo, useState } from 'react';
 import ConfirmDialog from '../ConfirmDialog';
+import SearchableSelect from '../SearchableSelect';
 import WatchersField from '../task/WatchersField';
+import TaskPickField from './TaskPickField';
 import { formatIsoDate, todayIso } from '../../lib/format';
 import { computePlan, fmtQty, PLAN_STATUS_LABEL } from '../../lib/velocity';
+import { applyLink, deriveLinked, isLinked } from '../../lib/velocityLink';
 import { createVelocityChart, deleteVelocityChart, updateVelocityChart } from '../../lib/velocityChartWrites';
 import { logProgress } from '../../lib/velocityProgressWrites';
 import type { MemberRoleInfo } from '../../lib/memberRole';
-import type { TeamMember, VelocityChart, VelocityChartInput } from '../../types';
+import type {
+  Feature,
+  Task,
+  TeamMember,
+  VelocityChart,
+  VelocityChartInput,
+  VelocityCountBy,
+  VelocityLinkKind,
+} from '../../types';
 
 interface Props {
   /** null = tạo mới. */
@@ -15,6 +26,9 @@ interface Props {
   members: TeamMember[];
   roleOf: (uid: string | null) => MemberRoleInfo | undefined;
   holidaySet: ReadonlySet<string>;
+  /** Feature + task của dự án — để link nguồn tiến độ và xem trước số dẫn xuất. */
+  features: Feature[];
+  tasks: Task[];
   /** uid người đang đăng nhập — gắn vào created_by khi tạo (RLS ép đúng người gọi). */
   currentUid: string;
   /** false = chỉ xem (không phải admin / người tạo / sprint.manage). */
@@ -30,10 +44,16 @@ function parseNum(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const LINK_KINDS: { id: VelocityLinkKind; label: string }[] = [
+  { id: 'manual', label: 'Nhập tay' },
+  { id: 'feature', label: 'Theo feature' },
+  { id: 'tasks', label: 'Chọn task' },
+];
+
 /**
- * Form tạo/sửa một chart tốc độ. Bên dưới các ô nhập có khung XEM TRƯỚC tính ngay khi gõ:
- * ngày công, cần mỗi ngày bao nhiêu, dự kiến xong — để người lập kế hoạch thử số liệu
- * (đổi mốc, thêm người…) mà không phải Lưu rồi mới thấy.
+ * Form tạo/sửa một chart tốc độ. Khung XEM TRƯỚC tính ngay khi gõ để thử số liệu (đổi mốc,
+ * thêm người…) mà không phải Lưu. Nguồn tiến độ: nhập tay (+ nhật ký), hoặc LINK task
+ * (0087) — khi link, "đã xong" và đường thật lấy từ task done, không có ô nhập.
  */
 export default function VelocityChartModal({
   chart,
@@ -41,6 +61,8 @@ export default function VelocityChartModal({
   members,
   roleOf,
   holidaySet,
+  features,
+  tasks,
   currentUid,
   canEdit,
   onClose,
@@ -51,28 +73,34 @@ export default function VelocityChartModal({
   const [startDate, setStartDate] = useState(chart?.startDate ?? todayIso());
   const [targetDate, setTargetDate] = useState(chart?.targetDate ?? '');
   const [endDate, setEndDate] = useState(chart?.endDate ?? '');
-  const [totalQty, setTotalQty] = useState(chart ? String(chart.totalQty) : '');
+  const [totalQty, setTotalQty] = useState(chart && chart.totalQty > 0 ? String(chart.totalQty) : '');
   const [doneQty, setDoneQty] = useState(chart ? String(chart.doneQty) : '0');
   const [velocity, setVelocity] = useState(chart?.velocity === null || chart?.velocity === undefined ? '' : String(chart.velocity));
   const [memberIds, setMemberIds] = useState<string[]>(chart?.memberIds ?? []);
   const [note, setNote] = useState(chart?.note ?? '');
+  const [linkKind, setLinkKind] = useState<VelocityLinkKind>(chart?.linkKind ?? 'manual');
+  const [featureId, setFeatureId] = useState<string>(chart?.featureId ?? '');
+  const [taskIds, setTaskIds] = useState<string[]>(chart?.taskIds ?? []);
+  const [countBy, setCountBy] = useState<VelocityCountBy>(chart?.countBy ?? 'tasks');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const disabled = !canEdit || saving;
-  const unitLabel = unit.trim() || 'việc';
+  const linked = linkKind !== 'manual';
+  const unitLabel = linked && countBy === 'points' ? 'điểm' : linked && !unit.trim() ? 'task' : unit.trim() || 'việc';
+  const today = todayIso();
 
-  // Xem trước: dựng chart tạm từ form; thiếu ngày/số thì chưa tính.
-  const preview = useMemo(() => {
-    const total = parseNum(totalQty);
-    if (!startDate || !endDate || endDate < startDate || total === null) return null;
+  // Bản nháp từ form — dùng cho cả xem trước lẫn lưu. Thiếu ngày/số thì null.
+  const draft = useMemo<VelocityChart | null>(() => {
+    const total = parseNum(totalQty) ?? 0;
+    if (!startDate || !endDate || endDate < startDate) return null;
     if (targetDate && (targetDate < startDate || targetDate > endDate)) return null;
-    const draft: VelocityChart = {
+    return {
       id: chart?.id ?? 'draft',
       projectId,
       name,
-      unit,
+      unit: unitLabel,
       startDate,
       endDate,
       targetDate: targetDate || null,
@@ -81,13 +109,18 @@ export default function VelocityChartModal({
       velocity: parseNum(velocity),
       memberIds,
       note,
+      linkKind,
+      featureId: featureId || null,
+      taskIds,
+      countBy,
       sortOrder: 0,
       createdBy: null,
     };
-    return computePlan(draft, holidaySet, todayIso());
-  }, [chart?.id, projectId, name, unit, startDate, targetDate, endDate, totalQty, doneQty, velocity, memberIds, note, holidaySet]);
+  }, [chart?.id, projectId, name, unitLabel, startDate, targetDate, endDate, totalQty, doneQty, velocity, memberIds, note, linkKind, featureId, taskIds, countBy]);
 
-  // Đếm nhân sự theo chuyên môn ngay dưới ô chọn người.
+  const linkedInfo = useMemo(() => (draft && isLinked(draft) ? deriveLinked(draft, tasks, today) : null), [draft, tasks, today]);
+  const preview = useMemo(() => (draft ? computePlan(applyLink(draft, tasks, today), holidaySet, today) : null), [draft, tasks, today, holidaySet]);
+
   const roleSummary = useMemo(() => {
     const counts = new Map<string, { icon: string; label: string; n: number }>();
     for (const uid of memberIds) {
@@ -105,9 +138,12 @@ export default function VelocityChartModal({
     if (!startDate || !endDate) return 'Cần chọn ngày bắt đầu và deadline.';
     if (endDate < startDate) return 'Deadline phải sau (hoặc bằng) ngày bắt đầu.';
     if (targetDate && (targetDate < startDate || targetDate > endDate)) return 'Mốc cần xong phải nằm giữa ngày bắt đầu và deadline.';
-    const total = parseNum(totalQty);
-    if (total === null || total < 0) return 'Khối lượng phải là số ≥ 0.';
-    const done = parseNum(doneQty) ?? 0;
+    if (linkKind === 'feature' && !featureId) return 'Chọn feature để lấy tiến độ.';
+    if (linkKind === 'tasks' && taskIds.length === 0) return 'Chọn ít nhất một task.';
+    const total = parseNum(totalQty) ?? 0;
+    if (total < 0) return 'Khối lượng phải là số ≥ 0.';
+    if (!linked && total <= 0) return 'Khối lượng tổng phải > 0.';
+    const done = linked ? (linkedInfo?.doneQty ?? 0) : parseNum(doneQty) ?? 0;
     if (done < 0) return 'Đã làm phải là số ≥ 0.';
     const vel = velocity.trim() ? parseNum(velocity) : null;
     if (velocity.trim() && (vel === null || vel < 0)) return 'Tốc độ phải là số ≥ 0, hoặc để trống để tự đo.';
@@ -122,6 +158,10 @@ export default function VelocityChartModal({
       velocity: vel,
       memberIds,
       note,
+      linkKind,
+      featureId: linkKind === 'feature' ? featureId : null,
+      taskIds: linkKind === 'tasks' ? taskIds : [],
+      countBy,
     };
   }
 
@@ -137,11 +177,11 @@ export default function VelocityChartModal({
       let id = chart?.id;
       if (chart) await updateVelocityChart(chart.id, input);
       else id = await createVelocityChart(projectId, input, currentUid);
-      // "Đã làm" đổi ở đây = một mục nhật ký cho HÔM NAY, để đồ thị burn-up có điểm và
-      // done_qty không bị mục nhật ký cũ hơn đè lại. Best-effort: chart đã lưu xong rồi.
+      // Chart NHẬP TAY: đổi "Đã làm" = một mục nhật ký cho hôm nay để burn-up có điểm.
+      // Chart LINK không ghi nhật ký — tiến độ là của task, không có nguồn thứ hai.
       const doneChanged = chart ? input.doneQty !== chart.doneQty : input.doneQty > 0;
-      if (id && doneChanged) {
-        void logProgress(id, todayIso(), input.doneQty, currentUid).catch((err) =>
+      if (id && !linked && doneChanged) {
+        void logProgress(id, today, input.doneQty, currentUid).catch((err) =>
           console.warn('Ghi nhật ký tiến độ kèm lần lưu thất bại:', err),
         );
       }
@@ -180,7 +220,14 @@ export default function VelocityChartModal({
           </label>
           <label className="field">
             <span>Đơn vị khối lượng</span>
-            <input className="input" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="model, map, màn…" disabled={disabled} maxLength={30} />
+            <input
+              className="input"
+              value={linked && countBy === 'points' ? 'điểm' : unit}
+              onChange={(e) => setUnit(e.target.value)}
+              placeholder="model, map, màn…"
+              disabled={disabled || (linked && countBy === 'points')}
+              maxLength={30}
+            />
           </label>
         </div>
 
@@ -191,15 +238,7 @@ export default function VelocityChartModal({
           </label>
           <label className="field">
             <span>Mốc cần xong (tuỳ chọn)</span>
-            <input
-              className="input"
-              type="date"
-              value={targetDate}
-              min={startDate || undefined}
-              max={endDate || undefined}
-              onChange={(e) => setTargetDate(e.target.value)}
-              disabled={disabled}
-            />
+            <input className="input" type="date" value={targetDate} min={startDate || undefined} max={endDate || undefined} onChange={(e) => setTargetDate(e.target.value)} disabled={disabled} />
           </label>
           <label className="field">
             <span>Deadline *</span>
@@ -211,14 +250,64 @@ export default function VelocityChartModal({
           Bỏ trống mốc thì tính tới deadline.
         </p>
 
+        {/* Nguồn tiến độ (0087). */}
+        <div className="field" style={{ marginBottom: '0.5rem' }}>
+          <span>Nguồn tiến độ</span>
+          <div className="row" style={{ gap: '0.6rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+            <div className="seg-toggle" role="group" aria-label="Nguồn tiến độ">
+              {LINK_KINDS.map((k) => (
+                <button key={k.id} type="button" className={`seg${linkKind === k.id ? ' on' : ''}`} onClick={() => setLinkKind(k.id)} disabled={disabled}>
+                  {k.label}
+                </button>
+              ))}
+            </div>
+            {linked && (
+              <div className="seg-toggle" role="group" aria-label="Cách đếm">
+                <button type="button" className={`seg${countBy === 'tasks' ? ' on' : ''}`} onClick={() => setCountBy('tasks')} disabled={disabled}>Mỗi task = 1</button>
+                <button type="button" className={`seg${countBy === 'points' ? ' on' : ''}`} onClick={() => setCountBy('points')} disabled={disabled}>Theo điểm</button>
+              </div>
+            )}
+          </div>
+        </div>
+        {linkKind === 'feature' && (
+          <div className="field">
+            <SearchableSelect
+              value={featureId}
+              onChange={setFeatureId}
+              options={features.map((f) => ({ value: f.id, label: `${f.icon} ${f.name}` }))}
+              placeholder="Chọn feature…"
+              disabled={disabled}
+            />
+          </div>
+        )}
+        {linkKind === 'tasks' && (
+          <div className="field">
+            <TaskPickField tasks={tasks} selectedIds={taskIds} onChange={setTaskIds} disabled={disabled} />
+          </div>
+        )}
+        <p className="muted" style={{ fontSize: '0.78rem', marginTop: '-0.35rem', marginBottom: '0.85rem' }}>
+          {linked
+            ? <>🔗 Đã xong lấy từ task ở trạng thái Hoàn thành trong phạm vi; đường tiến độ thật dựng từ ngày tick xong.
+              {linkedInfo && <> Hiện có <b>{linkedInfo.scope.length}</b> task, xong <b>{linkedInfo.doneTasks.length}</b>.</>}</>
+            : <>✍️ Đổi "Đã làm" ở đây = ghi một mục nhật ký tiến độ cho hôm nay.</>}
+        </p>
+
         <div className="grid-3">
           <label className="field">
-            <span>Khối lượng tổng *</span>
-            <input className="input" inputMode="decimal" value={totalQty} onChange={(e) => setTotalQty(e.target.value)} placeholder="120" disabled={disabled} />
+            <span>{linked ? 'Khối lượng kế hoạch (0 = theo số task)' : 'Khối lượng tổng *'}</span>
+            <input className="input" inputMode="decimal" value={totalQty} onChange={(e) => setTotalQty(e.target.value)} placeholder={linked && linkedInfo ? `Theo phạm vi: ${fmtQty(linkedInfo.totalQty)}` : '120'} disabled={disabled} />
           </label>
           <label className="field">
             <span>Đã làm được</span>
-            <input className="input" inputMode="decimal" value={doneQty} onChange={(e) => setDoneQty(e.target.value)} placeholder="0" disabled={disabled} />
+            <input
+              className="input"
+              inputMode="decimal"
+              value={linked ? (linkedInfo ? String(linkedInfo.doneQty) : '') : doneQty}
+              onChange={(e) => setDoneQty(e.target.value)}
+              placeholder="0"
+              disabled={disabled || linked}
+              title={linked ? 'Tự tính từ task đã hoàn thành' : undefined}
+            />
           </label>
           <label className="field">
             <span>Tốc độ hiện tại ({unitLabel}/ngày công)</span>
@@ -232,12 +321,7 @@ export default function VelocityChartModal({
             />
           </label>
         </div>
-        <p className="muted" style={{ fontSize: '0.78rem', marginTop: '-0.35rem', marginBottom: '0.85rem' }}>
-          💡 Đổi “Đã làm” ở đây = ghi một mục nhật ký tiến độ cho hôm nay. Để trống tốc độ thì
-          hệ thống tự đo = đã làm ÷ ngày công đã qua; điền tay khi muốn thử “giả sử đội chạy X/ngày”.
-        </p>
 
-        {/* Khung xem trước — tính ngay khi gõ, trước khi Lưu. */}
         <div className="gantt-preview glass">
           {preview ? (
             <>
@@ -245,7 +329,7 @@ export default function VelocityChartModal({
                 <span>Ngày công</span>
                 <b className="mono">{preview.totalWorkdays}</b>
                 <span className="muted">
-                  tới {formatIsoDate(preview.aimDate)} (đã qua {preview.elapsedWorkdays} · còn {preview.remainingWorkdays}
+                  tới {formatIsoDate(preview.aimDate)} (đã qua {preview.elapsedWorkdays}, còn {preview.remainingWorkdays}
                   {targetDate ? `, tới deadline còn ${preview.workdaysToDeadline}` : ''}), bỏ T7/CN và ngày lễ
                 </span>
               </div>
@@ -273,17 +357,11 @@ export default function VelocityChartModal({
               </div>
             </>
           ) : (
-            <span className="muted" style={{ fontSize: '0.82rem' }}>Điền ngày bắt đầu, deadline (mốc nếu có phải nằm giữa) và khối lượng để xem tính toán.</span>
+            <span className="muted" style={{ fontSize: '0.82rem' }}>Điền ngày bắt đầu, deadline (mốc nếu có phải nằm giữa) để xem tính toán.</span>
           )}
         </div>
 
-        <WatchersField
-          members={members}
-          watcherIds={memberIds}
-          onChange={setMemberIds}
-          disabled={disabled}
-          label="Thành viên tham gia"
-        />
+        <WatchersField members={members} watcherIds={memberIds} onChange={setMemberIds} disabled={disabled} label="Thành viên tham gia" />
         {roleSummary.length > 0 && (
           <p className="gantt-roles" style={{ marginTop: '-0.4rem', marginBottom: '0.85rem' }}>
             <span className="muted" style={{ fontSize: '0.78rem' }}>{memberIds.length} người:</span>
