@@ -7,7 +7,7 @@ import { formatIsoDate, todayIso } from '../../lib/format';
 import { computePlan, fmtQty, PLAN_STATUS_LABEL } from '../../lib/velocity';
 import { applyLink, deriveLinked, isLinked } from '../../lib/velocityLink';
 import { createVelocityChart, deleteVelocityChart, updateVelocityChart } from '../../lib/velocityChartWrites';
-import { logProgress } from '../../lib/velocityProgressWrites';
+import { setProgressTotal } from '../../lib/velocityProgressWrites';
 import type { MemberRoleInfo } from '../../lib/memberRole';
 import type {
   Feature,
@@ -177,11 +177,11 @@ export default function VelocityChartModal({
       let id = chart?.id;
       if (chart) await updateVelocityChart(chart.id, input);
       else id = await createVelocityChart(projectId, input, currentUid);
-      // Chart NHẬP TAY: đổi "Đã làm" = một mục nhật ký cho hôm nay để burn-up có điểm.
-      // Chart LINK không ghi nhật ký — tiến độ là của task, không có nguồn thứ hai.
+      // Chart NHẬP TAY: ô "Đã làm" là TỔNG — chỉnh mục hôm nay sao cho tổng nhật ký = số này
+      // (nhật ký lưu theo ngày, 0089). Chart LINK không ghi nhật ký — tiến độ là của task.
       const doneChanged = chart ? input.doneQty !== chart.doneQty : input.doneQty > 0;
       if (id && !linked && doneChanged) {
-        void logProgress(id, today, input.doneQty, currentUid).catch((err) =>
+        void setProgressTotal(id, today, input.doneQty, currentUid).catch((err) =>
           console.warn('Ghi nhật ký tiến độ kèm lần lưu thất bại:', err),
         );
       }
@@ -263,7 +263,7 @@ export default function VelocityChartModal({
             </div>
             {linked && (
               <div className="seg-toggle" role="group" aria-label="Cách đếm">
-                <button type="button" className={`seg${countBy === 'tasks' ? ' on' : ''}`} onClick={() => setCountBy('tasks')} disabled={disabled}>Mỗi task = 1</button>
+                <button type="button" className={`seg${countBy === 'tasks' ? ' on' : ''}`} onClick={() => setCountBy('tasks')} disabled={disabled} title="Mỗi task = 1 đơn vị, hoặc số đơn vị khai trong chi tiết task">Theo đơn vị task</button>
                 <button type="button" className={`seg${countBy === 'points' ? ' on' : ''}`} onClick={() => setCountBy('points')} disabled={disabled}>Theo điểm</button>
               </div>
             )}
@@ -282,14 +282,21 @@ export default function VelocityChartModal({
         )}
         {linkKind === 'tasks' && (
           <div className="field">
-            <TaskPickField tasks={tasks} selectedIds={taskIds} onChange={setTaskIds} disabled={disabled} />
+            <TaskPickField
+              tasks={tasks}
+              selectedIds={taskIds}
+              onChange={setTaskIds}
+              lockedIds={chart ? tasks.filter((t) => t.chartId === chart.id).map((t) => t.id) : []}
+              disabled={disabled}
+            />
           </div>
         )}
         <p className="muted" style={{ fontSize: '0.78rem', marginTop: '-0.35rem', marginBottom: '0.85rem' }}>
           {linked
-            ? <>🔗 Đã xong lấy từ task ở trạng thái Hoàn thành trong phạm vi; đường tiến độ thật dựng từ ngày tick xong.
+            ? <>🔗 Đã xong lấy từ task Hoàn thành trong phạm vi; đường tiến độ thật dựng từ ngày tick xong.
+              Task cũng gắn được vào chart này từ chi tiết task, kèm số {unitLabel} riêng của nó.
               {linkedInfo && <> Hiện có <b>{linkedInfo.scope.length}</b> task, xong <b>{linkedInfo.doneTasks.length}</b>.</>}</>
-            : <>✍️ Đổi "Đã làm" ở đây = ghi một mục nhật ký tiến độ cho hôm nay.</>}
+            : <>✍️ "Đã làm" là tổng hiện tại; đổi ở đây = chỉnh mục hôm nay trong nhật ký để tổng bằng số này.</>}
         </p>
 
         <div className="grid-3">

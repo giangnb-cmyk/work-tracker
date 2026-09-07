@@ -60,6 +60,9 @@ export function taskCopyInput(task: Task): NewTaskInput {
     projectId: task.projectId,
     featureId: task.featureId,
     status: 'todo',
+    // Giữ liên kết chart tốc độ + số đơn vị: bản sao là "một cái như vầy", cùng tính vào chart đó.
+    chartId: task.chartId,
+    chartQty: task.chartQty,
     priority: task.priority,
     points: task.points,
     assigneeId: task.assigneeId,

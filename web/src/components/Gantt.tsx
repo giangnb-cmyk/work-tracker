@@ -114,7 +114,7 @@ export default function Gantt() {
           {charts.map((c) => {
             const plan = plans.get(c.id)!;
             const expanded = expandedId === c.id;
-            const label = linkLabel(c, projectFeatures);
+            const label = linkLabel(c, projectFeatures, tasks);
             return (
               <div key={c.id} className="gantt-item">
                 <GanttRow

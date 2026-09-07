@@ -1,5 +1,9 @@
-// Chart tốc độ LINK với task (migration 0087): dẫn xuất "đã xong", "tổng" và đường tiến độ
-// thật từ task trong phạm vi, thay cho nhập tay + nhật ký. Thuần — không React, không Supabase.
+// Chart tốc độ LINK với task (migration 0087/0088): dẫn xuất "đã xong", "tổng" và đường
+// tiến độ thật từ task trong phạm vi, thay cho nhập tay + nhật ký. Thuần — không React.
+//
+// Phạm vi = (task theo feature | task_ids chọn từ phía chart) ∪ task có `chartId` trỏ về chart
+// (gắn từ chi tiết task, 0088). Trọng số khi đếm 'tasks' = `chartQty` của task (NULL = 1) —
+// "task này tương đương 3 model"; đếm 'points' = story points.
 //
 // Ngày hoàn thành của task = `dueDate` khi task đã done (updateTask/moveTask ghi ngày xong
 // thật vào đó — xem DATA_MODEL "dueDate reset to done-day"). Không có ngày thì tính vào
@@ -17,20 +21,22 @@ export function isLinked(chart: Pick<VelocityChart, 'linkKind'>): boolean {
   return chart.linkKind !== 'manual';
 }
 
-/** Task nằm trong phạm vi của chart. Chart nhập tay → rỗng. */
+/** Task nằm trong phạm vi của chart. Chart nhập tay → rỗng (task gắn vào chart tay không có tác dụng). */
 export function tasksInScope(chart: VelocityChart, tasks: Task[]): Task[] {
-  if (chart.linkKind === 'feature') {
-    return chart.featureId ? tasks.filter((t) => t.featureId === chart.featureId) : [];
-  }
-  if (chart.linkKind === 'tasks') {
-    const ids = new Set(chart.taskIds);
-    return tasks.filter((t) => ids.has(t.id));
-  }
-  return [];
+  if (!isLinked(chart)) return [];
+  const picked = new Set(chart.linkKind === 'tasks' ? chart.taskIds : []);
+  return tasks.filter(
+    (t) =>
+      t.chartId === chart.id ||
+      picked.has(t.id) ||
+      (chart.linkKind === 'feature' && chart.featureId !== null && t.featureId === chart.featureId),
+  );
 }
 
-function weightOf(chart: VelocityChart, t: Task): number {
-  return chart.countBy === 'points' ? t.points || 0 : 1;
+/** Khối lượng một task đóng góp vào chart: điểm, hoặc số đơn vị tự khai (mặc định 1). */
+export function weightOf(chart: Pick<VelocityChart, 'countBy'>, t: Task): number {
+  if (chart.countBy === 'points') return t.points || 0;
+  return t.chartQty ?? 1;
 }
 
 export interface LinkedProgress {
@@ -75,11 +81,14 @@ export function applyLink(chart: VelocityChart, tasks: Task[], today: string): V
 }
 
 /** Nhãn ngắn cho nguồn tiến độ, vd "tự động từ feature Shop" / "tự động từ 12 task". null = nhập tay. */
-export function linkLabel(chart: VelocityChart, features: Feature[]): string | null {
+export function linkLabel(chart: VelocityChart, features: Feature[], tasks: Task[] = []): string | null {
+  if (!isLinked(chart)) return null;
+  const attached = tasks.filter((t) => t.chartId === chart.id).length;
+  const extra = attached > 0 ? ` (+${attached} task gắn từ chi tiết)` : '';
   if (chart.linkKind === 'feature') {
     const f = features.find((x) => x.id === chart.featureId);
-    return f ? `tự động từ feature ${f.name}` : 'feature đã bị xoá';
+    return f ? `tự động từ feature ${f.name}${extra}` : `feature đã bị xoá${extra}`;
   }
-  if (chart.linkKind === 'tasks') return `tự động từ ${chart.taskIds.length} task`;
-  return null;
+  const n = new Set([...chart.taskIds, ...tasks.filter((t) => t.chartId === chart.id).map((t) => t.id)]).size;
+  return `tự động từ ${n} task`;
 }

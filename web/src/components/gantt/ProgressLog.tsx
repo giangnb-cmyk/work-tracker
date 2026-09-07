@@ -7,7 +7,7 @@ import type { VelocityChart, VelocityProgress } from '../../types';
 
 interface Props {
   chart: VelocityChart;
-  /** Đã sắp theo ngày tăng dần (hook). */
+  /** Mục nhật ký thô (số làm TRONG ngày), đã sắp theo ngày tăng dần (hook). */
   entries: VelocityProgress[];
   currentUid: string;
 }
@@ -21,11 +21,11 @@ function parseNum(s: string): number | null {
 }
 
 /**
- * Nhật ký tiến độ của một chart — ghi "tới hết ngày X đã xong CỘNG DỒN bao nhiêu".
+ * Nhật ký tiến độ của một chart — ghi "ngày X làm được N", tổng tự cộng dồn (0089).
  *
- * Cộng dồn chứ không "làm thêm trong ngày": người ghi chỉ cần nhìn tổng đang có (đếm file,
- * đếm model trong scene) rồi gõ một số, không phải nhớ hôm qua ghi bao nhiêu để trừ.
- * Mọi người trong dự án đều ghi được (RLS 0086) — người làm tự ghi việc của mình.
+ * Ghi theo ngày chứ không ghi tổng: người làm chỉ cần gõ số mình vừa xong, không phải nhớ
+ * tổng cũ để cộng tay; sửa một ngày cũ cũng không kéo theo phải sửa mọi ngày sau. Mọi
+ * người trong dự án đều ghi được (RLS 0086) — người làm tự ghi việc của mình.
  */
 export default function ProgressLog({ chart, entries, currentUid }: Props) {
   const [day, setDay] = useState(todayIso());
@@ -35,20 +35,20 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
   const [removing, setRemoving] = useState<VelocityProgress | null>(null);
 
   const today = todayIso();
-  // Mới nhất lên đầu; kèm Δ so với mục liền trước để thấy nhịp từng lần ghi.
+  // Cộng dồn theo ngày tăng dần để hiện "tổng tới ngày đó" trên từng dòng; hiển thị mới nhất lên đầu.
   const rows = useMemo(() => {
     const asc = [...entries].sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
-    return asc
-      .map((e, i) => ({ ...e, delta: i === 0 ? e.doneQty : e.doneQty - asc[i - 1].doneQty }))
-      .reverse();
+    let cum = 0;
+    return asc.map((e) => ({ ...e, total: (cum += e.doneQty) })).reverse();
   }, [entries]);
-  const latest = rows[0];
+  const total = rows[0]?.total ?? 0;
+  const existingForDay = entries.find((e) => e.day === day);
 
   async function handleLog() {
     const n = parseNum(qty);
     if (!day) return setError('Chọn ngày.');
     if (day > today) return setError('Chưa tới ngày đó. Nhật ký chỉ ghi việc đã xong.');
-    if (n === null || n < 0) return setError('Số đã xong phải là số ≥ 0.');
+    if (n === null || n < 0) return setError('Số làm được phải là số ≥ 0.');
     setBusy(true);
     setError(null);
     try {
@@ -77,9 +77,9 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
     <div className="plog">
       <div className="plog-head">
         <strong>Nhật ký tiến độ</strong>
-        {latest && (
+        {rows.length > 0 && (
           <span className="gantt-meta">
-            Mới nhất {fmtQty(latest.doneQty)} {chart.unit}, ngày {formatIsoDate(latest.day).slice(0, 5)}
+            Tổng {fmtQty(total)} {chart.unit} tới {formatIsoDate(rows[0].day).slice(0, 5)}
           </span>
         )}
       </div>
@@ -91,28 +91,28 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
           inputMode="decimal"
           value={qty}
           onChange={(e) => setQty(e.target.value)}
-          placeholder={latest ? `Đang ${fmtQty(latest.doneQty)} ${chart.unit}` : `Đã xong cộng dồn (${chart.unit})`}
+          placeholder={existingForDay ? `Ngày này đã ghi ${fmtQty(existingForDay.doneQty)}, gõ để sửa` : `Làm được trong ngày (${chart.unit})`}
           disabled={busy}
           onKeyDown={(e) => e.key === 'Enter' && void handleLog()}
         />
         <button className="btn-primary" onClick={() => void handleLog()} disabled={busy || !qty.trim()}>Ghi</button>
       </div>
-      <p className="plog-hint">Ghi số đã xong cộng dồn tới hết ngày đó. Ghi lại cùng ngày để sửa.</p>
+      <p className="plog-hint">Ghi số làm được trong ngày đó, tổng tự cộng dồn. Ghi lại cùng ngày để sửa số của ngày đó.</p>
       {error && <p className="error-text" style={{ marginTop: '0.4rem' }}>{error}</p>}
 
       {rows.length === 0 && (
-        <div className="plog-empty">Chưa có mục nào. Ghi số của hôm nay để đường tiến độ thật bắt đầu chạy.</div>
+        <div className="plog-empty">Chưa có mục nào. Ghi số làm được hôm nay để đường tiến độ thật bắt đầu chạy.</div>
       )}
 
       {rows.length > 0 && (
         <ul className="plog-list">
           {rows.map((r) => (
-            <li key={r.day} className="plog-item">
+            <li key={r.day} className="plog-item plog-inc">
               <span className="mono">{formatIsoDate(r.day).slice(0, 5)}</span>
               <span>
-                <b className="mono">{fmtQty(r.doneQty)}</b> <span className="muted">{chart.unit}</span>
+                <b className="mono">+{fmtQty(r.doneQty)}</b> <span className="muted">{chart.unit}</span>
               </span>
-              <span className={`plog-delta mono${r.delta < 0 ? ' neg' : ''}`}>{r.delta >= 0 ? '+' : ''}{fmtQty(r.delta)}</span>
+              <span className="gantt-meta mono" title="Tổng cộng dồn tới hết ngày này">= {fmtQty(r.total)}</span>
               <button className="plog-x" onClick={() => setRemoving(r)} title="Xoá mục này" aria-label="Xoá mục này">×</button>
             </li>
           ))}
@@ -122,8 +122,8 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
       {removing && (
         <ConfirmDialog
           title="Xoá mục tiến độ?"
-          message={<>Xoá mục <strong>{formatIsoDate(removing.day)}: {fmtQty(removing.doneQty)} {chart.unit}</strong>.</>}
-          detail="Đường tiến độ thật trên đồ thị sẽ mất điểm này; số 'đã làm' của chart lùi về mục mới nhất còn lại."
+          message={<>Xoá mục <strong>{formatIsoDate(removing.day)}: +{fmtQty(removing.doneQty)} {chart.unit}</strong>.</>}
+          detail="Tổng đã làm của chart giảm đúng bằng số này; đường tiến độ thật trên đồ thị mất điểm ngày đó."
           confirmLabel="Xoá mục"
           onConfirm={() => handleRemove(removing)}
           onCancel={() => setRemoving(null)}

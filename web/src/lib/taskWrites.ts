@@ -80,6 +80,8 @@ export async function createTask(input: NewTaskInput, opts: CreateOpts): Promise
       subtasks: input.subtasks ?? [],
       watcher_ids: input.watcherIds ?? [],
       watcher_names: opts.watcherNames ?? [],
+      chart_id: input.chartId ?? null,
+      chart_qty: input.chartQty ?? null,
     })
     .select('id, short_code')
     .single();

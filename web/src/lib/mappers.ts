@@ -348,6 +348,8 @@ export function rowToTask(r: Row): Task {
     subtasks: (r.subtasks ?? []) as Subtask[],
     watcherIds: r.watcher_ids ?? [],
     watcherNames: r.watcher_names ?? [],
+    chartId: r.chart_id ?? null,
+    chartQty: r.chart_qty === null || r.chart_qty === undefined ? null : Number(r.chart_qty),
   };
 }
 
@@ -450,6 +452,8 @@ export function taskPatchToRow(patch: Partial<Task>): Row {
     subtasks: 'subtasks',
     watcherIds: 'watcher_ids',
     watcherNames: 'watcher_names',
+    chartId: 'chart_id',
+    chartQty: 'chart_qty',
   };
   const row: Row = {};
   for (const [k, v] of Object.entries(patch)) {

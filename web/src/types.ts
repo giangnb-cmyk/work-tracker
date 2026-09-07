@@ -673,6 +673,13 @@ export interface Task {
   /** Related people (uids) beyond the assignee — mentioned on completion. */
   watcherIds: string[];
   watcherNames: string[];
+  /**
+   * Chart tốc độ task này tính vào (→ velocity_charts, migration 0088) — gắn từ chi tiết
+   * task. Chỉ có tác dụng với chart đang link (feature/tasks); null = không gắn.
+   */
+  chartId: string | null;
+  /** Số đơn vị của task trong chart (vd 3 model). null = 1. */
+  chartQty: number | null;
 }
 
 /**
@@ -689,6 +696,7 @@ export interface TaskSprintEntry {
 export type NewTaskInput = Pick<
   Task,
   'title' | 'description' | 'sprintId' | 'projectId' | 'featureId' | 'status' | 'priority' | 'points'
+  | 'chartId' | 'chartQty'
 > & {
   assigneeId: string | null;
   dueDate: Date | null;
@@ -826,13 +834,14 @@ export interface Holiday {
 }
 
 /**
- * Một mục nhật ký tiến độ (bảng `velocity_chart_progress`, 0086): tới hết `day` đã xong
- * CỘNG DỒN `doneQty` (không phải số làm trong ngày). Trigger DB đồng bộ mục mới nhất vào
- * `VelocityChart.doneQty` — đồ thị burn-up vẽ đường "tiến độ thật" từ các mục này.
+ * Một mục nhật ký tiến độ (bảng `velocity_chart_progress`, 0086/0089): số làm được TRONG
+ * `day`. Tổng của chart = SUM các mục (trigger DB đồng bộ vào `VelocityChart.doneQty`);
+ * đồ thị burn-up cộng dồn theo ngày để vẽ đường "tiến độ thật" (lib/burnup.cumulate).
  */
 export interface VelocityProgress {
   chartId: string;
   day: string; // 'YYYY-MM-DD'
+  /** Số làm được trong ngày (0089). Mục dẫn xuất từ task (velocityLink) cũng theo nghĩa này. */
   doneQty: number;
   createdBy: string | null;
 }

@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { useVelocityProgress } from '../../hooks/useVelocityProgress';
+import { cumulate } from '../../lib/burnup';
 import type { LinkedProgress } from '../../lib/velocityLink';
 import type { VelocityPlan } from '../../lib/velocity';
 import type { Task, VelocityChart } from '../../types';
@@ -24,7 +26,9 @@ interface Props {
  */
 export default function GanttRowDetail({ chart, plan, holidaySet, today, currentUid, linked, onOpenTask }: Props) {
   const { entries: logged, loading } = useVelocityProgress(linked ? null : chart.id);
-  const entries = linked ? linked.progress.entries : logged;
+  // Burn-up cần chuỗi CỘNG DỒN: nhật ký tay lưu số theo ngày (0089); mục dẫn xuất từ task
+  // (velocityLink) đã cộng dồn sẵn.
+  const entries = useMemo(() => (linked ? linked.progress.entries : cumulate(logged)), [linked, logged]);
 
   return (
     <div className="gantt-detail glass" onClick={(e) => e.stopPropagation()}>
@@ -37,7 +41,7 @@ export default function GanttRowDetail({ chart, plan, holidaySet, today, current
       </div>
       <div className="gantt-detail-log">
         {linked ? (
-          <LinkedTaskList scope={linked.progress.scope} label={linked.label} onOpenTask={onOpenTask} />
+          <LinkedTaskList chart={chart} scope={linked.progress.scope} label={linked.label} onOpenTask={onOpenTask} />
         ) : (
           <ProgressLog chart={chart} entries={logged} currentUid={currentUid} />
         )}

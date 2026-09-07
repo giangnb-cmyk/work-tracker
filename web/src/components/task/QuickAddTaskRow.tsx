@@ -42,6 +42,9 @@ export default function QuickAddTaskRow({ featureId, sprintId, projectId }: Prop
           projectId,
           featureId,
           status: 'todo',
+          // Thêm nhanh không gắn chart tốc độ — mở chi tiết task để gắn (0088).
+          chartId: null,
+          chartQty: null,
           priority: 'medium',
           points: 0,
           assigneeId: user?.uid ?? null,

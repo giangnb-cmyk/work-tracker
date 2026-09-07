@@ -3,6 +3,7 @@ import { Timestamp } from '../lib/time';
 import { useAuth } from '../contexts/AuthContext';
 import { useSprintContext } from '../contexts/SprintContext';
 import { useFeatureAssignees } from '../hooks/useFeatureAssignees';
+import { useVelocityCharts } from '../hooks/useVelocityCharts';
 import { usePasteAttachment } from '../hooks/usePasteAttachment';
 import { createTask, deleteTask, descWithLongTitle, syncTaskToNotion, updateTask } from '../lib/taskWrites';
 import { copyTitle, duplicateTask } from '../lib/duplicateWrites';
@@ -87,6 +88,20 @@ export default function TaskModal({
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium');
   const [assigneeId, setAssigneeId] = useState<string | null>(task?.assigneeId ?? defaultAssigneeId ?? null);
   const [points, setPoints] = useState<number>(task?.points ?? 0);
+  // Gắn vào chart tốc độ (0088): chọn chart + khai task này tương đương bao nhiêu đơn vị của
+  // chart (chuỗi để gõ được "2,5"; rỗng = 1). Chỉ chart đang LINK (feature/tasks) mới nhận.
+  const [chartId, setChartId] = useState<string | null>(task?.chartId ?? null);
+  const [chartQty, setChartQty] = useState<string>(task?.chartQty !== null && task?.chartQty !== undefined ? String(task.chartQty) : '');
+  const { charts: projectCharts } = useVelocityCharts(projectId);
+  // Chart nhập tay bỏ khỏi danh sách; chart đang gắn (kể cả đã đổi sang nhập tay) vẫn hiện để không âm thầm mất.
+  const chartOptions = projectCharts.filter((c) => c.linkKind !== 'manual' || c.id === chartId);
+  const chartUnit = projectCharts.find((c) => c.id === chartId)?.unit ?? 'đơn vị';
+  const parsedChartQty = (() => {
+    const t = chartQty.trim().replace(',', '.');
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  })();
   // Tạo mới: hạn chót mặc định = NGÀY KẾT THÚC sprint đang chọn (xem lib/sprintDue — một
   // luật cho cả web lẫn bot). Người tạo vẫn đổi tay được trước khi bấm Tạo.
   const [due, setDue] = useState<string>(() => {
@@ -191,7 +206,7 @@ export default function TaskModal({
   // the last-saved task (so the done-transition + due-snap fire once, not per keystroke).
   const savedTaskRef = useRef<Task | null>(task ?? null);
   const snapshot = () =>
-    JSON.stringify({ title, description, sprintId, featureId, status, priority, assigneeId, points, due, attachments, subtasks, watcherIds });
+    JSON.stringify({ title, description, sprintId, featureId, status, priority, assigneeId, points, due, attachments, subtasks, watcherIds, chartId, chartQty });
   const lastSavedRef = useRef<string | null>(null);
   if (lastSavedRef.current === null) lastSavedRef.current = snapshot();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -217,6 +232,7 @@ export default function TaskModal({
       assigneeId, assigneeName: assignee?.displayName ?? '',
       dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
       attachments, subtasks, watcherIds, watcherNames,
+      chartId, chartQty: chartId ? parsedChartQty : null,
     };
     // Subtask VỪA chuyển sang done ở lượt lưu này. Phải diff chứ không bắt từng cú bấm:
     // autosave gom 700ms nên tick liền mấy cái là về cùng một lượt. `=== false` (không phải
@@ -252,7 +268,7 @@ export default function TaskModal({
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, sprintId, featureId, status, priority, assigneeId, points, due, attachments, subtasks, watcherIds]);
+  }, [title, description, sprintId, featureId, status, priority, assigneeId, points, due, attachments, subtasks, watcherIds, chartId, chartQty]);
 
   async function handleClose() {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -274,7 +290,7 @@ export default function TaskModal({
     const dueDate = due ? new Date(due) : null;
     try {
       await createTask(
-        { title, description, sprintId, projectId, featureId, status, priority, points, assigneeId, dueDate, attachments, subtasks, watcherIds },
+        { title, description, sprintId, projectId, featureId, status, priority, points, assigneeId, dueDate, attachments, subtasks, watcherIds, chartId, chartQty: chartId ? parsedChartQty : null },
         { reporterId: user?.uid ?? '', assigneeName: assignee?.displayName ?? '', assigneeNotionUserId: assignee?.notionUserId ?? null, notionProjectId, notionSyncEnabled, watcherNames },
       );
       onClose();
@@ -326,6 +342,7 @@ export default function TaskModal({
           title, description, sprintId, featureId, status, priority, assigneeId, points,
           dueDate: due ? Timestamp.fromDate(new Date(due)) : null,
           attachments, subtasks, watcherIds,
+          chartId, chartQty: chartId ? parsedChartQty : null,
         },
         {
           reporterId: user?.uid ?? '',
@@ -498,6 +515,36 @@ export default function TaskModal({
                   {/* Story point: CHỈ admin — kể cả người tạo task (trigger 0024 chặn thêm ở DB). */}
                   <input className="input" type="number" min={0} value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} disabled={!isAdmin} />
                 </label>
+                {/* Chart tốc độ (0088): task tính vào chart nào + tương đương bao nhiêu đơn vị.
+                    Chỉ liệt kê chart đang link task; chart nhập tay không nhận. */}
+                {(chartOptions.length > 0 || chartId) && (
+                  <div className="tm-field">
+                    <span>Chart tốc độ</span>
+                    <SearchableSelect
+                      value={chartId ?? ''}
+                      onChange={(v) => setChartId(v || null)}
+                      options={chartOptions.map((c) => ({ value: c.id, label: c.name }))}
+                      allowEmpty
+                      emptyLabel="— Không tính vào chart —"
+                      placeholder="— Không tính vào chart —"
+                      disabled={!canEditOwn}
+                    />
+                  </div>
+                )}
+                {chartId && (
+                  <label className="tm-field">
+                    <span>Task này = bao nhiêu {chartUnit}</span>
+                    <input
+                      className="input"
+                      inputMode="decimal"
+                      value={chartQty}
+                      onChange={(e) => setChartQty(e.target.value)}
+                      placeholder="1"
+                      disabled={!canEditOwn}
+                      title={`Khối lượng của task trong chart. Trống = 1 ${chartUnit}.`}
+                    />
+                  </label>
+                )}
               </div>
               <WatchersField members={members} watcherIds={watcherIds} onChange={setWatcherIds} disabled={!canEditFields} excludeIds={watcherExclude} />
             </section>

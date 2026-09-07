@@ -9,6 +9,21 @@ import { isoToUtcMs, isWorkday, utcMsToIso } from './workdays';
 import type { VelocityPlan } from './velocity';
 import type { VelocityChart, VelocityProgress } from '../types';
 
+/**
+ * Nhật ký (số làm TRONG ngày, 0089) → chuỗi CỘNG DỒN theo ngày tăng dần — dạng buildBurnup
+ * cần. Cùng ngày có nhiều mục (không xảy ra với khoá chart_id+day, nhưng mục dẫn xuất từ
+ * task thì có thể) được gộp.
+ */
+export function cumulate(entries: VelocityProgress[]): VelocityProgress[] {
+  const byDay = new Map<string, number>();
+  for (const e of entries) byDay.set(e.day, (byDay.get(e.day) ?? 0) + e.doneQty);
+  let cum = 0;
+  return [...byDay.keys()].sort().map((day) => {
+    cum += byDay.get(day) as number;
+    return { chartId: entries[0]?.chartId ?? '', day, doneQty: cum, createdBy: null };
+  });
+}
+
 export interface BurnupSeries {
   /** Từng ngày lịch trong [start, end] — cũng là nhãn trục x. */
   days: string[];
@@ -62,6 +77,7 @@ function offRunsOf(days: string[], holidays: ReadonlySet<string>): { from: numbe
   return runs;
 }
 
+/** `entries` phải là chuỗi CỘNG DỒN (qua `cumulate`) — mỗi mục = tổng tới hết ngày đó. */
 export function buildBurnup(
   chart: VelocityChart,
   plan: VelocityPlan,

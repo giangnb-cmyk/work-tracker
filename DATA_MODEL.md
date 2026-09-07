@@ -591,20 +591,27 @@ và suy ngày dự kiến xong. Mọi phép tính là THUẦN phía web (`lib/wo
 | `linkKind` | `manual` \| `feature` \| `tasks` | **Nguồn tiến độ** (migration `0087`). `manual` = nhập tay + nhật ký. `feature` = mọi task có `tasks.feature_id = featureId`. `tasks` = danh sách `taskIds`. Khi link, web **dẫn xuất** `doneQty` (task `done` trong phạm vi) và đường "thật" (gom theo ngày xong = `tasks.dueDate` của task done) — `lib/velocityLink.ts`; giá trị `done_qty` trong DB chỉ là bản chụp lúc lưu form, không phải nguồn sự thật |
 | `featureId` | uuid \| null | FK → features, `on delete set null` (feature xoá → chart về "phạm vi trống", người dùng thấy để chỉnh) |
 | `taskIds` | uuid[] | không FK (như `memberIds`): task xoá tự rơi khỏi phạm vi |
-| `countBy` | `tasks` \| `points` | mỗi task = 1 đơn vị, hoặc cộng story points. Khi link, `totalQty > 0` = khối lượng KẾ HOẠCH (feature còn thêm task dần); `= 0` → tổng = khối lượng task trong phạm vi |
+| `countBy` | `tasks` \| `points` | `tasks` = cộng `tasks.chartQty` của từng task (NULL = 1 — "task này = 3 model", migration `0088`); `points` = cộng story points. Khi link, `totalQty > 0` = khối lượng KẾ HOẠCH (feature còn thêm task dần); `= 0` → tổng = khối lượng task trong phạm vi |
+
+**Gắn từ phía task** (`0088`): `tasks.chartId` (FK → chart, set null khi xoá chart) + `tasks.chartQty`.
+Phạm vi hiệu lực của chart link = (theo feature | `taskIds`) **∪** task có `chartId` = chart. Chart
+nhập tay KHÔNG nhận task gắn (chi tiết task chỉ liệt kê chart đang link). Trong form chart, task
+gắn từ phía task hiện tick sẵn và khoá — gỡ ở chính task.
 | `note`, `sortOrder`, `createdAt`, `createdBy` | | |
 
 **Ngày công** = T2–T6 **trừ** các ngày trong `holidays` (`day date pk`, `name`). Bảng lễ
 DÙNG CHUNG cả công ty (nghỉ lễ là nghỉ cả đội), không theo dự án. T7/CN tự bỏ, không khai.
 
 **Nhật ký tiến độ** — `velocity_chart_progress` (`chartId` → chart, `day` date, `doneQty`
-numeric, `createdBy`; khoá chính `(chart_id, day)`): "tới hết `day` đã xong **CỘNG DỒN**
-`doneQty`". Ghi lại cùng ngày = sửa số. **Trigger `velocity_progress_sync_done`**
-(SECURITY DEFINER có chủ đích) đồng bộ mục MỚI NHẤT theo ngày vào `velocity_charts.done_qty`
-— nên member không có quyền sửa chart vẫn ghi tiến độ được mà con số trên dòng Gantt vẫn
-đúng; xoá hết nhật ký thì giữ `done_qty` cũ. Đổi "Đã làm" trong form sửa chart cũng ghi
-một mục cho hôm nay. Đồ thị burn-up (`lib/burnup.ts`) vẽ đường "tiến độ thật" từ các mục
-này (+ mốc 0 ở start, + điểm hôm nay), phẳng qua ngày nghỉ.
+numeric, `createdBy`; khoá chính `(chart_id, day)`): "ngày `day` làm được `doneQty`"
+(**số TRONG ngày**, migration `0089` — trước đó là cộng dồn, đã đổi vì người ghi gõ số vừa
+làm và mong tổng tự tăng). Ghi lại cùng ngày = sửa số ngày đó. **Trigger
+`velocity_progress_sync_done`** (SECURITY DEFINER có chủ đích) đồng bộ **SUM** vào
+`velocity_charts.done_qty` — member không có quyền sửa chart vẫn ghi tiến độ được mà con số
+trên dòng Gantt vẫn đúng. Ô "Đã làm" trong form chart là TỔNG: web chỉnh mục hôm nay sao cho
+tổng nhật ký bằng số đó (`setProgressTotal`). Đồ thị burn-up cộng dồn theo ngày
+(`lib/burnup.cumulate`) rồi vẽ đường "tiến độ thật" (+ mốc 0 ở start, + điểm hôm nay), phẳng
+qua ngày nghỉ.
 
 **Cách tính** (`computePlan`) — quy ước **ghi cuối ngày**: ngày công đã qua = `[start, hôm
 nay]` (hôm nay tính là đã làm), còn lại = `[mai, mốc]` với mốc = `targetDate ?? endDate`.
@@ -643,6 +650,8 @@ A unit of work. Doc id is auto-generated. `sprintId = null` means it is in the *
 | `points`       | number            | story points (0 if unestimated)                         |
 | `tags`         | string[]          | free tags                                               |
 | `dueStart`     | Timestamp \| null | work-window start (creation day)                        |
+| `chartId`      | uuid \| null | Chart tốc độ (`velocity_charts`) task này tính vào — gắn từ chi tiết task (migration `0088`). FK set null khi xoá chart. Chỉ có tác dụng với chart đang link (feature/tasks) |
+| `chartQty`     | number \| null | Số đơn vị của task trong chart (vd 3 model). NULL = 1. Chart đếm `countBy = tasks` cộng cột này |
 | `dueDate`      | Timestamp \| null | work-window end / deadline; reset to done-day on finish. **Mặc định khi tạo / chuyển vào sprint mà không chọn ngày = `sprint.end_date` (cuối ngày)** — một luật cho web (`lib/sprintDue.ts`: TaskModal, createTask, moveTaskToSprint) và bot (`task_ops._due_window`). Sprint không có `end_date` mới lùi về chủ nhật của tuần bắt đầu; task Backlog (không sprint) để trống. Luật cũ "chủ nhật tuần chứa start_date" bỏ vì vỡ khi sprint bắt đầu từ CN (hạn rơi vào ngày ĐẦU sprint) hoặc kết thúc lệch |
 | `order`        | number            | sort order within its status column (lower = higher)    |
 | `createdAt`    | Timestamp         | creation time                                           |
