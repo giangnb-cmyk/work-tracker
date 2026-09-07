@@ -603,6 +603,9 @@ task hiện tick sẵn và khoá — gỡ ở chính task.
 
 **Ngày công** = T2–T6 **trừ** các ngày trong `holidays` (`day date pk`, `name`). Bảng lễ
 DÙNG CHUNG cả công ty (nghỉ lễ là nghỉ cả đội), không theo dự án. T7/CN tự bỏ, không khai.
+UI khai theo **dải** (từ → đến, cùng tên): `upsertHolidayRange` tách thành từng ngày CÔNG
+trong dải (bỏ T7/CN, tối đa 60 ngày) và ghi một lệnh upsert; danh sách gộp các ngày liên tục
+cùng tên (T7/CN kẹp giữa vẫn coi là liên tục) thành một dòng, xoá là xoá cả dải.
 
 **Nhật ký tiến độ** — `velocity_chart_progress` (`chartId` → chart, `day` date, `doneQty`
 numeric, `createdBy`; khoá chính `(chart_id, day)`): "ngày `day` làm được `doneQty`"

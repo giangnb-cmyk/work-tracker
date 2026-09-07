@@ -3882,11 +3882,14 @@ body.kb-open .mnav { display: none; }
 .gantt-preview-key > b { color: #c7d2fe; }
 
 /* Modal ngày lễ */
-.holiday-add { display: grid; grid-template-columns: 170px 1fr auto; gap: 0.5rem; margin-bottom: 0.9rem; }
+.holiday-add { display: grid; grid-template-columns: 150px 150px minmax(0, 1fr) auto; gap: 0.5rem; align-items: end; margin-bottom: 0.35rem; }
+.holiday-add-f { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.holiday-add-f > span { font-size: 0.74rem; color: var(--muted); }
+.holiday-add .btn-primary { height: 40px; }
 .holiday-head { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0.4rem 0 0.3rem; }
 .holiday-list { list-style: none; margin: 0 0 0.6rem; padding: 0; display: flex; flex-direction: column; }
 .holiday-item {
-  display: grid; grid-template-columns: 96px 28px 1fr auto; gap: 0.6rem; align-items: center;
+  display: grid; grid-template-columns: 128px 90px minmax(0, 1fr) auto; gap: 0.6rem; align-items: center;
   padding: 0.45rem 0.5rem; border-radius: 8px; font-size: 0.82rem;
 }
 .holiday-item + .holiday-item { border-top: 1px solid var(--border-soft); }
