@@ -583,7 +583,8 @@ và suy ngày dự kiến xong. Mọi phép tính là THUẦN phía web (`lib/wo
 | `projectId` | uuid → projects | cascade — chart thuộc MỘT dự án |
 | `name` | string | tên dòng công việc (1–120) |
 | `unit` | string | đơn vị khối lượng hiện cạnh số: "model", "map", "màn"… mặc định `việc` |
-| `startDate` / `endDate` | date | `end >= start` (check DB) |
+| `startDate` / `endDate` | date | `end >= start` (check DB). `endDate` = **deadline cứng** |
+| `targetDate` | date \| null | **Mốc cần xong** (migration `0086`, trong `[start, end]`): nhịp "cần/ngày" tính tới đây; null = tới deadline |
 | `totalQty` / `doneQty` | numeric | khối lượng tổng / đã làm — numeric vì có "nửa model" |
 | `velocity` | numeric \| null | tốc độ hiện tại NGƯỜI DÙNG nhập (đơn vị/ngày công). `null` = web tự đo = `doneQty ÷ ngày công đã qua` |
 | `memberIds` | uuid[] | người tham gia — không FK (người rời nhóm vẫn giữ lịch sử); web tra roster để hiện avatar + đếm theo role động |
@@ -592,17 +593,30 @@ và suy ngày dự kiến xong. Mọi phép tính là THUẦN phía web (`lib/wo
 **Ngày công** = T2–T6 **trừ** các ngày trong `holidays` (`day date pk`, `name`). Bảng lễ
 DÙNG CHUNG cả công ty (nghỉ lễ là nghỉ cả đội), không theo dự án. T7/CN tự bỏ, không khai.
 
-**Cách tính** (`computePlan`): ngày công đã qua = `[start, hôm qua]`; còn lại = `[hôm nay, end]`
-(hôm nay vẫn còn làm được). `cần/ngày = (tổng − đã làm) ÷ ngày công còn lại`;
-`nhịp kế hoạch = tổng ÷ ngày công cả kỳ`; `đáng ra tới hôm nay = nhịp kế hoạch × đã qua`
-(vạch sky trên bar); `dự kiến xong` = ngày công thứ `ceil(còn lại ÷ tốc độ hiện tại)` tính từ
-hôm nay. Trạng thái: `done` / `not_started` / `overdue` / `no_data` (chưa có tốc độ) /
-`on_track` (tốc độ ≥ 99,9% mức cần) / `behind`.
+**Nhật ký tiến độ** — `velocity_chart_progress` (`chartId` → chart, `day` date, `doneQty`
+numeric, `createdBy`; khoá chính `(chart_id, day)`): "tới hết `day` đã xong **CỘNG DỒN**
+`doneQty`". Ghi lại cùng ngày = sửa số. **Trigger `velocity_progress_sync_done`**
+(SECURITY DEFINER có chủ đích) đồng bộ mục MỚI NHẤT theo ngày vào `velocity_charts.done_qty`
+— nên member không có quyền sửa chart vẫn ghi tiến độ được mà con số trên dòng Gantt vẫn
+đúng; xoá hết nhật ký thì giữ `done_qty` cũ. Đổi "Đã làm" trong form sửa chart cũng ghi
+một mục cho hôm nay. Đồ thị burn-up (`lib/burnup.ts`) vẽ đường "tiến độ thật" từ các mục
+này (+ mốc 0 ở start, + điểm hôm nay), phẳng qua ngày nghỉ.
+
+**Cách tính** (`computePlan`) — quy ước **ghi cuối ngày**: ngày công đã qua = `[start, hôm
+nay]` (hôm nay tính là đã làm), còn lại = `[mai, mốc]` với mốc = `targetDate ?? endDate`.
+`cần/ngày = (tổng − đã làm) ÷ ngày công còn lại`; `nhịp kế hoạch = tổng ÷ ngày công [start,
+mốc]`; `đáng ra tới hôm nay = nhịp kế hoạch × đã qua` (vạch sky trên bar); `dự kiến xong` =
+ngày công thứ `ceil(còn lại ÷ tốc độ hiện tại)` tính từ mai. Ví dụ khớp đồ thị của đội:
+12 station tới 24/8 sau 6 ngày công = 2/ngày; còn 38 ÷ 6 ngày công (25/8 → 4/9, trừ lễ) =
+6,33/ngày. Trạng thái: `done` / `not_started` / `overdue` (quá deadline) / `behind` (chậm
+hơn mức cần, hoặc đã lỡ mốc) / `no_data` (chưa có tốc độ) / `on_track` (≥ 99,9% mức cần).
 
 **RLS**: đọc theo luật thấy dự án (`is_admin() or is_project_member`); thêm = người trong dự
 án, `created_by` ép đúng người gọi; sửa/xoá = admin **hoặc** người tạo **hoặc**
 `has_perm('sprint.manage')` (người điều phối sprint cũng canh tốc độ). `holidays`: đọc mọi
-người đăng nhập; ghi = admin hoặc `sprint.manage`. Cả hai bảng có realtime.
+người đăng nhập; ghi = admin hoặc `sprint.manage`. `velocity_chart_progress`: quyền đi theo
+chart — ai **thấy** chart (subquery dưới RLS của `velocity_charts`) thì đọc **và ghi** được
+nhật ký (`created_by` ép đúng người gọi khi insert). Cả ba bảng có realtime.
 
 ## `tasks/{taskId}`
 

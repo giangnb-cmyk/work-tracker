@@ -778,6 +778,12 @@ export interface VelocityChart {
   unit: string;
   startDate: string; // 'YYYY-MM-DD'
   endDate: string; // 'YYYY-MM-DD', >= startDate (DB check)
+  /**
+   * Mốc CẦN XONG (tuỳ chọn, trong [startDate, endDate] — migration 0086): nhịp cần/ngày
+   * tính tới mốc này (đường cam trên burn-up); `endDate` vẫn là deadline cứng.
+   * null = mốc trùng deadline.
+   */
+  targetDate: string | null;
   totalQty: number;
   doneQty: number;
   /**
@@ -796,11 +802,23 @@ export interface VelocityChart {
 /** Dữ liệu form thêm/sửa một chart (id/dự án/người tạo do chỗ gọi + DB lo). */
 export type VelocityChartInput = Pick<
   VelocityChart,
-  'name' | 'unit' | 'startDate' | 'endDate' | 'totalQty' | 'doneQty' | 'velocity' | 'memberIds' | 'note'
+  | 'name' | 'unit' | 'startDate' | 'endDate' | 'targetDate' | 'totalQty' | 'doneQty' | 'velocity' | 'memberIds' | 'note'
 >;
 
 /** Ngày lễ toàn công ty (bảng `holidays`) — KHÔNG tính là ngày công, cùng với T7/CN. */
 export interface Holiday {
   day: string; // 'YYYY-MM-DD' — khoá chính
   name: string;
+}
+
+/**
+ * Một mục nhật ký tiến độ (bảng `velocity_chart_progress`, 0086): tới hết `day` đã xong
+ * CỘNG DỒN `doneQty` (không phải số làm trong ngày). Trigger DB đồng bộ mục mới nhất vào
+ * `VelocityChart.doneQty` — đồ thị burn-up vẽ đường "tiến độ thật" từ các mục này.
+ */
+export interface VelocityProgress {
+  chartId: string;
+  day: string; // 'YYYY-MM-DD'
+  doneQty: number;
+  createdBy: string | null;
 }

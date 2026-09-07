@@ -4,6 +4,7 @@ import WatchersField from '../task/WatchersField';
 import { formatIsoDate, todayIso } from '../../lib/format';
 import { computePlan, fmtQty, PLAN_STATUS_LABEL } from '../../lib/velocity';
 import { createVelocityChart, deleteVelocityChart, updateVelocityChart } from '../../lib/velocityChartWrites';
+import { logProgress } from '../../lib/velocityProgressWrites';
 import type { MemberRoleInfo } from '../../lib/memberRole';
 import type { TeamMember, VelocityChart, VelocityChartInput } from '../../types';
 
@@ -32,7 +33,7 @@ function parseNum(s: string): number | null {
 /**
  * Form tạo/sửa một chart tốc độ. Bên dưới các ô nhập có khung XEM TRƯỚC tính ngay khi gõ:
  * ngày công, cần mỗi ngày bao nhiêu, dự kiến xong — để người lập kế hoạch thử số liệu
- * (đổi deadline, thêm người…) mà không phải Lưu rồi mới thấy.
+ * (đổi mốc, thêm người…) mà không phải Lưu rồi mới thấy.
  */
 export default function VelocityChartModal({
   chart,
@@ -48,6 +49,7 @@ export default function VelocityChartModal({
   const [name, setName] = useState(chart?.name ?? '');
   const [unit, setUnit] = useState(chart?.unit ?? 'việc');
   const [startDate, setStartDate] = useState(chart?.startDate ?? todayIso());
+  const [targetDate, setTargetDate] = useState(chart?.targetDate ?? '');
   const [endDate, setEndDate] = useState(chart?.endDate ?? '');
   const [totalQty, setTotalQty] = useState(chart ? String(chart.totalQty) : '');
   const [doneQty, setDoneQty] = useState(chart ? String(chart.doneQty) : '0');
@@ -59,11 +61,13 @@ export default function VelocityChartModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const disabled = !canEdit || saving;
+  const unitLabel = unit.trim() || 'việc';
 
   // Xem trước: dựng chart tạm từ form; thiếu ngày/số thì chưa tính.
   const preview = useMemo(() => {
     const total = parseNum(totalQty);
     if (!startDate || !endDate || endDate < startDate || total === null) return null;
+    if (targetDate && (targetDate < startDate || targetDate > endDate)) return null;
     const draft: VelocityChart = {
       id: chart?.id ?? 'draft',
       projectId,
@@ -71,6 +75,7 @@ export default function VelocityChartModal({
       unit,
       startDate,
       endDate,
+      targetDate: targetDate || null,
       totalQty: total,
       doneQty: parseNum(doneQty) ?? 0,
       velocity: parseNum(velocity),
@@ -80,7 +85,7 @@ export default function VelocityChartModal({
       createdBy: null,
     };
     return computePlan(draft, holidaySet, todayIso());
-  }, [chart?.id, projectId, name, unit, startDate, endDate, totalQty, doneQty, velocity, memberIds, note, holidaySet]);
+  }, [chart?.id, projectId, name, unit, startDate, targetDate, endDate, totalQty, doneQty, velocity, memberIds, note, holidaySet]);
 
   // Đếm nhân sự theo chuyên môn ngay dưới ô chọn người.
   const roleSummary = useMemo(() => {
@@ -97,8 +102,9 @@ export default function VelocityChartModal({
 
   function validate(): VelocityChartInput | string {
     if (!name.trim()) return 'Cần nhập tên công việc.';
-    if (!startDate || !endDate) return 'Cần chọn ngày bắt đầu và kết thúc.';
-    if (endDate < startDate) return 'Ngày kết thúc phải sau (hoặc bằng) ngày bắt đầu.';
+    if (!startDate || !endDate) return 'Cần chọn ngày bắt đầu và deadline.';
+    if (endDate < startDate) return 'Deadline phải sau (hoặc bằng) ngày bắt đầu.';
+    if (targetDate && (targetDate < startDate || targetDate > endDate)) return 'Mốc cần xong phải nằm giữa ngày bắt đầu và deadline.';
     const total = parseNum(totalQty);
     if (total === null || total < 0) return 'Khối lượng phải là số ≥ 0.';
     const done = parseNum(doneQty) ?? 0;
@@ -107,9 +113,10 @@ export default function VelocityChartModal({
     if (velocity.trim() && (vel === null || vel < 0)) return 'Tốc độ phải là số ≥ 0, hoặc để trống để tự đo.';
     return {
       name,
-      unit: unit.trim() || 'việc',
+      unit: unitLabel,
       startDate,
       endDate,
+      targetDate: targetDate || null,
       totalQty: total,
       doneQty: done,
       velocity: vel,
@@ -127,8 +134,17 @@ export default function VelocityChartModal({
     setSaving(true);
     setError(null);
     try {
+      let id = chart?.id;
       if (chart) await updateVelocityChart(chart.id, input);
-      else await createVelocityChart(projectId, input, currentUid);
+      else id = await createVelocityChart(projectId, input, currentUid);
+      // "Đã làm" đổi ở đây = một mục nhật ký cho HÔM NAY, để đồ thị burn-up có điểm và
+      // done_qty không bị mục nhật ký cũ hơn đè lại. Best-effort: chart đã lưu xong rồi.
+      const doneChanged = chart ? input.doneQty !== chart.doneQty : input.doneQty > 0;
+      if (id && doneChanged) {
+        void logProgress(id, todayIso(), input.doneQty, currentUid).catch((err) =>
+          console.warn('Ghi nhật ký tiến độ kèm lần lưu thất bại:', err),
+        );
+      }
       onClose();
     } catch (err) {
       console.error('Lưu chart tốc độ thất bại', err);
@@ -168,16 +184,32 @@ export default function VelocityChartModal({
           </label>
         </div>
 
-        <div className="grid-2">
+        <div className="grid-3">
           <label className="field">
             <span>Bắt đầu *</span>
             <input className="input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={disabled} />
+          </label>
+          <label className="field">
+            <span>Mốc cần xong (tuỳ chọn)</span>
+            <input
+              className="input"
+              type="date"
+              value={targetDate}
+              min={startDate || undefined}
+              max={endDate || undefined}
+              onChange={(e) => setTargetDate(e.target.value)}
+              disabled={disabled}
+            />
           </label>
           <label className="field">
             <span>Deadline *</span>
             <input className="input" type="date" value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)} disabled={disabled} />
           </label>
         </div>
+        <p className="muted" style={{ fontSize: '0.78rem', marginTop: '-0.35rem', marginBottom: '0.85rem' }}>
+          💡 Mốc cần xong = ngày đội muốn xong (nhịp "cần/ngày" tính tới đây); Deadline = hạn cứng.
+          Bỏ trống mốc thì tính tới deadline.
+        </p>
 
         <div className="grid-3">
           <label className="field">
@@ -189,7 +221,7 @@ export default function VelocityChartModal({
             <input className="input" inputMode="decimal" value={doneQty} onChange={(e) => setDoneQty(e.target.value)} placeholder="0" disabled={disabled} />
           </label>
           <label className="field">
-            <span>Tốc độ hiện tại ({unit.trim() || 'việc'}/ngày công)</span>
+            <span>Tốc độ hiện tại ({unitLabel}/ngày công)</span>
             <input
               className="input"
               inputMode="decimal"
@@ -201,8 +233,8 @@ export default function VelocityChartModal({
           </label>
         </div>
         <p className="muted" style={{ fontSize: '0.78rem', marginTop: '-0.35rem', marginBottom: '0.85rem' }}>
-          💡 Để trống tốc độ thì hệ thống tự đo = đã làm ÷ số ngày công đã qua. Điền tay khi
-          muốn "giả sử đội chạy X/ngày" để xem kịp không.
+          💡 Đổi “Đã làm” ở đây = ghi một mục nhật ký tiến độ cho hôm nay. Để trống tốc độ thì
+          hệ thống tự đo = đã làm ÷ ngày công đã qua; điền tay khi muốn thử “giả sử đội chạy X/ngày”.
         </p>
 
         {/* Khung xem trước — tính ngay khi gõ, trước khi Lưu. */}
@@ -212,23 +244,26 @@ export default function VelocityChartModal({
               <div className="gantt-preview-row">
                 <span>Ngày công</span>
                 <b className="mono">{preview.totalWorkdays}</b>
-                <span className="muted">(đã qua {preview.elapsedWorkdays} · còn {preview.remainingWorkdays}) — bỏ T7/CN & ngày lễ</span>
+                <span className="muted">
+                  tới {formatIsoDate(preview.aimDate)} (đã qua {preview.elapsedWorkdays} · còn {preview.remainingWorkdays}
+                  {targetDate ? ` · tới deadline còn ${preview.workdaysToDeadline}` : ''}) — bỏ T7/CN & ngày lễ
+                </span>
               </div>
               <div className="gantt-preview-row">
                 <span>Nhịp kế hoạch</span>
                 <b className="mono">{fmtQty(preview.plannedPerDay)}</b>
-                <span className="muted">{unit}/ngày công cho cả kỳ</span>
+                <span className="muted">{unitLabel}/ngày công cho cả kỳ</span>
               </div>
               <div className="gantt-preview-row gantt-preview-key">
-                <span>Cần từ giờ</span>
+                <span>Cần từ mai</span>
                 <b className="mono">{preview.requiredPerDay === null ? '∞' : fmtQty(preview.requiredPerDay)}</b>
-                <span className="muted">{unit}/ngày công để kịp deadline (còn {fmtQty(preview.remainingQty)} {unit})</span>
+                <span className="muted">{unitLabel}/ngày công để kịp mốc (còn {fmtQty(preview.remainingQty)} {unitLabel})</span>
               </div>
               <div className="gantt-preview-row">
                 <span>Tốc độ hiện tại</span>
                 <b className="mono">{fmtQty(preview.currentVelocity)}</b>
                 <span className="muted">
-                  {unit}/ngày
+                  {unitLabel}/ngày
                   {preview.projectedFinish && preview.status !== 'done' ? ` → dự kiến xong ${formatIsoDate(preview.projectedFinish)}` : ''}
                 </span>
               </div>
@@ -238,7 +273,7 @@ export default function VelocityChartModal({
               </div>
             </>
           ) : (
-            <span className="muted" style={{ fontSize: '0.82rem' }}>Điền ngày bắt đầu, deadline và khối lượng để xem tính toán.</span>
+            <span className="muted" style={{ fontSize: '0.82rem' }}>Điền ngày bắt đầu, deadline (mốc nếu có phải nằm giữa) và khối lượng để xem tính toán.</span>
           )}
         </div>
 
@@ -286,7 +321,7 @@ export default function VelocityChartModal({
         <ConfirmDialog
           title="Xoá chart tốc độ?"
           message={<>Xoá chart <strong>“{chart.name}”</strong> khỏi tab Gantt.</>}
-          detail="Không hoàn tác được. Task/feature của dự án không bị ảnh hưởng — chart chỉ là bảng theo dõi riêng."
+          detail="Không hoàn tác được — nhật ký tiến độ của chart cũng mất theo. Task/feature của dự án không bị ảnh hưởng."
           confirmLabel="Xoá chart"
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(false)}

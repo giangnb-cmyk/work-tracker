@@ -9,6 +9,7 @@ import { buildAxis } from '../lib/ganttAxis';
 import { memberRoleResolver } from '../lib/memberRole';
 import { computePlan } from '../lib/velocity';
 import GanttRow from './gantt/GanttRow';
+import GanttRowDetail from './gantt/GanttRowDetail';
 import HolidaysModal from './gantt/HolidaysModal';
 import VelocityChartModal from './gantt/VelocityChartModal';
 import type { VelocityChart } from '../types';
@@ -16,7 +17,8 @@ import type { VelocityChart } from '../types';
 /**
  * Tab Gantt — theo dõi TỐC ĐỘ từng dòng công việc của dự án (vd "Model 3D": 120 model
  * trong tháng 9). Mỗi chart: khối lượng × khoảng ngày × người tham gia → hệ thống tự tính
- * mỗi NGÀY CÔNG cần làm bao nhiêu để kịp deadline, so với tốc độ hiện tại.
+ * mỗi NGÀY CÔNG cần làm bao nhiêu để kịp mốc, so với tốc độ hiện tại. Bấm một dòng để xổ
+ * đồ thị burn-up (tiến độ thật · dự kiến · nhịp cần) và nhật ký tiến độ theo ngày.
  *
  * Ngày công = T2–T6 trừ ngày lễ (bảng holidays, dùng chung cả công ty) — xem lib/workdays.
  * Trục thời gian CHUNG cho mọi dòng để so được cái nào chạy trước/sau (lib/ganttAxis).
@@ -30,6 +32,7 @@ export default function Gantt() {
   const [editing, setEditing] = useState<VelocityChart | null>(null);
   const [creating, setCreating] = useState(false);
   const [holidaysOpen, setHolidaysOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const today = todayIso();
   const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
@@ -58,7 +61,7 @@ export default function Gantt() {
           <p>
             {charts.length === 0
               ? 'Mỗi chart là một dòng công việc có khối lượng và deadline — hệ thống tính mỗi ngày công cần làm bao nhiêu.'
-              : `${charts.length} chart${behind > 0 ? ` · ${behind} đang chậm/quá hạn` : ' · đều kịp tiến độ'} — ngày công bỏ T7/CN và ${holidays.length} ngày lễ.`}
+              : `${charts.length} chart${behind > 0 ? ` · ${behind} đang chậm/quá hạn` : ' · đều kịp tiến độ'} — bấm một dòng để xem đồ thị. Ngày công bỏ T7/CN và ${holidays.length} ngày lễ.`}
           </p>
         </div>
         <div className="row" style={{ gap: '0.6rem' }}>
@@ -96,21 +99,32 @@ export default function Gantt() {
             <div className="gantt-metrics muted" style={{ fontSize: '0.75rem' }}>Đã làm · tốc độ · đánh giá</div>
           </div>
 
-          {charts.map((c) => (
-            <GanttRow
-              key={c.id}
-              chart={c}
-              plan={plans.get(c.id)!}
-              axis={axis}
-              participants={c.memberIds.map((id) => memberById.get(id)).filter((m): m is NonNullable<typeof m> => Boolean(m))}
-              roleOf={roleOf}
-              onOpen={setEditing}
-            />
-          ))}
+          {charts.map((c) => {
+            const plan = plans.get(c.id)!;
+            const expanded = expandedId === c.id;
+            return (
+              <div key={c.id} className="gantt-item">
+                <GanttRow
+                  chart={c}
+                  plan={plan}
+                  axis={axis}
+                  participants={c.memberIds.map((id) => memberById.get(id)).filter((m): m is NonNullable<typeof m> => Boolean(m))}
+                  roleOf={roleOf}
+                  expanded={expanded}
+                  onToggle={(ch) => setExpandedId((cur) => (cur === ch.id ? null : ch.id))}
+                  onEdit={setEditing}
+                />
+                {expanded && user && (
+                  <GanttRowDetail chart={c} plan={plan} holidaySet={holidaySet} today={today} currentUid={user.uid} />
+                )}
+              </div>
+            );
+          })}
 
           <p className="muted gantt-legend">
             <span><i className="gantt-lg gantt-lg-done" /> đã làm</span>
             <span><i className="gantt-lg gantt-lg-expect" /> đáng ra tới hôm nay</span>
+            <span><i className="gantt-lg gantt-lg-aim" /> mốc cần xong</span>
             <span><i className="gantt-lg gantt-lg-today" /> hôm nay</span>
           </p>
         </div>

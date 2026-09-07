@@ -14,7 +14,10 @@ interface Props {
   /** Người tham gia đã tra ra từ roster (uid không còn trong roster thì đã bị lọc). */
   participants: TeamMember[];
   roleOf: (uid: string | null) => MemberRoleInfo | undefined;
-  onOpen: (chart: VelocityChart) => void;
+  /** Dòng đang xổ panel đồ thị + nhật ký. */
+  expanded: boolean;
+  onToggle: (chart: VelocityChart) => void;
+  onEdit: (chart: VelocityChart) => void;
 }
 
 /** Tối đa bao nhiêu avatar xếp chồng trước khi gộp thành "+N". */
@@ -36,30 +39,37 @@ function roleCounts(participants: TeamMember[], roleOf: Props['roleOf']) {
 /**
  * Một dòng Gantt = một chart tốc độ: cột trái là tên + người, giữa là bar trên trục chung
  * (phần đã làm tô đậm, vạch "đáng ra tới hôm nay" để thấy ngay nhanh/chậm), phải là số.
- * Cả dòng bấm được để mở form sửa.
+ * Bấm dòng để xổ đồ thị burn-up + nhật ký; nút ✏️ mở form sửa thông số.
  */
-export default function GanttRow({ chart, plan, axis, participants, roleOf, onOpen }: Props) {
+export default function GanttRow({ chart, plan, axis, participants, roleOf, expanded, onToggle, onEdit }: Props) {
   const roles = useMemo(() => roleCounts(participants, roleOf), [participants, roleOf]);
 
   // Bar phủ trọn ngày cuối: mốc kết thúc = đầu ngày kế tiếp.
   const left = axis.pct(chart.startDate);
   const width = Math.max(0.6, axis.pct(addDaysIso(chart.endDate, 1)) - left);
+  const aimPct = chart.targetDate ? axis.pct(addDaysIso(chart.targetDate, 1)) : null;
   const pctDone = Math.round(plan.pctDone * 100);
   const shownAvatars = participants.slice(0, MAX_AVATARS);
   const extra = participants.length - shownAvatars.length;
 
   return (
     <div
-      className={`gantt-row glass gantt-st-${plan.status}`}
-      onClick={() => onOpen(chart)}
+      className={`gantt-row glass gantt-st-${plan.status}${expanded ? ' open' : ''}`}
+      onClick={() => onToggle(chart)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onOpen(chart)}
+      aria-expanded={expanded}
+      onKeyDown={(e) => e.key === 'Enter' && onToggle(chart)}
     >
       <div className="gantt-info">
-        <div className="gantt-name">{chart.name}</div>
+        <div className="gantt-name">
+          <span className="gantt-caret" aria-hidden>▸</span>
+          {chart.name}
+        </div>
         <div className="gantt-dates mono muted">
-          {formatIsoDate(chart.startDate)} → {formatIsoDate(chart.endDate)} · {plan.totalWorkdays} ngày công
+          {formatIsoDate(chart.startDate)} → {formatIsoDate(chart.endDate)}
+          {chart.targetDate && ` · mốc ${formatIsoDate(chart.targetDate).slice(0, 5)}`}
+          {' · '}{plan.totalWorkdays} ngày công
         </div>
         <div className="gantt-people">
           {participants.length === 0 ? (
@@ -105,6 +115,9 @@ export default function GanttRow({ chart, plan, axis, participants, roleOf, onOp
           )}
           <span className="gantt-bar-label mono">{pctDone}%</span>
         </div>
+        {aimPct !== null && (
+          <div className="gantt-aim" style={{ left: `${aimPct}%` }} title={`Mốc cần xong ${formatIsoDate(chart.targetDate as string)}`} aria-hidden />
+        )}
         {axis.todayPct !== null && (
           <div className="gantt-today" style={{ left: `${axis.todayPct}%` }} aria-hidden />
         )}
@@ -119,7 +132,7 @@ export default function GanttRow({ chart, plan, axis, participants, roleOf, onOp
           <span title="Tốc độ hiện tại (nhập tay, hoặc đo từ đã làm ÷ ngày công đã qua)">
             Hiện tại <b className="mono">{fmtQty(plan.currentVelocity)}</b>/ngày
           </span>
-          <span title="Mỗi ngày công còn lại phải làm bao nhiêu để kịp deadline">
+          <span title={`Mỗi ngày công từ mai phải làm bao nhiêu để kịp ${formatIsoDate(plan.aimDate)}`}>
             Cần <b className="mono">{plan.requiredPerDay === null ? '∞' : fmtQty(plan.requiredPerDay)}</b>/ngày
           </span>
         </div>
@@ -131,8 +144,18 @@ export default function GanttRow({ chart, plan, axis, participants, roleOf, onOp
             </span>
           )}
           {plan.status !== 'done' && plan.status !== 'not_started' && (
-            <span className="muted mono" style={{ fontSize: '0.76rem' }}>còn {plan.remainingWorkdays} ngày công</span>
+            <span className="muted mono" style={{ fontSize: '0.76rem' }} title={`Ngày công từ mai tới ${formatIsoDate(plan.aimDate)}`}>
+              còn {plan.remainingWorkdays} ngày công
+            </span>
           )}
+          <button
+            type="button"
+            className="btn-sm gantt-edit"
+            onClick={(e) => { e.stopPropagation(); onEdit(chart); }}
+            title="Sửa thông số chart (ngày, khối lượng, người tham gia)"
+          >
+            ✏️ Sửa
+          </button>
         </div>
       </div>
     </div>

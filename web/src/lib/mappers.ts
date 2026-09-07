@@ -31,6 +31,7 @@ import type {
   TaskSprintEntry,
   VelocityChart,
   VelocityChartInput,
+  VelocityProgress,
   TeamMember,
   TeamRole,
 } from '../types';
@@ -475,6 +476,7 @@ export function rowToVelocityChart(r: Row): VelocityChart {
     unit: r.unit ?? 'việc',
     startDate: r.start_date,
     endDate: r.end_date,
+    targetDate: r.target_date ?? null,
     totalQty: num(r.total_qty),
     doneQty: num(r.done_qty),
     velocity: r.velocity === null || r.velocity === undefined ? null : num(r.velocity),
@@ -493,6 +495,7 @@ export function velocityChartInputToRow(input: VelocityChartInput): Row {
     unit: input.unit.trim() || 'việc',
     start_date: input.startDate,
     end_date: input.endDate,
+    target_date: input.targetDate,
     total_qty: input.totalQty,
     done_qty: input.doneQty,
     velocity: input.velocity,
@@ -503,4 +506,8 @@ export function velocityChartInputToRow(input: VelocityChartInput): Row {
 
 export function rowToHoliday(r: Row): Holiday {
   return { day: r.day, name: r.name ?? '' };
+}
+
+export function rowToVelocityProgress(r: Row): VelocityProgress {
+  return { chartId: r.chart_id, day: r.day, doneQty: num(r.done_qty), createdBy: r.created_by ?? null };
 }
