@@ -594,9 +594,11 @@ và suy ngày dự kiến xong. Mọi phép tính là THUẦN phía web (`lib/wo
 | `countBy` | `tasks` \| `points` | `tasks` = cộng `tasks.chartQty` của từng task (NULL = 1 — "task này = 3 model", migration `0088`); `points` = cộng story points. Khi link, `totalQty > 0` = khối lượng KẾ HOẠCH (feature còn thêm task dần); `= 0` → tổng = khối lượng task trong phạm vi |
 
 **Gắn từ phía task** (`0088`): `tasks.chartId` (FK → chart, set null khi xoá chart) + `tasks.chartQty`.
-Phạm vi hiệu lực của chart link = (theo feature | `taskIds`) **∪** task có `chartId` = chart. Chart
-nhập tay KHÔNG nhận task gắn (chi tiết task chỉ liệt kê chart đang link). Trong form chart, task
-gắn từ phía task hiện tick sẵn và khoá — gỡ ở chính task.
+Phạm vi hiệu lực của chart link = (theo feature | `taskIds`) **∪** task có `chartId` = chart. Chi
+tiết task liệt kê **mọi** chart của dự án; chart nhập tay mà có task gắn vào thì **chuyển sang
+chạy theo task** (`isLinked(chart, tasks)` = `linkKind ≠ manual` HOẶC có task gắn) — nhật ký
+tay của chart đó không dùng nữa, tránh hai nguồn sự thật. Trong form chart, task gắn từ phía
+task hiện tick sẵn và khoá — gỡ ở chính task.
 | `note`, `sortOrder`, `createdAt`, `createdBy` | | |
 
 **Ngày công** = T2–T6 **trừ** các ngày trong `holidays` (`day date pk`, `name`). Bảng lễ

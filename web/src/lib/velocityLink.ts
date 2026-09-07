@@ -17,13 +17,23 @@ function localIso(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export function isLinked(chart: Pick<VelocityChart, 'linkKind'>): boolean {
-  return chart.linkKind !== 'manual';
+/** Task gắn vào chart từ chi tiết task (tasks.chart_id, 0088). */
+export function attachedTasks(chart: Pick<VelocityChart, 'id'>, tasks: Task[]): Task[] {
+  return tasks.filter((t) => t.chartId === chart.id);
 }
 
-/** Task nằm trong phạm vi của chart. Chart nhập tay → rỗng (task gắn vào chart tay không có tác dụng). */
+/**
+ * Chart lấy tiến độ từ task? = nguồn đặt là feature/tasks, HOẶC có task gắn từ chi tiết task.
+ * Chart "nhập tay" mà ai đó gắn task vào thì từ đó chạy theo task — người gắn muốn thế, và
+ * hai nguồn (nhật ký tay + task) cùng lúc thì không biết tin bên nào.
+ */
+export function isLinked(chart: Pick<VelocityChart, 'id' | 'linkKind'>, tasks: Task[]): boolean {
+  return chart.linkKind !== 'manual' || attachedTasks(chart, tasks).length > 0;
+}
+
+/** Task nằm trong phạm vi của chart: theo feature / task_ids của chart ∪ task gắn từ chi tiết. */
 export function tasksInScope(chart: VelocityChart, tasks: Task[]): Task[] {
-  if (!isLinked(chart)) return [];
+  if (!isLinked(chart, tasks)) return [];
   const picked = new Set(chart.linkKind === 'tasks' ? chart.taskIds : []);
   return tasks.filter(
     (t) =>
@@ -75,20 +85,22 @@ export function deriveLinked(chart: VelocityChart, tasks: Task[], today: string)
 
 /** Chart với số liệu HIỆU LỰC: link thì thay doneQty/totalQty bằng dẫn xuất; nhập tay giữ nguyên. */
 export function applyLink(chart: VelocityChart, tasks: Task[], today: string): VelocityChart {
-  if (!isLinked(chart)) return chart;
+  if (!isLinked(chart, tasks)) return chart;
   const { doneQty, totalQty } = deriveLinked(chart, tasks, today);
   return { ...chart, doneQty, totalQty };
 }
 
 /** Nhãn ngắn cho nguồn tiến độ, vd "tự động từ feature Shop" / "tự động từ 12 task". null = nhập tay. */
 export function linkLabel(chart: VelocityChart, features: Feature[], tasks: Task[] = []): string | null {
-  if (!isLinked(chart)) return null;
-  const attached = tasks.filter((t) => t.chartId === chart.id).length;
-  const extra = attached > 0 ? ` (+${attached} task gắn từ chi tiết)` : '';
+  if (!isLinked(chart, tasks)) return null;
+  const attached = attachedTasks(chart, tasks);
   if (chart.linkKind === 'feature') {
     const f = features.find((x) => x.id === chart.featureId);
+    const extra = attached.length > 0 ? ` (+${attached.length} task gắn từ chi tiết)` : '';
     return f ? `tự động từ feature ${f.name}${extra}` : `feature đã bị xoá${extra}`;
   }
-  const n = new Set([...chart.taskIds, ...tasks.filter((t) => t.chartId === chart.id).map((t) => t.id)]).size;
-  return `tự động từ ${n} task`;
+  if (chart.linkKind === 'tasks') {
+    return `tự động từ ${new Set([...chart.taskIds, ...attached.map((t) => t.id)]).size} task`;
+  }
+  return `tự động từ ${attached.length} task gắn từ chi tiết`;
 }

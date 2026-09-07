@@ -92,9 +92,8 @@ export default function TaskModal({
   // chart (chuỗi để gõ được "2,5"; rỗng = 1). Chỉ chart đang LINK (feature/tasks) mới nhận.
   const [chartId, setChartId] = useState<string | null>(task?.chartId ?? null);
   const [chartQty, setChartQty] = useState<string>(task?.chartQty !== null && task?.chartQty !== undefined ? String(task.chartQty) : '');
+  // Mọi chart của dự án đều gắn được — chart nhập tay có task gắn vào thì chạy theo task (velocityLink.isLinked).
   const { charts: projectCharts } = useVelocityCharts(projectId);
-  // Chart nhập tay bỏ khỏi danh sách; chart đang gắn (kể cả đã đổi sang nhập tay) vẫn hiện để không âm thầm mất.
-  const chartOptions = projectCharts.filter((c) => c.linkKind !== 'manual' || c.id === chartId);
   const chartUnit = projectCharts.find((c) => c.id === chartId)?.unit ?? 'đơn vị';
   const parsedChartQty = (() => {
     const t = chartQty.trim().replace(',', '.');
@@ -516,21 +515,25 @@ export default function TaskModal({
                   <input className="input" type="number" min={0} value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} disabled={!isAdmin} />
                 </label>
                 {/* Chart tốc độ (0088): task tính vào chart nào + tương đương bao nhiêu đơn vị.
-                    Chỉ liệt kê chart đang link task; chart nhập tay không nhận. */}
-                {(chartOptions.length > 0 || chartId) && (
-                  <div className="tm-field">
-                    <span>Chart tốc độ</span>
+                    Luôn hiện để người dùng biết có tính năng này; chưa có chart thì chỉ đường sang tab Gantt. */}
+                <div className="tm-field">
+                  <span>Chart tốc độ</span>
+                  {projectCharts.length === 0 ? (
+                    <span className="muted" style={{ fontSize: '0.82rem', display: 'block', padding: '0.5rem 0' }}>
+                      Dự án chưa có chart tốc độ. Tạo ở tab Gantt rồi quay lại gắn.
+                    </span>
+                  ) : (
                     <SearchableSelect
                       value={chartId ?? ''}
                       onChange={(v) => setChartId(v || null)}
-                      options={chartOptions.map((c) => ({ value: c.id, label: c.name }))}
+                      options={projectCharts.map((c) => ({ value: c.id, label: c.name }))}
                       allowEmpty
                       emptyLabel="— Không tính vào chart —"
                       placeholder="— Không tính vào chart —"
                       disabled={!canEditOwn}
                     />
-                  </div>
-                )}
+                  )}
+                </div>
                 {chartId && (
                   <label className="tm-field">
                     <span>Task này = bao nhiêu {chartUnit}</span>

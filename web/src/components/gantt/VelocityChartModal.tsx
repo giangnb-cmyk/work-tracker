@@ -87,7 +87,9 @@ export default function VelocityChartModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const disabled = !canEdit || saving;
-  const linked = linkKind !== 'manual';
+  // Chart nhập tay nhưng có task gắn từ chi tiết task → vẫn chạy theo task (xem isLinked).
+  const attachedCount = chart ? tasks.filter((t) => t.chartId === chart.id).length : 0;
+  const linked = linkKind !== 'manual' || attachedCount > 0;
   const unitLabel = linked && countBy === 'points' ? 'điểm' : linked && !unit.trim() ? 'task' : unit.trim() || 'việc';
   const today = todayIso();
 
@@ -118,7 +120,7 @@ export default function VelocityChartModal({
     };
   }, [chart?.id, projectId, name, unitLabel, startDate, targetDate, endDate, totalQty, doneQty, velocity, memberIds, note, linkKind, featureId, taskIds, countBy]);
 
-  const linkedInfo = useMemo(() => (draft && isLinked(draft) ? deriveLinked(draft, tasks, today) : null), [draft, tasks, today]);
+  const linkedInfo = useMemo(() => (draft && isLinked(draft, tasks) ? deriveLinked(draft, tasks, today) : null), [draft, tasks, today]);
   const preview = useMemo(() => (draft ? computePlan(applyLink(draft, tasks, today), holidaySet, today) : null), [draft, tasks, today, holidaySet]);
 
   const roleSummary = useMemo(() => {
@@ -294,9 +296,12 @@ export default function VelocityChartModal({
         <p className="muted" style={{ fontSize: '0.78rem', marginTop: '-0.35rem', marginBottom: '0.85rem' }}>
           {linked
             ? <>🔗 Đã xong lấy từ task Hoàn thành trong phạm vi; đường tiến độ thật dựng từ ngày tick xong.
-              Task cũng gắn được vào chart này từ chi tiết task, kèm số {unitLabel} riêng của nó.
+              {linkKind === 'manual'
+                ? <> Chart này có <b>{attachedCount}</b> task gắn từ chi tiết task nên chạy theo task; nhật ký tay không dùng nữa.</>
+                : <> Task cũng gắn được vào chart này từ chi tiết task, kèm số {unitLabel} riêng của nó.</>}
               {linkedInfo && <> Hiện có <b>{linkedInfo.scope.length}</b> task, xong <b>{linkedInfo.doneTasks.length}</b>.</>}</>
-            : <>✍️ "Đã làm" là tổng hiện tại; đổi ở đây = chỉnh mục hôm nay trong nhật ký để tổng bằng số này.</>}
+            : <>✍️ "Đã làm" là tổng hiện tại; đổi ở đây = chỉnh mục hôm nay trong nhật ký để tổng bằng số này.
+              Gắn task vào chart này từ chi tiết task thì chart chuyển sang chạy theo task.</>}
         </p>
 
         <div className="grid-3">

@@ -135,7 +135,7 @@ export default function Gantt() {
                     holidaySet={holidaySet}
                     today={today}
                     currentUid={user.uid}
-                    linked={isLinked(c) && label ? { progress: deriveLinked(c, tasks, today), label } : undefined}
+                    linked={isLinked(c, tasks) && label ? { progress: deriveLinked(c, tasks, today), label } : undefined}
                     onOpenTask={setOpenTask}
                   />
                 )}
