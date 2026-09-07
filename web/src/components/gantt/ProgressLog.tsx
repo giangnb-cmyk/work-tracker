@@ -47,7 +47,7 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
   async function handleLog() {
     const n = parseNum(qty);
     if (!day) return setError('Chọn ngày.');
-    if (day > today) return setError('Chưa tới ngày đó — nhật ký ghi việc ĐÃ xong.');
+    if (day > today) return setError('Chưa tới ngày đó. Nhật ký chỉ ghi việc đã xong.');
     if (n === null || n < 0) return setError('Số đã xong phải là số ≥ 0.');
     setBusy(true);
     setError(null);
@@ -56,7 +56,7 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
       setQty('');
     } catch (err) {
       console.error('Ghi tiến độ thất bại', err);
-      setError('Ghi thất bại — kiểm tra kết nối hoặc quyền xem dự án.');
+      setError('Ghi thất bại. Kiểm tra kết nối hoặc quyền xem dự án.');
     } finally {
       setBusy(false);
     }
@@ -77,9 +77,11 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
     <div className="plog">
       <div className="plog-head">
         <strong>Nhật ký tiến độ</strong>
-        <span className="muted" style={{ fontSize: '0.76rem' }}>
-          {latest ? `Mới nhất: ${fmtQty(latest.doneQty)} ${chart.unit} tới ${formatIsoDate(latest.day).slice(0, 5)}` : 'Chưa ghi lần nào'}
-        </span>
+        {latest && (
+          <span className="gantt-meta">
+            Mới nhất {fmtQty(latest.doneQty)} {chart.unit}, ngày {formatIsoDate(latest.day).slice(0, 5)}
+          </span>
+        )}
       </div>
 
       <div className="plog-add">
@@ -89,16 +91,18 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
           inputMode="decimal"
           value={qty}
           onChange={(e) => setQty(e.target.value)}
-          placeholder={latest ? `Cộng dồn (đang ${fmtQty(latest.doneQty)})` : `Đã xong cộng dồn (${chart.unit})`}
+          placeholder={latest ? `Đang ${fmtQty(latest.doneQty)} ${chart.unit}` : `Đã xong cộng dồn (${chart.unit})`}
           disabled={busy}
           onKeyDown={(e) => e.key === 'Enter' && void handleLog()}
         />
         <button className="btn-primary" onClick={() => void handleLog()} disabled={busy || !qty.trim()}>Ghi</button>
       </div>
-      <p className="muted" style={{ fontSize: '0.74rem', margin: '0.35rem 0 0' }}>
-        Ghi số ĐÃ XONG CỘNG DỒN tới hết ngày đó (vd đang 12, hôm nay thêm 3 → ghi 15). Ghi lại cùng ngày = sửa số.
-      </p>
+      <p className="plog-hint">Ghi số đã xong cộng dồn tới hết ngày đó. Ghi lại cùng ngày để sửa.</p>
       {error && <p className="error-text" style={{ marginTop: '0.4rem' }}>{error}</p>}
+
+      {rows.length === 0 && (
+        <div className="plog-empty">Chưa có mục nào. Ghi số của hôm nay để đường tiến độ thật bắt đầu chạy.</div>
+      )}
 
       {rows.length > 0 && (
         <ul className="plog-list">
@@ -118,7 +122,7 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
       {removing && (
         <ConfirmDialog
           title="Xoá mục tiến độ?"
-          message={<>Xoá mục <strong>{formatIsoDate(removing.day)} — {fmtQty(removing.doneQty)} {chart.unit}</strong>.</>}
+          message={<>Xoá mục <strong>{formatIsoDate(removing.day)}: {fmtQty(removing.doneQty)} {chart.unit}</strong>.</>}
           detail="Đường tiến độ thật trên đồ thị sẽ mất điểm này; số 'đã làm' của chart lùi về mục mới nhất còn lại."
           confirmLabel="Xoá mục"
           onConfirm={() => handleRemove(removing)}

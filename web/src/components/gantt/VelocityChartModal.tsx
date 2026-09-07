@@ -148,7 +148,7 @@ export default function VelocityChartModal({
       onClose();
     } catch (err) {
       console.error('Lưu chart tốc độ thất bại', err);
-      setError('Lưu thất bại — kiểm tra quyền hoặc kết nối.');
+      setError('Lưu thất bại. Kiểm tra quyền hoặc kết nối.');
       setSaving(false);
     }
   }
@@ -161,7 +161,7 @@ export default function VelocityChartModal({
     } catch (err) {
       console.error('Xoá chart tốc độ thất bại', err);
       setConfirmDelete(false);
-      setError('Xoá thất bại — cần quyền admin hoặc là người tạo chart.');
+      setError('Xoá thất bại. Cần quyền admin hoặc là người tạo chart.');
     }
   }
 
@@ -170,7 +170,7 @@ export default function VelocityChartModal({
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <h2>{isEdit ? 'Sửa chart tốc độ' : 'Chart tốc độ mới'}</h2>
         {!canEdit && (
-          <p className="perf-hint">Chỉ xem — admin, người tạo chart hoặc người có quyền Quản lý sprint mới sửa được.</p>
+          <p className="perf-hint">Chỉ xem. Admin, người tạo chart hoặc người có quyền Quản lý sprint mới sửa được.</p>
         )}
 
         <div className="grid-2">
@@ -246,7 +246,7 @@ export default function VelocityChartModal({
                 <b className="mono">{preview.totalWorkdays}</b>
                 <span className="muted">
                   tới {formatIsoDate(preview.aimDate)} (đã qua {preview.elapsedWorkdays} · còn {preview.remainingWorkdays}
-                  {targetDate ? ` · tới deadline còn ${preview.workdaysToDeadline}` : ''}) — bỏ T7/CN & ngày lễ
+                  {targetDate ? `, tới deadline còn ${preview.workdaysToDeadline}` : ''}), bỏ T7/CN và ngày lễ
                 </span>
               </div>
               <div className="gantt-preview-row">
@@ -321,7 +321,7 @@ export default function VelocityChartModal({
         <ConfirmDialog
           title="Xoá chart tốc độ?"
           message={<>Xoá chart <strong>“{chart.name}”</strong> khỏi tab Gantt.</>}
-          detail="Không hoàn tác được — nhật ký tiến độ của chart cũng mất theo. Task/feature của dự án không bị ảnh hưởng."
+          detail="Không hoàn tác được. Nhật ký tiến độ của chart cũng mất theo. Task/feature của dự án không bị ảnh hưởng."
           confirmLabel="Xoá chart"
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(false)}

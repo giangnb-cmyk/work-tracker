@@ -40,7 +40,7 @@ export default function HolidaysModal({ holidays, canManage, onClose }: Props) {
       return;
     }
     if (isWeekendIso(day)) {
-      setError('Ngày đó là T7/CN — vốn đã không tính là ngày công, không cần khai.');
+      setError('Ngày đó là T7/CN, vốn đã không tính là ngày công.');
       return;
     }
     setBusy(true);
@@ -51,7 +51,7 @@ export default function HolidaysModal({ holidays, canManage, onClose }: Props) {
       setName('');
     } catch (err) {
       console.error('Thêm ngày lễ thất bại', err);
-      setError('Thêm thất bại — cần quyền admin hoặc Quản lý sprint.');
+      setError('Thêm thất bại. Cần quyền admin hoặc Quản lý sprint.');
     } finally {
       setBusy(false);
     }
@@ -64,7 +64,7 @@ export default function HolidaysModal({ holidays, canManage, onClose }: Props) {
     } catch (err) {
       console.error('Xoá ngày lễ thất bại', err);
       setRemoving(null);
-      setError('Xoá thất bại — cần quyền admin hoặc Quản lý sprint.');
+      setError('Xoá thất bại. Cần quyền admin hoặc Quản lý sprint.');
     }
   }
 
@@ -74,7 +74,7 @@ export default function HolidaysModal({ holidays, canManage, onClose }: Props) {
         <li key={h.day} className="holiday-item">
           <span className="mono holiday-day">{formatIsoDate(h.day)}</span>
           <span className="muted holiday-wd">{weekdayOf(h.day)}</span>
-          <span className="holiday-name">{h.name || <span className="muted">—</span>}</span>
+          <span className="holiday-name">{h.name || <span className="muted">không tên</span>}</span>
           {canManage && (
             <button className="btn-sm btn-danger" onClick={() => setRemoving(h)} title="Bỏ ngày lễ này">Xoá</button>
           )}
@@ -88,8 +88,8 @@ export default function HolidaysModal({ holidays, canManage, onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>📅 Ngày lễ</h2>
         <p className="perf-hint">
-          Dùng chung cả công ty, mọi dự án. Ngày công = T2–T6 trừ các ngày này. T7/CN tự bỏ,
-          không cần khai.
+          Dùng chung cả công ty, mọi dự án. Ngày công là thứ 2 đến thứ 6, trừ các ngày này.
+          T7/CN tự bỏ, không cần khai.
         </p>
 
         {canManage && (
@@ -136,8 +136,8 @@ export default function HolidaysModal({ holidays, canManage, onClose }: Props) {
       {removing && (
         <ConfirmDialog
           title="Bỏ ngày lễ?"
-          message={<>Bỏ <strong>{formatIsoDate(removing.day)}{removing.name ? ` — ${removing.name}` : ''}</strong> khỏi danh sách ngày lễ.</>}
-          detail="Ngày này sẽ được tính lại là ngày công ở MỌI chart tốc độ, mọi dự án — số 'cần mỗi ngày' của cả đội đổi theo."
+          message={<>Bỏ <strong>{formatIsoDate(removing.day)}{removing.name ? ` (${removing.name})` : ''}</strong> khỏi danh sách ngày lễ.</>}
+          detail="Ngày này sẽ được tính lại là ngày công ở MỌI chart tốc độ, mọi dự án, nên số 'cần mỗi ngày' của cả đội đổi theo."
           confirmLabel="Bỏ ngày lễ"
           onConfirm={() => handleRemove(removing)}
           onCancel={() => setRemoving(null)}

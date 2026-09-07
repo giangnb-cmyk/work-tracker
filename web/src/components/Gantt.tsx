@@ -60,12 +60,12 @@ export default function Gantt() {
           <h1>⏱️ Gantt tốc độ</h1>
           <p>
             {charts.length === 0
-              ? 'Mỗi chart là một dòng công việc có khối lượng và deadline — hệ thống tính mỗi ngày công cần làm bao nhiêu.'
-              : `${charts.length} chart${behind > 0 ? ` · ${behind} đang chậm/quá hạn` : ' · đều kịp tiến độ'} — bấm một dòng để xem đồ thị. Ngày công bỏ T7/CN và ${holidays.length} ngày lễ.`}
+              ? 'Mỗi chart là một dòng công việc có khối lượng và deadline. Hệ thống tính mỗi ngày công cần làm bao nhiêu.'
+              : `${charts.length} chart${behind > 0 ? `, ${behind} đang chậm hoặc quá hạn` : ', đều kịp tiến độ'}. Bấm một dòng để xem đồ thị. Ngày công bỏ T7/CN và ${holidays.length} ngày lễ.`}
           </p>
         </div>
         <div className="row" style={{ gap: '0.6rem' }}>
-          <button className="btn-sm" onClick={() => setHolidaysOpen(true)} title="Ngày lễ toàn công ty — không tính là ngày công">
+          <button className="btn-sm" onClick={() => setHolidaysOpen(true)} title="Ngày lễ toàn công ty, không tính là ngày công">
             📅 Ngày lễ{holidays.length > 0 ? ` (${holidays.length})` : ''}
           </button>
           <button className="btn-primary" onClick={() => setCreating(true)}>+ Chart mới</button>
@@ -76,14 +76,14 @@ export default function Gantt() {
         <div className="center-screen" style={{ minHeight: 200 }}><div className="spinner" /></div>
       ) : charts.length === 0 ? (
         <div className="glass empty">
-          Chưa có chart nào. Bấm <strong>+ Chart mới</strong> — vd “Model 3D”, 120 model, 01/09 → 30/09,
-          chọn 3 người 3D — để xem mỗi ngày cần ra bao nhiêu model.
+          Chưa có chart nào. Bấm <strong>+ Chart mới</strong>, ví dụ “Model 3D”, 120 model, 01/09 → 30/09,
+          chọn 3 người 3D, để xem mỗi ngày cần ra bao nhiêu model.
         </div>
       ) : (
         <div className="gantt">
           {/* Đầu trục: tháng + vạch hôm nay, cùng lưới cột với từng dòng để bar thẳng hàng. */}
           <div className="gantt-head">
-            <div className="gantt-info muted" style={{ fontSize: '0.75rem' }}>Công việc · người tham gia</div>
+            <div className="gantt-col-label">Công việc</div>
             <div className="gantt-track gantt-axis">
               {axis.months.map((m) => (
                 <span key={m.label} className="gantt-month" style={{ left: `${m.leftPct}%`, width: `${m.widthPct}%` }}>
@@ -96,7 +96,16 @@ export default function Gantt() {
                 </span>
               )}
             </div>
-            <div className="gantt-metrics muted" style={{ fontSize: '0.75rem' }}>Đã làm · tốc độ · đánh giá</div>
+            <div className="gantt-col-label">Số liệu</div>
+          </div>
+          {/* Chú giải bar nằm ngay dưới trục, thẳng cột với bar — không để tận đáy trang. */}
+          <div className="gantt-legend-row">
+            <p className="gantt-legend">
+              <span><i className="gantt-lg gantt-lg-done" /> đã làm</span>
+              <span><i className="gantt-lg gantt-lg-expect" /> đáng ra tới hôm nay</span>
+              <span><i className="gantt-lg gantt-lg-aim" /> mốc cần xong</span>
+              <span><i className="gantt-lg gantt-lg-today" /> hôm nay</span>
+            </p>
           </div>
 
           {charts.map((c) => {
@@ -120,13 +129,6 @@ export default function Gantt() {
               </div>
             );
           })}
-
-          <p className="muted gantt-legend">
-            <span><i className="gantt-lg gantt-lg-done" /> đã làm</span>
-            <span><i className="gantt-lg gantt-lg-expect" /> đáng ra tới hôm nay</span>
-            <span><i className="gantt-lg gantt-lg-aim" /> mốc cần xong</span>
-            <span><i className="gantt-lg gantt-lg-today" /> hôm nay</span>
-          </p>
         </div>
       )}
 
