@@ -10,6 +10,8 @@ interface Props {
   /** Mục nhật ký thô (số làm TRONG ngày), đã sắp theo ngày tăng dần (hook). */
   entries: VelocityProgress[];
   currentUid: string;
+  /** Đứng dưới danh sách task (chart có nguồn task): tiêu đề nói rõ đây là phần điền tay, cộng thêm vào task. */
+  compact?: boolean;
 }
 
 /** Chuỗi ô số → number; rỗng/sai → null. Cho phép dấu phẩy kiểu VN ("2,5"). */
@@ -27,7 +29,7 @@ function parseNum(s: string): number | null {
  * tổng cũ để cộng tay; sửa một ngày cũ cũng không kéo theo phải sửa mọi ngày sau. Mọi
  * người trong dự án đều ghi được (RLS 0086) — người làm tự ghi việc của mình.
  */
-export default function ProgressLog({ chart, entries, currentUid }: Props) {
+export default function ProgressLog({ chart, entries, currentUid, compact = false }: Props) {
   const [day, setDay] = useState(todayIso());
   const [qty, setQty] = useState('');
   const [busy, setBusy] = useState(false);
@@ -74,9 +76,9 @@ export default function ProgressLog({ chart, entries, currentUid }: Props) {
   }
 
   return (
-    <div className="plog">
+    <div className={`plog${compact ? ' plog-compact' : ''}`}>
       <div className="plog-head">
-        <strong>Nhật ký tiến độ</strong>
+        <strong>{compact ? 'Điền tay (cộng thêm vào task)' : 'Nhật ký tiến độ'}</strong>
         {rows.length > 0 && (
           <span className="gantt-meta">
             Tổng {fmtQty(total)} {chart.unit} tới {formatIsoDate(rows[0].day).slice(0, 5)}

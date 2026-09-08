@@ -87,7 +87,8 @@ export default function VelocityChartModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const disabled = !canEdit || saving;
-  // Chart nhập tay nhưng có task gắn từ chi tiết task → vẫn chạy theo task (xem isLinked).
+  // Có nguồn task = nguồn đặt là feature/tasks, hoặc có task gắn từ chi tiết task (isLinked).
+  // Nguồn task CỘNG THÊM vào phần điền tay, không thay thế — ô "Đã làm" luôn sửa được.
   const attachedCount = chart ? tasks.filter((t) => t.chartId === chart.id).length : 0;
   const linked = linkKind !== 'manual' || attachedCount > 0;
   const unitLabel = linked && countBy === 'points' ? 'điểm' : linked && !unit.trim() ? 'task' : unit.trim() || 'việc';
@@ -145,7 +146,8 @@ export default function VelocityChartModal({
     const total = parseNum(totalQty) ?? 0;
     if (total < 0) return 'Khối lượng phải là số ≥ 0.';
     if (!linked && total <= 0) return 'Khối lượng tổng phải > 0.';
-    const done = linked ? (linkedInfo?.doneQty ?? 0) : parseNum(doneQty) ?? 0;
+    // doneQty lưu = phần ĐIỀN TAY (SUM nhật ký); phần task cộng lúc hiển thị (applyLink).
+    const done = parseNum(doneQty) ?? 0;
     if (done < 0) return 'Đã làm phải là số ≥ 0.';
     const vel = velocity.trim() ? parseNum(velocity) : null;
     if (velocity.trim() && (vel === null || vel < 0)) return 'Tốc độ phải là số ≥ 0, hoặc để trống để tự đo.';
@@ -179,10 +181,10 @@ export default function VelocityChartModal({
       let id = chart?.id;
       if (chart) await updateVelocityChart(chart.id, input);
       else id = await createVelocityChart(projectId, input, currentUid);
-      // Chart NHẬP TAY: ô "Đã làm" là TỔNG — chỉnh mục hôm nay sao cho tổng nhật ký = số này
-      // (nhật ký lưu theo ngày, 0089). Chart LINK không ghi nhật ký — tiến độ là của task.
+      // Ô "Đã làm (điền tay)" là TỔNG phần tay — chỉnh mục hôm nay sao cho SUM nhật ký = số
+      // này (nhật ký lưu theo ngày, 0089). Phần task không ghi vào nhật ký, cộng lúc hiển thị.
       const doneChanged = chart ? input.doneQty !== chart.doneQty : input.doneQty > 0;
-      if (id && !linked && doneChanged) {
+      if (id && doneChanged) {
         void setProgressTotal(id, today, input.doneQty, currentUid).catch((err) =>
           console.warn('Ghi nhật ký tiến độ kèm lần lưu thất bại:', err),
         );
@@ -295,13 +297,11 @@ export default function VelocityChartModal({
         )}
         <p className="muted" style={{ fontSize: '0.78rem', marginTop: '-0.35rem', marginBottom: '0.85rem' }}>
           {linked
-            ? <>🔗 Đã xong lấy từ task Hoàn thành trong phạm vi; đường tiến độ thật dựng từ ngày tick xong.
-              {linkKind === 'manual'
-                ? <> Chart này có <b>{attachedCount}</b> task gắn từ chi tiết task nên chạy theo task; nhật ký tay không dùng nữa.</>
-                : <> Task cũng gắn được vào chart này từ chi tiết task, kèm số {unitLabel} riêng của nó.</>}
-              {linkedInfo && <> Hiện có <b>{linkedInfo.scope.length}</b> task, xong <b>{linkedInfo.doneTasks.length}</b>.</>}</>
-            : <>✍️ "Đã làm" là tổng hiện tại; đổi ở đây = chỉnh mục hôm nay trong nhật ký để tổng bằng số này.
-              Gắn task vào chart này từ chi tiết task thì chart chuyển sang chạy theo task.</>}
+            ? <>🔗 Task Hoàn thành trong phạm vi được CỘNG THÊM vào phần điền tay; đường tiến độ thật gộp cả hai.
+              {linkKind === 'manual' && <> Chart này có <b>{attachedCount}</b> task gắn từ chi tiết task.</>}
+              {linkedInfo && <> Hiện có <b>{linkedInfo.scope.length}</b> task, xong <b>{linkedInfo.doneTasks.length}</b> = <b>{fmtQty(linkedInfo.taskDone)}</b> {unitLabel}.</>}</>
+            : <>✍️ "Đã làm" là tổng phần điền tay; đổi ở đây = chỉnh mục hôm nay trong nhật ký để tổng bằng số này.
+              Gắn task vào chart từ chi tiết task thì khối lượng task xong cộng thêm vào.</>}
         </p>
 
         <div className="grid-3">
@@ -310,16 +310,21 @@ export default function VelocityChartModal({
             <input className="input" inputMode="decimal" value={totalQty} onChange={(e) => setTotalQty(e.target.value)} placeholder={linked && linkedInfo ? `Theo phạm vi: ${fmtQty(linkedInfo.totalQty)}` : '120'} disabled={disabled} />
           </label>
           <label className="field">
-            <span>Đã làm được</span>
+            <span>{linked ? 'Đã làm (điền tay)' : 'Đã làm được'}</span>
             <input
               className="input"
               inputMode="decimal"
-              value={linked ? (linkedInfo ? String(linkedInfo.doneQty) : '') : doneQty}
+              value={doneQty}
               onChange={(e) => setDoneQty(e.target.value)}
               placeholder="0"
-              disabled={disabled || linked}
-              title={linked ? 'Tự tính từ task đã hoàn thành' : undefined}
+              disabled={disabled}
+              title={linked && linkedInfo ? `Cộng thêm ${fmtQty(linkedInfo.taskDone)} từ task xong = tổng ${fmtQty(linkedInfo.doneQty)}` : undefined}
             />
+            {linked && linkedInfo && (
+              <span className="gantt-meta" style={{ display: 'block', marginTop: '0.25rem' }}>
+                + {fmtQty(linkedInfo.taskDone)} từ task = tổng <b>{fmtQty(linkedInfo.doneQty)}</b> {unitLabel}
+              </span>
+            )}
           </label>
           <label className="field">
             <span>Tốc độ hiện tại ({unitLabel}/ngày công)</span>

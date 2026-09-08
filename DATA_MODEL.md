@@ -595,10 +595,13 @@ và suy ngày dự kiến xong. Mọi phép tính là THUẦN phía web (`lib/wo
 
 **Gắn từ phía task** (`0088`): `tasks.chartId` (FK → chart, set null khi xoá chart) + `tasks.chartQty`.
 Phạm vi hiệu lực của chart link = (theo feature | `taskIds`) **∪** task có `chartId` = chart. Chi
-tiết task liệt kê **mọi** chart của dự án; chart nhập tay mà có task gắn vào thì **chuyển sang
-chạy theo task** (`isLinked(chart, tasks)` = `linkKind ≠ manual` HOẶC có task gắn) — nhật ký
-tay của chart đó không dùng nữa, tránh hai nguồn sự thật. Trong form chart, task gắn từ phía
-task hiện tick sẵn và khoá — gỡ ở chính task.
+tiết task liệt kê **mọi** chart của dự án. **Hai nguồn CỘNG DỒN, không thay nhau**: đã làm
+hiệu lực = phần điền tay (`done_qty` = SUM nhật ký) **+** Σ khối lượng task đã xong trong phạm vi;
+đường tiến độ thật = gộp nhật ký tay với khối lượng task xong theo ngày rồi cộng dồn
+(`cumulate`). `isLinked(chart, tasks)` = `linkKind ≠ manual` HOẶC có task gắn — chỉ quyết định có
+tính phần task hay không; nhật ký tay luôn còn. `totalQty = 0` với chart có nguồn task → tổng =
+Σ task trong phạm vi + phần tay. Trong form chart, task gắn từ phía task hiện tick sẵn và khoá —
+gỡ ở chính task.
 | `note`, `sortOrder`, `createdAt`, `createdBy` | | |
 
 **Ngày công** = T2–T6 **trừ** các ngày trong `holidays` (`day date pk`, `name`). Bảng lễ

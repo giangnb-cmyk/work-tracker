@@ -43,6 +43,9 @@ export default function Gantt() {
   const today = todayIso();
   const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
   const memberById = useMemo(() => new Map(members.map((m) => [m.uid, m])), [members]);
+  // Bản GỐC theo id: deriveLinked/form sửa phải nhận doneQty = phần điền tay, không phải bản
+  // đã cộng task (applyLink) — không thì phần task bị cộng hai lần.
+  const rawById = useMemo(() => new Map(rawCharts.map((r) => [r.id, r])), [rawCharts]);
   const projectFeatures = useMemo(() => features.filter((f) => f.projectId === selectedProjectId), [features, selectedProjectId]);
   // Chart hiệu lực: link thì doneQty/totalQty dẫn xuất từ task; nhập tay giữ nguyên.
   const charts = useMemo(() => rawCharts.map((c) => applyLink(c, tasks, today)), [rawCharts, tasks, today]);
@@ -135,7 +138,7 @@ export default function Gantt() {
                     holidaySet={holidaySet}
                     today={today}
                     currentUid={user.uid}
-                    linked={isLinked(c, tasks) && label ? { progress: deriveLinked(c, tasks, today), label } : undefined}
+                    linked={isLinked(c, tasks) && label ? { progress: deriveLinked(rawById.get(c.id) ?? c, tasks, today), label } : undefined}
                     onOpenTask={setOpenTask}
                   />
                 )}
@@ -149,7 +152,7 @@ export default function Gantt() {
         <VelocityChartModal
           // Form sửa nhận bản GỐC (số nhập tay), không phải bản đã applyLink — để "khối lượng
           // kế hoạch" hiện đúng giá trị người dùng đã đặt (0 = theo số task).
-          chart={editing ? rawCharts.find((c) => c.id === editing.id) ?? editing : null}
+          chart={editing ? rawById.get(editing.id) ?? editing : null}
           projectId={selectedProjectId}
           members={members}
           roleOf={roleOf}

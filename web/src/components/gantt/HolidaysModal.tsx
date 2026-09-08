@@ -114,7 +114,7 @@ export default function HolidaysModal({ holidays, canManage, onClose }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <h2>📅 Ngày lễ</h2>
         <p className="perf-hint">
           Dùng chung cả công ty, mọi dự án. Ngày công là thứ 2 đến thứ 6, trừ các ngày này.

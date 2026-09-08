@@ -3882,15 +3882,17 @@ body.kb-open .mnav { display: none; }
 .gantt-preview-key > b { color: #c7d2fe; }
 
 /* Modal ngày lễ */
-.holiday-add { display: grid; grid-template-columns: 150px 150px minmax(0, 1fr) auto; gap: 0.5rem; align-items: end; margin-bottom: 0.35rem; }
-.holiday-add-f { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-.holiday-add-f > span { font-size: 0.74rem; color: var(--muted); }
-.holiday-add .btn-primary { height: 40px; }
+.holiday-add { display: grid; grid-template-columns: 190px 190px minmax(200px, 1fr) auto; gap: 0.75rem; align-items: end; margin-bottom: 0.35rem; }
+.holiday-add-f { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.holiday-add-f > span { font-size: 0.78rem; color: var(--muted); }
+.holiday-add .input { padding: 0.6rem 0.75rem; font-size: 0.95rem; min-height: 44px; }
+.holiday-add .btn-primary { height: 44px; padding: 0 1.1rem; }
+.plog-compact { margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--border-soft); }
 .holiday-head { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0.4rem 0 0.3rem; }
 .holiday-list { list-style: none; margin: 0 0 0.6rem; padding: 0; display: flex; flex-direction: column; }
 .holiday-item {
-  display: grid; grid-template-columns: 128px 90px minmax(0, 1fr) auto; gap: 0.6rem; align-items: center;
-  padding: 0.45rem 0.5rem; border-radius: 8px; font-size: 0.82rem;
+  display: grid; grid-template-columns: 150px 100px minmax(0, 1fr) auto; gap: 0.75rem; align-items: center;
+  padding: 0.55rem 0.6rem; border-radius: 8px; font-size: 0.9rem;
 }
 .holiday-item + .holiday-item { border-top: 1px solid var(--border-soft); }
 .holiday-item:hover { background: rgba(255, 255, 255, 0.04); }
