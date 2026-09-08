@@ -25,6 +25,8 @@ interface Props {
 
 /** Tối đa bao nhiêu avatar xếp chồng trước khi gộp thành "+N". */
 const MAX_AVATARS = 5;
+/** Bar hẹp hơn ngưỡng này (% trục) thì giấu chữ "%" trong bar — chữ không lọt, chỉ còn tooltip. */
+const NARROW_BAR_PCT = 5;
 
 /** "24/08" từ 'YYYY-MM-DD' — năm để ở tooltip, dòng ngày cần gọn. */
 const dm = (iso: string) => formatIsoDate(iso).slice(0, 5);
@@ -53,10 +55,17 @@ function roleCounts(participants: TeamMember[], roleOf: Props['roleOf']) {
 export default function GanttRow({ chart, plan, axis, participants, roleOf, linkLabel, expanded, onToggle, onEdit }: Props) {
   const roles = useMemo(() => roleCounts(participants, roleOf), [participants, roleOf]);
 
-  // Bar phủ trọn ngày cuối: mốc kết thúc = đầu ngày kế tiếp.
-  const left = axis.pct(chart.startDate);
-  const width = Math.max(0.6, axis.pct(addDaysIso(chart.endDate, 1)) - left);
-  const aimPct = chart.targetDate ? axis.pct(addDaysIso(chart.targetDate, 1)) : null;
+  // Bar phủ trọn ngày cuối: mốc kết thúc = đầu ngày kế tiếp. Dùng rawPct: bar giữ độ dài
+  // thật, .gantt-track cắt phần lòi ra ngoài khung → % đã làm vẫn đúng tỉ lệ khi bị cắt.
+  const left = axis.rawPct(chart.startDate);
+  const width = Math.max(0.6, axis.rawPct(addDaysIso(chart.endDate, 1)) - left);
+  // Trục theo khung người chọn: chart có thể nằm hẳn ngoài khung (không vẽ bar) hoặc bị
+  // cắt một/hai đầu (mũi tên ở mép track báo "còn tiếp").
+  const outside = axis.windowed ? (chart.endDate < axis.from ? 'before' : chart.startDate > axis.to ? 'after' : null) : null;
+  const clipL = axis.windowed && !outside && chart.startDate < axis.from;
+  const clipR = axis.windowed && !outside && chart.endDate > axis.to;
+  const aimInView = chart.targetDate !== null && chart.targetDate >= axis.from && chart.targetDate <= axis.to;
+  const aimPct = chart.targetDate && aimInView ? axis.pct(addDaysIso(chart.targetDate, 1)) : null;
   const pctDone = Math.round(plan.pctDone * 100);
   const shownAvatars = participants.slice(0, MAX_AVATARS);
   const extra = participants.length - shownAvatars.length;
@@ -114,21 +123,29 @@ export default function GanttRow({ chart, plan, axis, participants, roleOf, link
         {axis.months.map((m) => (
           <span key={m.label} className="gantt-month-line" style={{ left: `${m.leftPct}%` }} aria-hidden />
         ))}
-        <div
-          className="gantt-bar"
-          style={{ left: `${left}%`, width: `${width}%` }}
-          title={`${fmtQty(chart.doneQty)}/${fmtQty(chart.totalQty)} ${chart.unit} (${pctDone}%)`}
-        >
-          <div className="gantt-bar-done" style={{ width: `${plan.pctDone * 100}%` }} />
-          {running && (
-            <div
-              className="gantt-bar-expect"
-              style={{ left: `${plan.pctExpected * 100}%` }}
-              title={`Theo kế hoạch tới hôm nay đáng ra xong ${fmtQty(plan.expectedDoneQty)} ${chart.unit}`}
-            />
-          )}
-          <span className="gantt-bar-label mono">{pctDone}%</span>
-        </div>
+        {outside ? (
+          <span className={`gantt-outside gantt-outside-${outside}`}>
+            {outside === 'before' ? `◂ Kết thúc ${dm(chart.endDate)}, trước khung` : `Bắt đầu ${dm(chart.startDate)}, sau khung ▸`}
+          </span>
+        ) : (
+          <div
+            className="gantt-bar"
+            style={{ left: `${left}%`, width: `${width}%` }}
+            title={`${fmtQty(chart.doneQty)}/${fmtQty(chart.totalQty)} ${chart.unit} (${pctDone}%) · ${formatIsoDate(chart.startDate)} → ${formatIsoDate(chart.endDate)}`}
+          >
+            <div className="gantt-bar-done" style={{ width: `${plan.pctDone * 100}%` }} />
+            {running && (
+              <div
+                className="gantt-bar-expect"
+                style={{ left: `${plan.pctExpected * 100}%` }}
+                title={`Theo kế hoạch tới hôm nay đáng ra xong ${fmtQty(plan.expectedDoneQty)} ${chart.unit}`}
+              />
+            )}
+            {width >= NARROW_BAR_PCT && <span className="gantt-bar-label mono">{pctDone}%</span>}
+          </div>
+        )}
+        {clipL && <span className="gantt-clip gantt-clip-l" title={`Bắt đầu ${formatIsoDate(chart.startDate)}, trước khung`} aria-hidden>◂</span>}
+        {clipR && <span className="gantt-clip gantt-clip-r" title={`Kết thúc ${formatIsoDate(chart.endDate)}, sau khung`} aria-hidden>▸</span>}
         {aimPct !== null && (
           <div className="gantt-aim" style={{ left: `${aimPct}%` }} title={`Mốc cần xong ${formatIsoDate(chart.targetDate as string)}`} aria-hidden />
         )}

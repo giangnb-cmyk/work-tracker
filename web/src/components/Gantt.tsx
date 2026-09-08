@@ -5,11 +5,13 @@ import { useHolidays } from '../hooks/useHolidays';
 import { useProjectTasks } from '../hooks/useProjectTasks';
 import { useRoles } from '../hooks/useRoles';
 import { useVelocityCharts } from '../hooks/useVelocityCharts';
+import { TIMELINE_PRESETS, parseInputDate, toInputDate, type DateRange } from '../lib/dateRange';
 import { todayIso } from '../lib/format';
 import { buildAxis } from '../lib/ganttAxis';
 import { memberRoleResolver } from '../lib/memberRole';
 import { computePlan } from '../lib/velocity';
 import { applyLink, deriveLinked, isLinked, linkLabel } from '../lib/velocityLink';
+import DateRangePicker from './DateRangePicker';
 import GanttRow from './gantt/GanttRow';
 import GanttRowDetail from './gantt/GanttRowDetail';
 import HolidaysModal from './gantt/HolidaysModal';
@@ -26,7 +28,14 @@ import type { Task, VelocityChart } from '../types';
  * Chart LINK task (0087): số liệu dẫn xuất từ task của dự án (useProjectTasks) mỗi lần render
  * — task đổi trạng thái là chart đổi theo, không có nguồn sự thật thứ hai.
  * Ngày công = T2–T6 trừ ngày lễ (bảng holidays, dùng chung cả công ty) — xem lib/workdays.
+ *
+ * Trục thời gian: mặc định ôm hết mọi chart; chọn khoảng bằng DateRangePicker (cùng bộ preset
+ * với tab Timeline) để phóng to — một chart dài cả năm không bóp các chart ngắn thành vạch mỏng.
  */
+/** Ô tháng hẹp hơn ngưỡng này (% trục) thì hiện "T9" thay cho "Th 9/2026". */
+const NARROW_MONTH_PCT = 9;
+/** Vạch hôm nay quá sát mép phải thì nhãn "Hôm nay" lật sang bên trái vạch. */
+const TODAY_LABEL_FLIP_PCT = 85;
 export default function Gantt() {
   const { user, isAdmin, can } = useAuth();
   const { selectedProjectId, selectedSprintId, members, features } = useSprintContext();
@@ -39,6 +48,8 @@ export default function Gantt() {
   const [holidaysOpen, setHolidaysOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [openTask, setOpenTask] = useState<Task | null>(null);
+  // null = trục ôm hết chart (mặc định); có giá trị = khung người dùng phóng to.
+  const [range, setRange] = useState<DateRange | null>(null);
 
   const today = todayIso();
   const roleOf = useMemo(() => memberRoleResolver(members, roles), [members, roles]);
@@ -49,7 +60,10 @@ export default function Gantt() {
   const projectFeatures = useMemo(() => features.filter((f) => f.projectId === selectedProjectId), [features, selectedProjectId]);
   // Chart hiệu lực: link thì doneQty/totalQty dẫn xuất từ task; nhập tay giữ nguyên.
   const charts = useMemo(() => rawCharts.map((c) => applyLink(c, tasks, today)), [rawCharts, tasks, today]);
-  const axis = useMemo(() => buildAxis(charts, today), [charts, today]);
+  const axisWindow = useMemo(() => (range ? { from: toInputDate(range.fromMs), to: toInputDate(range.toMs) } : null), [range]);
+  const axis = useMemo(() => buildAxis(charts, today, axisWindow), [charts, today, axisWindow]);
+  // Giá trị hiện trên nút chọn khoảng khi chưa chọn gì: chính là biên trục đang vẽ.
+  const pickerValue: DateRange = range ?? { fromMs: parseInputDate(axis.from) ?? Date.now(), toMs: parseInputDate(axis.to) ?? Date.now(), presetId: null };
   const plans = useMemo(() => new Map(charts.map((c) => [c.id, computePlan(c, holidaySet, today)])), [charts, holidaySet, today]);
 
   // Sửa/xoá: admin, người tạo, hoặc 'sprint.manage' — khớp RLS velocity_charts_update.
@@ -73,6 +87,10 @@ export default function Gantt() {
           </p>
         </div>
         <div className="row" style={{ gap: '0.6rem' }}>
+          {range && (
+            <button className="btn-sm" onClick={() => setRange(null)} title="Trục ôm hết mọi chart">Tất cả chart</button>
+          )}
+          <DateRangePicker value={pickerValue} onChange={setRange} presets={TIMELINE_PRESETS} allowFuture />
           <button className="btn-sm" onClick={() => setHolidaysOpen(true)} title="Ngày lễ toàn công ty, không tính là ngày công">
             📅 Ngày lễ{holidays.length > 0 ? ` (${holidays.length})` : ''}
           </button>
@@ -93,12 +111,15 @@ export default function Gantt() {
             <div className="gantt-col-label">Công việc</div>
             <div className="gantt-track gantt-axis">
               {axis.months.map((m) => (
-                <span key={m.label} className="gantt-month" style={{ left: `${m.leftPct}%`, width: `${m.widthPct}%` }}>
-                  {m.label}
+                <span key={m.label} className="gantt-month" style={{ left: `${m.leftPct}%`, width: `${m.widthPct}%` }} title={m.label}>
+                  {m.widthPct < NARROW_MONTH_PCT ? m.short : m.label}
                 </span>
               ))}
               {axis.todayPct !== null && (
-                <span className="gantt-today gantt-today-label" style={{ left: `${axis.todayPct}%` }}>
+                <span
+                  className={`gantt-today gantt-today-label${axis.todayPct > TODAY_LABEL_FLIP_PCT ? ' flip' : ''}`}
+                  style={{ left: `${axis.todayPct}%` }}
+                >
                   <span>Hôm nay</span>
                 </span>
               )}
@@ -106,11 +127,12 @@ export default function Gantt() {
             <div className="gantt-col-label">Số liệu</div>
           </div>
           <div className="gantt-legend-row">
-            <p className="gantt-legend">
-              <span><i className="gantt-lg gantt-lg-done" /> đã làm</span>
-              <span><i className="gantt-lg gantt-lg-expect" /> đáng ra tới hôm nay</span>
-              <span><i className="gantt-lg gantt-lg-aim" /> mốc cần xong</span>
-              <span><i className="gantt-lg gantt-lg-today" /> hôm nay</span>
+            <p className="gantt-legend gantt-legend-main" aria-label="Chú giải">
+              <span><i className="gantt-lg gantt-lg-done" /> Đã làm</span>
+              <span><i className="gantt-lg gantt-lg-expect" /> Đáng ra tới hôm nay</span>
+              <span><i className="gantt-lg gantt-lg-aim" /> Mốc cần xong</span>
+              <span><i className="gantt-lg gantt-lg-today" /> Hôm nay</span>
+              {axis.windowed && <span><i className="gantt-lg gantt-lg-clip">▸</i> Bar còn tiếp ngoài khung</span>}
             </p>
           </div>
 

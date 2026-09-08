@@ -3726,7 +3726,7 @@ body.kb-open .mnav { display: none; }
   align-self: end; padding-bottom: 0.35rem;
   font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
 }
-.gantt-legend-row { padding: 0 1rem; margin-top: -0.3rem; }
+.gantt-legend-row { padding: 0 1rem; margin-top: -0.15rem; }
 .gantt-legend-row > .gantt-legend { grid-column: 2; }
 .gantt-item { display: flex; flex-direction: column; gap: 0.35rem; }
 .gantt-row {
@@ -3773,8 +3773,24 @@ body.kb-open .mnav { display: none; }
 .gantt-role-chip b { color: var(--text); }
 
 /* Trục + bar */
-.gantt-track { position: relative; height: 34px; min-width: 0; }
-.gantt-axis { height: 26px; }
+/* overflow-x: clip — bar giữ độ dài thật, phần lòi ngoài khung (trục theo khoảng chọn) bị cắt
+   ở mép track; trục y vẫn visible để vạch hôm nay lòi 4px trên/dưới không bị xén. */
+.gantt-track { position: relative; height: 34px; min-width: 0; overflow-x: clip; overflow-y: visible; }
+.gantt-axis { height: 26px; overflow: visible; }
+/* Mũi tên ở mép track: bar còn tiếp ngoài khung đang xem. */
+.gantt-clip {
+  position: absolute; top: 6px; height: 22px; display: inline-flex; align-items: center;
+  font-size: 0.82rem; line-height: 1; color: #c7d2fe; text-shadow: 0 0 6px rgba(15, 23, 42, 0.9); z-index: 1;
+}
+.gantt-clip-l { left: 1px; }
+.gantt-clip-r { right: 1px; }
+/* Chart nằm hẳn ngoài khung: một dòng chữ thay bar, neo về phía nó đang ở. */
+.gantt-outside {
+  position: absolute; top: 0; bottom: 0; display: inline-flex; align-items: center;
+  font-size: 0.82rem; color: var(--muted); white-space: nowrap;
+}
+.gantt-outside-before { left: 0.4rem; }
+.gantt-outside-after { right: 0.4rem; }
 .gantt-month {
   position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding-left: 0.4rem;
   font-size: 0.74rem; color: var(--muted); border-left: 1px solid var(--border);
@@ -3798,8 +3814,15 @@ body.kb-open .mnav { display: none; }
   font-size: 0.74rem; color: var(--text); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 .gantt-today { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--gold); opacity: 0.9; }
-.gantt-today-label { top: 0; bottom: 0; overflow: visible; }
-.gantt-today-label > span { position: absolute; top: 0; left: 4px; font-size: 0.74rem; color: var(--gold); white-space: nowrap; }
+/* Nhãn "Hôm nay" trên trục: pill có nền đặc, nổi lên trên nhãn tháng để không đè chữ vào nhau;
+   sát mép phải thì lật sang trái vạch (.flip). */
+.gantt-today-label { top: 0; bottom: 0; overflow: visible; z-index: 2; }
+.gantt-today-label > span {
+  position: absolute; top: 3px; left: 5px; padding: 0.1rem 0.45rem; border-radius: 999px;
+  font-size: 0.74rem; font-weight: 600; line-height: 1.2; color: var(--gold); white-space: nowrap;
+  background: var(--bg); border: 1px solid rgba(251, 191, 36, 0.55);
+}
+.gantt-today-label.flip > span { left: auto; right: 5px; }
 .gantt-aim { position: absolute; top: 2px; bottom: 2px; width: 0; border-left: 2px dotted var(--sky); }
 
 /* Cột số liệu: con số chính + badge trên một dòng, ba stat cùng khuôn, một dòng phụ. */
@@ -3821,15 +3844,22 @@ body.kb-open .mnav { display: none; }
 .gantt-badge-not_started { background: rgba(148, 163, 184, 0.16); color: var(--muted); }
 .gantt-badge-no_data { background: rgba(251, 191, 36, 0.16); color: #fde68a; }
 
-/* Chú giải — một khuôn cho cả bar lẫn đồ thị burn-up. */
-.gantt-legend { display: flex; gap: 1.1rem; margin: 0; font-size: 0.74rem; color: var(--muted); flex-wrap: wrap; }
-.gantt-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+/* Chú giải — một khuôn cho cả bar lẫn đồ thị burn-up. Cỡ 0.82rem (thang "nhãn"), chữ màu
+   text chứ không muted: đây là thứ người mới cần đọc được ngay, không phải meta. */
+.gantt-legend { display: flex; gap: 1.1rem; margin: 0; font-size: 0.82rem; color: var(--text); flex-wrap: wrap; }
+.gantt-legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
 .gantt-legend b { color: var(--text); font-weight: 600; }
-.gantt-lg { display: inline-block; width: 14px; height: 8px; border-radius: 2px; }
+/* Dòng chú giải chính dưới trục: đóng khung mờ để tách khỏi nền và khỏi các dòng chart. */
+.gantt-legend-main {
+  gap: 0.35rem 1.35rem; padding: 0.45rem 0.8rem; border-radius: 10px;
+  background: rgba(30, 41, 59, 0.55); border: 1px solid var(--border-soft);
+}
+.gantt-lg { display: inline-block; width: 18px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
 .gantt-lg-done { background: var(--primary); }
-.gantt-lg-expect { width: 0; height: 12px; border-left: 2px solid var(--sky); }
-.gantt-lg-aim { width: 0; height: 12px; border-left: 2px dotted var(--sky); }
-.gantt-lg-today { width: 0; height: 12px; border-left: 2px solid var(--gold); }
+.gantt-lg-expect { width: 0; height: 14px; border-left: 3px solid var(--sky); border-radius: 0; }
+.gantt-lg-aim { width: 0; height: 14px; border-left: 3px dotted var(--sky); border-radius: 0; }
+.gantt-lg-today { width: 0; height: 14px; border-left: 3px solid var(--gold); border-radius: 0; }
+.gantt-lg-clip { width: auto; height: auto; font-style: normal; font-size: 0.82rem; line-height: 1; color: #c7d2fe; }
 .burnup-legend { margin-top: 0.55rem; row-gap: 0.35rem; }
 .burnup-lg-line { width: 18px; height: 0; border-top: 2px solid #818cf8; }
 .burnup-lg-proj { width: 18px; height: 0; border-top: 2px dashed #818cf8; opacity: 0.8; }
